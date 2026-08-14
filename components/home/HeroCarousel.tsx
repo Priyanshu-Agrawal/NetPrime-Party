@@ -13,7 +13,7 @@ import {
   itemYear,
   type MediaItem,
 } from "@/utils/tmdbLists";
-import { colors, font, glow, radius } from "@/theme/bearoom";
+import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -219,20 +219,20 @@ const styles = StyleSheet.create({
   chipText: {
     color: colors.text,
     fontFamily: font.label,
-    fontSize: 10,
+    fontSize: ms(10),
     letterSpacing: 0.3,
   },
   title: {
     color: colors.text,
     fontFamily: font.headlineXbold,
-    fontSize: 30,
+    fontSize: ms(30),
     letterSpacing: -0.5,
     marginBottom: 6,
   },
   overview: {
     color: colors.textDim,
     fontFamily: font.body,
-    fontSize: 13,
+    fontSize: ms(13),
     lineHeight: 19,
     marginBottom: 16,
   },
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     ...glow.honey,
   },
-  playText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: 14 },
+  playText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(14) },
   infoBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -260,9 +260,9 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: radius.pill,
   },
-  infoText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14 },
+  infoText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14) },
   togetherBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  togetherText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 12 },
+  togetherText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(12) },
   dots: {
     position: "absolute",
     top: 14,

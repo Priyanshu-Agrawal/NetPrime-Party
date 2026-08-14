@@ -5,15 +5,15 @@
  * skin: wide 2:1 glass thumbnails with a glowing honey progress bar.
  */
 import { getWatchHistory, type HistoryItem } from "@/utils/history";
-import { colors, font, radius } from "@/theme/bearoom";
+import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-const CARD_W = 210;
-const CARD_H = 118;
+const CARD_W = ms(210);
+const CARD_H = ms(118);
 
 export function ContinueWatching() {
   const router = useRouter();
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontFamily: font.headlineSemi,
-    fontSize: 18,
+    fontSize: ms(18),
     letterSpacing: -0.2,
   },
   list: { paddingHorizontal: 16, gap: 10 },
@@ -165,8 +165,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   meta: { paddingHorizontal: 10, paddingBottom: 10 },
-  cardTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: 13 },
-  sub: { color: colors.textDim, fontFamily: font.body, fontSize: 11, marginTop: 1 },
+  cardTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
+  sub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(11), marginTop: 1 },
   progressTrack: {
     position: "absolute",
     left: 0,

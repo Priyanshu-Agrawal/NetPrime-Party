@@ -10,7 +10,7 @@ import {
 } from "@/components/details/sections";
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
-import { colors, font, glow, radius } from "@/theme/bearoom";
+import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { genRoomCode } from "@/utils/roomCode";
 import {
@@ -444,7 +444,7 @@ const TvDetails: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  errText: { color: colors.danger, fontFamily: font.body, fontSize: 15 },
+  errText: { color: colors.danger, fontFamily: font.body, fontSize: ms(15) },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 
   hero: { width: "100%", height: HERO_H, justifyContent: "flex-end" },
@@ -461,8 +461,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
-  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: 30, letterSpacing: -0.6, lineHeight: 34 },
-  seasonsLine: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13 },
+  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(30), letterSpacing: -0.6, lineHeight: 34 },
+  seasonsLine: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13) },
 
   actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
   playBtn: {
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     ...glow.honey,
   },
-  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: 15 },
+  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: ms(15) },
   togetherBtn: {
     flex: 1,
     flexDirection: "row",
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.pill,
   },
-  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: 15 },
+  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: ms(15) },
 
   quickRow: {
     flexDirection: "row",
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
   },
   quick: { alignItems: "center", gap: 6 },
   quickIcon: { width: 48, height: 48, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
-  quickLabel: { color: colors.textDim, fontFamily: font.label, fontSize: 12 },
+  quickLabel: { color: colors.textDim, fontFamily: font.label, fontSize: ms(12) },
 
   nextBanner: {
     flexDirection: "row",
@@ -515,11 +515,11 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: radius.md,
   },
-  nextText: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, flex: 1 },
+  nextText: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12), flex: 1 },
 
   overviewWrap: { paddingHorizontal: 16, marginTop: 18 },
-  overview: { color: colors.textDim, fontFamily: font.body, fontSize: 14, lineHeight: 21 },
-  moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13, marginTop: 4 },
+  overview: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14), lineHeight: 21 },
+  moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13), marginTop: 4 },
 
   seasonChip: {
     paddingHorizontal: 14,
@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   seasonChipActive: { backgroundColor: colors.honeySoft, borderColor: colors.honey },
-  seasonChipText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: 13 },
+  seasonChipText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: ms(13) },
   seasonChipTextActive: { color: colors.honey },
 
   episode: { flexDirection: "row", gap: 12, marginBottom: 16, alignItems: "center" },
@@ -544,11 +544,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(16,13,10,0.28)",
     borderRadius: radius.md,
   },
-  epTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14 },
+  epTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14) },
   epMeta: { flexDirection: "row", gap: 10, marginTop: 3, alignItems: "center" },
-  epMetaText: { color: colors.textDim, fontFamily: font.body, fontSize: 11 },
+  epMetaText: { color: colors.textDim, fontFamily: font.body, fontSize: ms(11) },
   epRating: { flexDirection: "row", alignItems: "center", gap: 2 },
-  epOverview: { color: colors.textDim, fontFamily: font.body, fontSize: 12, marginTop: 4, lineHeight: 16 },
+  epOverview: { color: colors.textDim, fontFamily: font.body, fontSize: ms(12), marginTop: 4, lineHeight: 16 },
 
   recCard: { width: 118 },
   recImgWrap: { borderRadius: radius.lg, overflow: "hidden" },
@@ -565,8 +565,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  recBadgeText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 9 },
-  recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, marginTop: 6 },
+  recBadgeText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(9) },
+  recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12), marginTop: 6 },
 });
 
 export default React.memo(TvDetails);

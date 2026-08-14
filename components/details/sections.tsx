@@ -4,7 +4,7 @@
  * round cast avatars, glass provider chips. Each renders a slice of the rich
  * TMDB data (see utils/tmdbDetails).
  */
-import { colors, font, radius } from "@/theme/bearoom";
+import { colors, ms, font, radius } from "@/theme/bearoom";
 import type { ExternalLink, Person, WatchProviders } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -247,12 +247,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 14,
   },
-  sectionTitle: { color: colors.text, fontFamily: font.headline, fontSize: 18 },
+  sectionTitle: { color: colors.text, fontFamily: font.headline, fontSize: ms(18) },
 
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   ratingPill: { flexDirection: "row", alignItems: "center", gap: 4 },
-  ratingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13 },
-  metaItem: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: 13 },
+  ratingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13) },
+  metaItem: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: ms(13) },
   sep: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.textFaint },
   certBox: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
-  certText: { color: colors.text, fontFamily: font.label, fontSize: 10, letterSpacing: 0.5 },
+  certText: { color: colors.text, fontFamily: font.label, fontSize: ms(10), letterSpacing: 0.5 },
 
   pillsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pill: {
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
-  pillText: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: 12 },
+  pillText: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: ms(12) },
 
   peopleRow: { gap: 16, paddingRight: 16 },
   person: { width: 72, alignItems: "center" },
@@ -285,8 +285,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   personNoImg: { alignItems: "center", justifyContent: "center" },
-  personName: { color: colors.text, fontFamily: font.bodySemi, fontSize: 12, marginTop: 8, textAlign: "center" },
-  personRole: { color: colors.textDim, fontFamily: font.body, fontSize: 10, marginTop: 1, textAlign: "center" },
+  personName: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(12), marginTop: 8, textAlign: "center" },
+  personRole: { color: colors.textDim, fontFamily: font.body, fontSize: ms(10), marginTop: 1, textAlign: "center" },
 
   factGrid: {
     flexDirection: "row",
@@ -298,11 +298,11 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   fact: { width: "50%", padding: 12 },
-  factLabel: { color: colors.textDim, fontFamily: font.label, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  factValue: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14, marginTop: 3 },
+  factLabel: { color: colors.textDim, fontFamily: font.label, fontSize: ms(10), textTransform: "uppercase", letterSpacing: 0.5 },
+  factValue: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14), marginTop: 3 },
 
   provGroup: { marginBottom: 14 },
-  provLabel: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: 12, marginBottom: 8 },
+  provLabel: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: ms(12), marginBottom: 8 },
   provList: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   provChip: {
     flexDirection: "row",
@@ -317,9 +317,9 @@ const styles = StyleSheet.create({
   },
   provLogo: { width: 28, height: 28, borderRadius: radius.sm, backgroundColor: colors.bgElevated },
   provNoLogo: { alignItems: "center", justifyContent: "center" },
-  provNoLogoText: { color: colors.textDim, fontFamily: font.label, fontSize: 11 },
-  provName: { color: colors.text, fontFamily: font.bodyMed, fontSize: 13 },
-  provRegion: { color: colors.textFaint, fontFamily: font.body, fontSize: 11, marginTop: 4 },
+  provNoLogoText: { color: colors.textDim, fontFamily: font.label, fontSize: ms(11) },
+  provName: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(13) },
+  provRegion: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(11), marginTop: 4 },
 
   review: {
     backgroundColor: colors.surface,
@@ -334,10 +334,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 6,
   },
-  reviewAuthor: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14 },
+  reviewAuthor: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14) },
   reviewRating: { flexDirection: "row", alignItems: "center", gap: 3 },
-  reviewRatingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 12 },
-  reviewBody: { color: colors.textDim, fontFamily: font.body, fontSize: 13, lineHeight: 19 },
+  reviewRatingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(12) },
+  reviewBody: { color: colors.textDim, fontFamily: font.body, fontSize: ms(13), lineHeight: 19 },
 
   linksRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   linkBtn: {
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.pill,
   },
-  linkText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13 },
+  linkText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13) },
 
   trailerBtn: {
     flexDirection: "row",
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     marginTop: 10,
   },
-  trailerText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 15 },
+  trailerText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(15) },
 });
 
 export const detailColors = {

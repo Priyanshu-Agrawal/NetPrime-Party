@@ -2,7 +2,7 @@ import ContinueWatching from "@/components/home/ContinueWatching";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import MediaRail from "@/components/home/MediaRail";
 import GlassCard from "@/components/ui/GlassCard";
-import { colors, font, glow, radius } from "@/theme/bearoom";
+import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRouter } from "expo-router";
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   brand: {
     color: colors.text,
     fontFamily: font.headlineXbold,
-    fontSize: 22,
+    fontSize: ms(22),
     letterSpacing: 0.2,
   },
   brandAccent: { color: colors.honey },
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     ...glow.honey,
   },
-  hostText: { color: colors.onHoney, fontFamily: font.label, fontSize: 12 },
+  hostText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(12) },
 
   ctaWrap: { paddingHorizontal: 16, marginTop: -14 },
   cta: {},
@@ -167,8 +167,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   ctaText: { flex: 1 },
-  ctaTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: 15 },
-  ctaSub: { color: colors.textDim, fontFamily: font.body, fontSize: 12, marginTop: 2 },
+  ctaTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
+  ctaSub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(12), marginTop: 2 },
   ctaBtn: {
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
@@ -177,5 +177,5 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.pill,
   },
-  ctaBtnText: { color: colors.honey, fontFamily: font.label, fontSize: 12 },
+  ctaBtnText: { color: colors.honey, fontFamily: font.label, fontSize: ms(12) },
 });

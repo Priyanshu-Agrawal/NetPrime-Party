@@ -9,7 +9,7 @@ import {
   Section,
 } from "@/components/details/sections";
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
-import { colors, font, glow, radius } from "@/theme/bearoom";
+import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { genRoomCode } from "@/utils/roomCode";
 import {
@@ -364,7 +364,7 @@ const Details: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  errText: { color: colors.danger, fontFamily: font.body, fontSize: 15 },
+  errText: { color: colors.danger, fontFamily: font.body, fontSize: ms(15) },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 
   hero: { width: "100%", height: HERO_H, justifyContent: "flex-end" },
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
-  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: 32, letterSpacing: -0.6, lineHeight: 36 },
+  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(32), letterSpacing: -0.6, lineHeight: 36 },
 
   actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
   playBtn: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     ...glow.honey,
   },
-  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: 15 },
+  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: ms(15) },
   togetherBtn: {
     flex: 1,
     flexDirection: "row",
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: radius.pill,
   },
-  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: 15 },
+  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: ms(15) },
 
   quickRow: {
     flexDirection: "row",
@@ -428,11 +428,11 @@ const styles = StyleSheet.create({
   },
   quick: { alignItems: "center", gap: 6 },
   quickIcon: { width: 48, height: 48, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
-  quickLabel: { color: colors.textDim, fontFamily: font.label, fontSize: 12 },
+  quickLabel: { color: colors.textDim, fontFamily: font.label, fontSize: ms(12) },
 
   overviewWrap: { paddingHorizontal: 16, marginTop: 20 },
-  overview: { color: colors.textDim, fontFamily: font.body, fontSize: 14, lineHeight: 21 },
-  moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13, marginTop: 4 },
+  overview: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14), lineHeight: 21 },
+  moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13), marginTop: 4 },
 
   clip: {
     width: 240,
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.sm,
   },
-  clipTagText: { color: colors.text, fontFamily: font.bodyMed, fontSize: 10 },
+  clipTagText: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(10) },
 
   recCard: { width: 118 },
   recImgWrap: { borderRadius: radius.lg, overflow: "hidden" },
@@ -482,8 +482,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  recBadgeText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 9 },
-  recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, marginTop: 6 },
+  recBadgeText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(9) },
+  recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12), marginTop: 6 },
 });
 
 export default Details;

@@ -10,14 +10,14 @@ import {
   itemTitle,
   type MediaItem,
 } from "@/utils/tmdbLists";
-import { colors, font, radius } from "@/theme/bearoom";
+import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-const POSTER_W = 112;
+const POSTER_W = ms(112);
 const POSTER_H = POSTER_W * 1.5;
 
 function PosterCard({
@@ -138,11 +138,11 @@ const styles = StyleSheet.create({
   railTitle: {
     color: colors.text,
     fontFamily: font.headlineSemi,
-    fontSize: 18,
+    fontSize: ms(18),
     letterSpacing: -0.2,
   },
   seeAll: { flexDirection: "row", alignItems: "center", gap: 2 },
-  seeAllText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: 12 },
+  seeAllText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: ms(12) },
   list: { paddingHorizontal: 16, gap: 10 },
   skeletonRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16 },
   skeleton: { backgroundColor: colors.bgElevated },
@@ -167,11 +167,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  ratingText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 9 },
+  ratingText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(9) },
   title: {
     color: colors.text,
     fontFamily: font.bodyMed,
-    fontSize: 12,
+    fontSize: ms(12),
     marginTop: 6,
   },
 });

@@ -1,4 +1,4 @@
-import { colors, font, radius } from "@/theme/bearoom";
+import { colors, ms, font, radius } from "@/theme/bearoom";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { detailsRoute, itemTitle, itemYear, type MediaItem } from "@/utils/tmdbLists";
 import { Ionicons } from "@expo/vector-icons";
@@ -359,9 +359,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  brand: { color: colors.text, fontFamily: font.headlineXbold, fontSize: 20, letterSpacing: 0.2 },
+  brand: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(20), letterSpacing: 0.2 },
   brandAccent: { color: colors.honey },
-  hostLink: { color: colors.honey, fontFamily: font.label, fontSize: 13 },
+  hostLink: { color: colors.honey, fontFamily: font.label, fontSize: ms(13) },
 
   searchWrap: {
     flexDirection: "row",
@@ -376,12 +376,12 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: radius.lg,
   },
-  input: { flex: 1, color: colors.text, fontFamily: font.body, fontSize: 15 },
+  input: { flex: 1, color: colors.text, fontFamily: font.body, fontSize: ms(15) },
 
   sectionTitle: {
     color: colors.text,
     fontFamily: font.headline,
-    fontSize: 17,
+    fontSize: ms(17),
     paddingHorizontal: 16,
     marginTop: 22,
     marginBottom: 12,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   trendChipHot: { backgroundColor: colors.honeySoft, borderColor: colors.honey },
-  trendText: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: 13 },
+  trendText: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: ms(13) },
   trendTextHot: { color: colors.text },
 
   moodGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingHorizontal: 16 },
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  moodLabel: { color: colors.text, fontFamily: font.headlineSemi, fontSize: 15 },
+  moodLabel: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
 
   provRow: { paddingHorizontal: 16, gap: 8 },
   provChip: {
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   provChipActive: { backgroundColor: colors.honeySoft, borderColor: colors.honey },
-  provText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: 13 },
+  provText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: ms(13) },
   provTextActive: { color: colors.honey },
 
   grid: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 120 },
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: radius.pill,
   },
-  ratingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 9 },
+  ratingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(9) },
   typeTag: {
     position: "absolute",
     bottom: 5,
@@ -463,15 +463,15 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: radius.sm,
   },
-  typeTagText: { color: colors.text, fontFamily: font.label, fontSize: 8, letterSpacing: 0.4 },
-  cardTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, marginTop: 6 },
+  typeTagText: { color: colors.text, fontFamily: font.label, fontSize: ms(8), letterSpacing: 0.4 },
+  cardTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12), marginTop: 6 },
 
   skBox: { backgroundColor: colors.bgElevated },
   skLine: { height: 10, borderRadius: 5, backgroundColor: colors.bgElevated },
 
   center: { alignItems: "center", justifyContent: "center", paddingVertical: 60, gap: 12 },
-  errText: { color: colors.danger, fontFamily: font.body, fontSize: 14 },
-  emptyText: { color: colors.textDim, fontFamily: font.body, fontSize: 14 },
+  errText: { color: colors.danger, fontFamily: font.body, fontSize: ms(14) },
+  emptyText: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14) },
 });
 
 export const options = { animation: "fade" };
