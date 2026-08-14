@@ -5,12 +5,9 @@
  * All calls go through our KLIPY Cloudflare proxy (services/gifs) — no key here.
  */
 import {
-  getCategories,
   reportMedia,
   searchMedia,
   shareTrigger,
-  trendingMedia,
-  type MediaCategory,
   type MediaItem,
   type MediaKind,
   type ReportReason,
@@ -48,6 +45,25 @@ const TABS: { key: MediaKind; label: string }[] = [
   { key: "stickers", label: "Stickers" },
 ];
 
+// Curated for a watch party — the reactions you actually send mid-movie, not
+// KLIPY's generic "happy birthday / good night" trending set. label = chip, q = search.
+const REACTIONS: { label: string; q: string }[] = [
+  { label: "😂 LOL", q: "laughing" },
+  { label: "😱 OMG", q: "shocked omg" },
+  { label: "🤯 Mind blown", q: "mind blown" },
+  { label: "🌀 Plot twist", q: "plot twist" },
+  { label: "😭 Crying", q: "crying" },
+  { label: "🍿 Popcorn", q: "popcorn movie" },
+  { label: "👏 Applause", q: "applause clapping" },
+  { label: "😨 Scared", q: "scared" },
+  { label: "🙈 Cringe", q: "cringe" },
+  { label: "😴 Bored", q: "bored" },
+  { label: "🔥 Hype", q: "excited hype" },
+  { label: "🤦 Facepalm", q: "facepalm" },
+  { label: "😍 Wow", q: "wow amazing" },
+  { label: "🎬 Movies", q: "movie" },
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -61,7 +77,6 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
   const [kind, setKind] = useState<MediaKind>("gifs");
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<MediaItem[]>([]);
-  const [categories, setCategories] = useState<MediaCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -73,16 +88,6 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
       setKind("gifs");
     }
   }, [visible]);
-
-  // Category chips per content type (for discovery when not searching).
-  useEffect(() => {
-    if (!visible) return;
-    let alive = true;
-    getCategories(kind).then((c) => alive && setCategories(c));
-    return () => {
-      alive = false;
-    };
-  }, [kind, visible]);
 
   // Send an item: fire KLIPY's Share Trigger (personalization + reporting), then hand it up.
   const pick = (item: MediaItem) => {
@@ -114,7 +119,8 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
     setItems([]);
     debounce.current = setTimeout(
       () => {
-        (query.trim() ? searchMedia(kind, query, customerId) : trendingMedia(kind, customerId)).then((r) => {
+        // Default (no search) → watch-party reactions, not KLIPY's generic trending.
+        searchMedia(kind, query.trim() || "reaction", customerId).then((r) => {
           if (alive) {
             setItems(r);
             setLoading(false);
@@ -176,19 +182,19 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
           })}
         </View>
 
-        {/* Category chips (discovery when not searching) */}
-        {!query.trim() && categories.length > 0 ? (
+        {/* Watch-party reaction chips (discovery when not searching) */}
+        {!query.trim() ? (
           <View style={styles.catWrap}>
             <FlatList
               horizontal
-              data={categories}
-              keyExtractor={(c) => c.query}
+              data={REACTIONS}
+              keyExtractor={(c) => c.q}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.catRow}
               keyboardShouldPersistTaps="handled"
               renderItem={({ item: c }) => (
-                <Pressable style={styles.catChip} onPress={() => setQuery(c.query)}>
-                  <Text style={styles.catText}>{c.category}</Text>
+                <Pressable style={styles.catChip} onPress={() => setQuery(c.q)}>
+                  <Text style={styles.catText}>{c.label}</Text>
                 </Pressable>
               )}
             />
