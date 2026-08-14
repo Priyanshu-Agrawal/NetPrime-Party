@@ -47,7 +47,7 @@ import {
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { height, width } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.3);
 
 const Details: React.FC = () => {
@@ -62,7 +62,7 @@ const Details: React.FC = () => {
   const [saved, setSaved] = useState(false);
 
   const headerH = insets.top + ms(52);
-  const { scrollHandler, barStyle, scrollY } = useCollapsingHeader(headerH);
+  const { scrollHandler, scrollY } = useCollapsingHeader(headerH);
   const headerTitleStyle = fadeInStyle(scrollY, HERO_H * 0.5, HERO_H * 0.72);
   const headerBgStyle = fadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
 
@@ -173,8 +173,8 @@ const Details: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Sticky, auto-hiding header */}
-      <Animated.View style={[styles.header, { height: headerH }, barStyle]} pointerEvents="box-none">
+      {/* Sticky header — always visible; bg + title fade in on scroll (like Home) */}
+      <View style={[styles.header, { height: headerH }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBgStyle]}>
           <BlurView
             intensity={40}
@@ -195,7 +195,7 @@ const Details: React.FC = () => {
             <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
           </Pressable>
         </View>
-      </Animated.View>
+      </View>
 
       <Animated.ScrollView
         bounces={false}
@@ -428,7 +428,9 @@ const styles = StyleSheet.create({
     width: ms(40),
     height: ms(40),
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceStrong,
+    // Dark scrim bubble so the light icon stays visible over ANY backdrop
+    // (bright posters washed out the old faint-white bubble).
+    backgroundColor: colors.scrim,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     alignItems: "center",
