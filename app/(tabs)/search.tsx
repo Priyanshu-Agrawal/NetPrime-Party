@@ -1,3 +1,4 @@
+import AppHeader from "@/components/ui/AppHeader";
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { detailsRoute, itemTitle, itemYear, type MediaItem } from "@/utils/tmdbLists";
@@ -74,6 +75,7 @@ const Search: React.FC = () => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
 
+  const inputRef = useRef<TextInput>(null);
   const latestCallIdRef = useRef<number>(0);
   const currentAbortControllerRef = useRef<AbortController | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -283,23 +285,13 @@ const Search: React.FC = () => {
 
   return (
     <View style={[styles.safe, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.brandRow}>
-          <Ionicons name="paw" size={18} color={colors.honey} />
-          <Text style={styles.brand}>
-            Bea<Text style={styles.brandAccent}>r</Text>oom
-          </Text>
-        </View>
-        <Pressable onPress={() => router.push("/joinParty")} hitSlop={6}>
-          <Text style={styles.hostLink}>Host Party</Text>
-        </Pressable>
-      </View>
+      <AppHeader onSearchPress={() => inputRef.current?.focus()} />
 
       {/* Search input */}
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={20} color={colors.textDim} />
         <TextInput
+          ref={inputRef}
           placeholder="Search movies, shows, people…"
           placeholderTextColor={colors.textDim}
           style={styles.input}

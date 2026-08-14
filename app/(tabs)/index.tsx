@@ -1,6 +1,7 @@
 import ContinueWatching from "@/components/home/ContinueWatching";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import MediaRail from "@/components/home/MediaRail";
+import AppHeader from "@/components/ui/AppHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
@@ -97,31 +98,7 @@ export default React.memo(function HomePage() {
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
-        <View style={styles.topBar}>
-          <View style={styles.brandRow}>
-            <Ionicons name="paw" size={20} color={colors.honey} />
-            <Text style={styles.brand}>
-              Bea<Text style={styles.brandAccent}>r</Text>oom
-            </Text>
-          </View>
-          <View style={styles.topActions}>
-            <Pressable
-              style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-              onPress={() => router.push("/(tabs)/search")}
-              hitSlop={6}
-            >
-              <Ionicons name="search" size={18} color={colors.text} />
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.hostBtn, pressed && styles.pressed]}
-              onPress={() => router.push("/joinParty")}
-              hitSlop={6}
-            >
-              <Ionicons name="people" size={15} color={colors.onHoney} />
-              <Text style={styles.hostText}>Host Party</Text>
-            </Pressable>
-          </View>
-        </View>
+        <AppHeader />
       </View>
     </View>
   );
