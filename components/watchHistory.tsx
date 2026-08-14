@@ -1,4 +1,3 @@
-import { Colors } from "@/constants/Colors";
 import { getWatchHistory } from "@/utils/history";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";

@@ -55,7 +55,7 @@ export async function getWatchHistory(): Promise<any[]> {
         }
 
         return [];
-    } catch (e) {
+    } catch {
         return [];
     }
 }
@@ -70,7 +70,7 @@ export async function addToWatchHistory(item: any): Promise<void> {
         );
         filtered.unshift(item);
         storage.set(HISTORY_KEY, JSON.stringify(filtered.slice(0, 200)));
-    } catch (e) {
+    } catch {
         // ignore
     }
 }
@@ -99,7 +99,7 @@ export async function updatePlaybackPosition(
             updatedAt: Date.now(),
         };
         storage.set(HISTORY_KEY, JSON.stringify(list.slice(0, 200)));
-    } catch (e) {
+    } catch {
         // ignore
     }
 }
@@ -118,7 +118,7 @@ export async function getPlaybackPosition(
             };
         }
         return null;
-    } catch (e) {
+    } catch {
         return null;
     }
 }
@@ -128,7 +128,7 @@ export async function clearWatchHistory(): Promise<void> {
         storage.remove(HISTORY_KEY);
         const exists = await RNFS.exists(HISTORY_FILE);
         if (exists) await RNFS.unlink(HISTORY_FILE);
-    } catch (e) {
+    } catch {
         // ignore
     }
 }
@@ -141,7 +141,7 @@ export async function clearAppCache(): Promise<void> {
         const cacheDir = RNFS.CachesDirectoryPath;
         const items = await RNFS.readDir(cacheDir);
         await Promise.all(items.map((it) => RNFS.unlink(it.path).catch(() => { })));
-    } catch (e) {
+    } catch {
         // ignore
     }
 }

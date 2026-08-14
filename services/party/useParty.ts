@@ -63,6 +63,9 @@ export function useParty(opts: {
 
   const client = useMemo(
     () => new PartyClient({ code, role, displayName, media: mediaRef.current, password }),
+    // retryNonce isn't read in the body — it's an intentional trigger: bumping it
+    // forces a fresh PartyClient (password re-attempt) even when password is unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [code, role, displayName, password, retryNonce],
   );
 

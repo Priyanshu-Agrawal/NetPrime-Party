@@ -133,7 +133,7 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
       alive = false;
       if (debounce.current) clearTimeout(debounce.current);
     };
-  }, [query, kind, visible]);
+  }, [query, kind, visible, customerId]);
 
   const sticker = kind === "stickers";
 
