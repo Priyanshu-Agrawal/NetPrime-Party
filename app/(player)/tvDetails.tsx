@@ -44,8 +44,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { height } = Dimensions.get("window");
-const HERO_H = Math.min(560, height * 0.62);
+const { height, width } = Dimensions.get("window");
+const HERO_H = Math.round(width * 1.3);
 
 const TvDetails: React.FC = () => {
   const router = useRouter();
@@ -207,7 +207,7 @@ const TvDetails: React.FC = () => {
             <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
           ) : null}
           <LinearGradient
-            colors={["rgba(16,13,10,0.4)", "transparent", colors.bg]}
+            colors={["transparent", "transparent", colors.bg]}
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient colors={[colors.bg, "rgba(16,13,10,0.5)", "transparent"]} style={styles.topScrim} />

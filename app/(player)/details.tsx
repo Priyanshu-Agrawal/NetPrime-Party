@@ -45,7 +45,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height, width } = Dimensions.get("window");
-const HERO_H = Math.min(560, height * 0.62);
+const HERO_H = Math.round(width * 1.3);
 
 const Details: React.FC = () => {
   const router = useRouter();
@@ -172,7 +172,7 @@ const Details: React.FC = () => {
             <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
           ) : null}
           <LinearGradient
-            colors={["rgba(16,13,10,0.4)", "transparent", colors.bg]}
+            colors={["transparent", "transparent", colors.bg]}
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient

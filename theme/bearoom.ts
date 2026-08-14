@@ -19,12 +19,20 @@ import { Dimensions, TextStyle, ViewStyle } from "react-native";
  *   with the screen without ballooning. Use this for font sizes, paddings, and
  *   fixed control/avatar dimensions. This is the primary responsive primitive.
  */
-const BASE_WIDTH = 390;
+const BASE_WIDTH = 411; // the "medium" reference device we design against
 const SCREEN_W = Dimensions.get("window").width;
-export const scale = (size: number): number =>
-  Math.round((SCREEN_W / BASE_WIDTH) * size);
-export const ms = (size: number, factor = 0.5): number =>
-  Math.round(size + (scale(size) - size) * factor);
+// Clamp so tiny/huge screens don't get absurd, but within the phone range
+// (~360–430dp) scaling is essentially linear so every phone looks proportional
+// to the medium reference (a 360dp small phone renders ~12% more compact).
+const RATIO = Math.min(Math.max(SCREEN_W / BASE_WIDTH, 0.82), 1.12);
+export const scale = (size: number): number => Math.round(size * RATIO);
+/**
+ * Responsive size. `factor` 1 (default) = fully proportional to the reference;
+ * lower it toward 0 to dampen (rarely needed now that the baseline is the medium
+ * device). Primary responsive primitive — wrap font sizes + fixed dimensions.
+ */
+export const ms = (size: number, factor = 1): number =>
+  Math.round(size * (1 - factor + factor * RATIO));
 
 export const colors = {
   // warm charcoal backgrounds (never pure cold black)

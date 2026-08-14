@@ -32,7 +32,7 @@ import {
 } from "react-native";
 
 const { width } = Dimensions.get("window");
-const HERO_H = Math.min(500, Dimensions.get("window").height * 0.62);
+const HERO_H = Math.round(width * 1.12);
 
 export function HeroCarousel() {
   const router = useRouter();

@@ -9,6 +9,7 @@ import {
   providerHosts,
   type Provider,
 } from "@/components/player/providerRegistry";
+import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
@@ -165,7 +166,7 @@ export const Player: React.FC = () => {
             startInLoadingState
             renderLoading={() => (
               <View style={[StyleSheet.absoluteFill, styles.center]}>
-                <ActivityIndicator size="large" color="#007bff" />
+                <ActivityIndicator size="large" color={colors.honey} />
               </View>
             )}
             setSupportMultipleWindows={false}
@@ -183,12 +184,12 @@ export const Player: React.FC = () => {
             style={styles.serverBtn}
             onPress={() => sheetRef.current?.present()}
           >
-            <Ionicons name="server-outline" size={15} color="#fff" />
+            <Ionicons name="server-outline" size={15} color={colors.textDim} />
             <Text style={styles.serverBtnText} numberOfLines={1}>
               {selected.name}
             </Text>
-            {canParty && <Ionicons name="people" size={12} color="#4ea1ff" />}
-            <Ionicons name="chevron-up" size={15} color="#9aa0a6" />
+            {canParty && <Ionicons name="paw" size={12} color={colors.honey} />}
+            <Ionicons name="chevron-up" size={15} color={colors.textDim} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -196,7 +197,7 @@ export const Player: React.FC = () => {
             disabled={!canParty}
             style={[styles.partyBtn, !canParty && styles.partyBtnDisabled]}
           >
-            <Ionicons name="people" size={15} color={canParty ? "#fff" : "#666"} />
+            <Ionicons name="people" size={15} color={canParty ? colors.onHoney : colors.textFaint} />
             <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>
               Watch Party
             </Text>
@@ -215,9 +216,9 @@ export const Player: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-  playerArea: { flex: 1, backgroundColor: "#000" },
-  webview: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: colors.black },
+  playerArea: { flex: 1, backgroundColor: colors.black },
+  webview: { flex: 1, backgroundColor: colors.black },
   center: { justifyContent: "center", alignItems: "center" },
   controlBar: {
     flexDirection: "row",
@@ -227,31 +228,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 4,
-    backgroundColor: "#0a0a0a",
+    backgroundColor: colors.bg,
   },
   serverBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#1c1c1e",
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 11,
+    borderRadius: radius.pill,
   },
-  serverBtnText: { color: "#fff", fontWeight: "600", fontSize: 14, flexShrink: 1 },
+  serverBtnText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14), flexShrink: 1 },
   partyBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#0a7ea4",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    backgroundColor: colors.honey,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: radius.pill,
+    ...glow.honey,
   },
-  partyBtnDisabled: { backgroundColor: "#1c1c1e" },
-  partyText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  partyTextDisabled: { color: "#666" },
+  partyBtnDisabled: { backgroundColor: colors.surfaceStrong, ...({ shadowOpacity: 0, elevation: 0 } as const) },
+  partyText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(13) },
+  partyTextDisabled: { color: colors.textFaint },
 });
 
 export default Player;

@@ -215,29 +215,18 @@ export default function Party() {
           </View>
         </View>
 
-        {/* Host control bar */}
+        {/* Host status bar — playback is driven by the web player's own controls
+            (they emit events that sync to everyone); no redundant buttons here. */}
         {party.isHost ? (
           <View style={styles.hostBar}>
-            <View style={styles.hostControls}>
-              <Pressable style={styles.hostBtn} onPress={() => party.seekBy(-30)}>
-                <Ionicons name="play-back" size={18} color={colors.textDim} />
-              </Pressable>
-              <View style={styles.playGroup}>
-                <Pressable style={styles.playActive} onPress={party.play}>
-                  <Ionicons name="play" size={18} color={colors.onHoney} />
-                </Pressable>
-                <Pressable style={styles.playInactive} onPress={party.pause}>
-                  <Ionicons name="pause" size={18} color={colors.textDim} />
-                </Pressable>
-              </View>
-              <Pressable style={styles.hostBtn} onPress={() => party.seekBy(30)}>
-                <Ionicons name="play-forward" size={18} color={colors.textDim} />
-              </Pressable>
+            <View style={styles.hostHintRow}>
+              <Ionicons name="ellipse" size={8} color={colors.honey} />
+              <Text style={styles.hostHint}>You're hosting · your playback syncs to everyone</Text>
             </View>
             {guests.length > 0 ? (
               <Pressable style={styles.transferBtn} onPress={transferHost}>
                 <Ionicons name="swap-horizontal" size={14} color={colors.honey} />
-                <Text style={styles.transferText}>Transfer host</Text>
+                <Text style={styles.transferText}>Transfer</Text>
               </Pressable>
             ) : null}
           </View>
@@ -496,37 +485,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  hostControls: { flexDirection: "row", alignItems: "center", gap: ms(8) },
-  hostBtn: {
-    width: ms(34),
-    height: ms(34),
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceStrong,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playGroup: {
-    flexDirection: "row",
-    gap: 4,
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.pill,
-    padding: 4,
-  },
-  playActive: {
-    width: ms(34),
-    height: ms(34),
-    borderRadius: radius.pill,
-    backgroundColor: colors.honey,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  playInactive: {
-    width: ms(34),
-    height: ms(34),
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  hostHintRow: { flexDirection: "row", alignItems: "center", gap: ms(6), flex: 1 },
+  hostHint: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: ms(11) },
   transferBtn: {
     flexDirection: "row",
     alignItems: "center",

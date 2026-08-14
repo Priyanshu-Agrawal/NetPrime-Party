@@ -36,6 +36,8 @@ import {
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { Platform } from "react-native";
 
 import {
   PROVIDERS,
@@ -43,18 +45,19 @@ import {
   isUnstable,
   type Provider,
 } from "@/components/player/providerRegistry";
+import { colors, font } from "@/theme/bearoom";
 
 const COLORS = {
-  bg: "#0d0d0f",
-  accent: "#007bff",
-  warn: "#e0a316",
-  white: "#ffffff",
-  muted: "#8a8a8f",
-  divider: "#1e1e22",
-  input: "#17171b",
-  chip: "#1c1c21",
-  selectedRow: "#141a24",
-  handle: "#3a3a40",
+  bg: colors.bgElevated,
+  accent: colors.honey,
+  warn: "#E0A316",
+  white: colors.text,
+  muted: colors.textDim,
+  divider: colors.border,
+  input: colors.surfaceStrong,
+  chip: colors.surfaceStrong,
+  selectedRow: colors.honeySoft,
+  handle: colors.borderStrong,
 } as const;
 
 type FilterKey = "all" | "party";
@@ -170,6 +173,7 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
         snapPoints={snapPoints}
         enablePanDownToClose
         backgroundStyle={styles.sheetBackground}
+        backgroundComponent={SheetBackground}
         handleIndicatorStyle={styles.handleIndicator}
         backdropComponent={renderBackdrop}
       >
@@ -261,6 +265,21 @@ function Divider(): React.ReactElement {
   return <View style={styles.divider} />;
 }
 
+/** Frosted-glass sheet background (blurs the player behind it). */
+function SheetBackground({ style }: any) {
+  return (
+    <View style={[style, styles.sheetBgClip]}>
+      <BlurView
+        intensity={48}
+        tint="dark"
+        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, styles.sheetBgTint]} />
+    </View>
+  );
+}
+
 interface FilterChipProps {
   label: string;
   active: boolean;
@@ -286,7 +305,18 @@ export default ProviderSheet;
 
 const styles = StyleSheet.create({
   sheetBackground: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: "transparent",
+  },
+  sheetBgClip: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "rgba(16,13,10,0.72)",
+  },
+  sheetBgTint: {
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   handleIndicator: {
     backgroundColor: COLORS.handle,
@@ -308,7 +338,7 @@ const styles = StyleSheet.create({
   title: {
     color: COLORS.white,
     fontSize: 18,
-    fontWeight: "700",
+    fontFamily: font.headline,
   },
   count: {
     color: COLORS.muted,
@@ -360,10 +390,10 @@ const styles = StyleSheet.create({
   chipText: {
     color: COLORS.muted,
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: font.bodySemi,
   },
   chipTextActive: {
-    color: COLORS.white,
+    color: colors.onHoney,
   },
 
   listContent: {
@@ -389,7 +419,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: COLORS.white,
     fontSize: 15,
-    fontWeight: "600",
+    fontFamily: font.bodySemi,
   },
   rowSubtitle: {
     color: COLORS.muted,

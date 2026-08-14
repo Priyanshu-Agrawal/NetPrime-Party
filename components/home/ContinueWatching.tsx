@@ -8,6 +8,7 @@ import { getWatchHistory, type HistoryItem } from "@/utils/history";
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -92,20 +93,23 @@ export function ContinueWatching() {
                   <Ionicons name="film-outline" size={24} color={colors.textFaint} />
                 </View>
               )}
-              <View style={styles.scrim} />
+              <LinearGradient
+                colors={["transparent", "rgba(16,13,10,0.35)", "rgba(16,13,10,0.92)"]}
+                style={StyleSheet.absoluteFill}
+              />
               <View style={styles.playBadge}>
                 <Ionicons name="play" size={18} color={colors.text} />
               </View>
               <View style={styles.meta}>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
                 {item.type === "tv" && item.season ? (
                   <Text style={styles.sub}>
                     S{item.season}
                     {item.episode ? ` · E${item.episode}` : ""}
                   </Text>
                 ) : null}
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
               </View>
               {progress > 0 ? (
                 <View style={styles.progressTrack}>
@@ -147,10 +151,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   noPoster: { alignItems: "center", justifyContent: "center" },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(16,13,10,0.28)",
-  },
   playBadge: {
     position: "absolute",
     top: 10,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   },
   meta: { paddingHorizontal: 10, paddingBottom: 10 },
   cardTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
-  sub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(11), marginTop: 1 },
+  sub: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(10), letterSpacing: 0.3, marginBottom: 2 },
   progressTrack: {
     position: "absolute",
     left: 0,
