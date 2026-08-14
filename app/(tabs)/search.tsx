@@ -236,7 +236,7 @@ const Search: React.FC = () => {
       </View>
 
       {/* Browse by mood */}
-      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Browse by mood</Text>
+      <Text style={styles.sectionTitle}>Browse by mood</Text>
       <View style={styles.moodGrid}>
         {MOODS.map((m) => (
           <Pressable
@@ -253,7 +253,7 @@ const Search: React.FC = () => {
       </View>
 
       {/* Provider filters */}
-      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
+      <Text style={styles.sectionTitle}>
         {selectedProvider ? "Popular on this service" : "Trending today"}
       </Text>
       <FlatList
@@ -261,6 +261,7 @@ const Search: React.FC = () => {
         data={PROVIDERS}
         keyExtractor={(p) => p.name}
         showsHorizontalScrollIndicator={false}
+        style={styles.provList}
         contentContainerStyle={styles.provRow}
         renderItem={({ item: p }) => {
           const active = selectedProvider === p.id;
@@ -383,7 +384,7 @@ const styles = StyleSheet.create({
     fontFamily: font.headline,
     fontSize: ms(17),
     paddingHorizontal: 16,
-    marginTop: 22,
+    marginTop: 20,
     marginBottom: 12,
   },
   trendWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16 },
@@ -421,6 +422,7 @@ const styles = StyleSheet.create({
   },
   moodLabel: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
 
+  provList: { flexGrow: 0, marginBottom: 18 },
   provRow: { paddingHorizontal: 16, gap: 8 },
   provChip: {
     height: 38,
@@ -436,7 +438,7 @@ const styles = StyleSheet.create({
   provText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: ms(13) },
   provTextActive: { color: colors.honey },
 
-  grid: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 120 },
+  grid: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 120 },
   card: { width: CARD_W, marginBottom: 16 },
   posterWrap: { borderRadius: radius.md, overflow: "hidden" },
   poster: { width: CARD_W, height: CARD_W * 1.5, borderRadius: radius.md, backgroundColor: colors.bgElevated },
