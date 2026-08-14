@@ -1,7 +1,7 @@
 import AppHeader from "@/components/ui/AppHeader";
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
-import { detailsRoute, itemTitle, itemYear, type MediaItem } from "@/utils/tmdbLists";
+import { detailsRoute, itemTitle, type MediaItem } from "@/utils/tmdbLists";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";

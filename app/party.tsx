@@ -17,7 +17,7 @@ import PlayerControls from "@/components/player/PlayerControls";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { getDisplayName } from "@/services/party/identity";
-import type { PartyMedia } from "@/services/party/protocol";
+import type { Member, PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
 import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/services/party/usePartyChat";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
@@ -42,6 +42,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
+// Stable empty reference so `members` doesn't churn memo deps before the snapshot lands.
+const EMPTY_MEMBERS: Member[] = [];
 
 /** Media position (seconds) → "m:ss" (or "h:mm:ss" past an hour). */
 function fmtMedia(sec: number): string {
@@ -169,7 +171,7 @@ export default function Party() {
   const roomCode = snap?.code || room;
   const hostPresent = !!snap?.lease.hostId;
   const hostId = snap?.lease.hostId;
-  const members = snap?.members ?? [];
+  const members = snap?.members ?? EMPTY_MEMBERS;
   const guests = useMemo(
     () => members.filter((m) => m.userId !== party.userId),
     [members, party.userId],
