@@ -78,6 +78,7 @@ export default function Party() {
 
   const playerRef = useRef<PlayerHandle>(null);
   const [password, setPassword] = useState<string | undefined>(undefined);
+  const [pwAttempt, setPwAttempt] = useState(0);
   const [pwPrompt, setPwPrompt] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -88,6 +89,7 @@ export default function Party() {
     displayName,
     media: hostMedia,
     password,
+    retryNonce: pwAttempt,
     playerRef,
   });
 
@@ -106,7 +108,10 @@ export default function Party() {
   const selfMember = members.find((m) => m.userId === party.userId);
   const selfApproved = selfMember?.approved !== false;
   const reactionsOn = config?.gifsEnabled !== false;
-  const canSendChat = party.isHost || (config?.chatEnabled !== false && selfMember?.permissions?.canChat !== false);
+  const canParticipate = party.isHost || selfApproved; // approved (or host) → not in the waiting room
+  const canSendChat =
+    party.isHost ||
+    (selfApproved && config?.chatEnabled !== false && selfMember?.permissions?.canChat !== false);
   const canGrabControl = !party.isHost && selfApproved && !!config?.guestControlDefault;
   const pendingCount = guests.filter((g) => g.approved === false).length;
 
@@ -126,9 +131,19 @@ export default function Party() {
   const submitPassword = () => {
     const p = pwInput.trim();
     if (!p) return;
-    setPassword(p); // rebuilds the client → retries join with the password
+    setPassword(p);
+    setPwAttempt((n) => n + 1); // force a client rebuild + retry even if pw unchanged
     setPwPrompt(false);
     setPwInput("");
+  };
+
+  // Surface a rejected host-admin RPC (e.g. lease lapsed → 'not host') instead of
+  // swallowing it. bearAlert renders in a Modal, so it shows over the settings sheet.
+  const runAdmin = (label: string, p: Promise<void> | void) => {
+    Promise.resolve(p).catch((e: unknown) => {
+      const msg = String((e as Error)?.message ?? e).replace(/^party_\w+:\s*/, "");
+      bearAlert(label, msg || "Please try again.");
+    });
   };
 
   const chat = usePartyChat({ code: roomCode, userId: party.userId, name: displayName });
@@ -156,7 +171,7 @@ export default function Party() {
     bearAlert("Transfer host", "Hand playback control to…", [
       ...guests.slice(0, 5).map((m) => ({
         text: m.displayName || "Guest",
-        onPress: () => party.transferHost(m.userId),
+        onPress: () => runAdmin("Couldn't transfer host", party.transferHost(m.userId)),
       })),
       { text: "Cancel", style: "cancel" as const },
     ]);
@@ -318,7 +333,7 @@ export default function Party() {
 
         {/* Input area */}
         <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          {reactionsOn ? (
+          {reactionsOn && canParticipate ? (
             <View style={styles.quickRow}>
               {QUICK_REACTIONS.map((e) => (
                 <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
@@ -366,11 +381,11 @@ export default function Party() {
           members={members}
           hostId={hostId}
           selfId={party.userId}
-          onSetConfig={(patch, pw) => void party.setConfig(patch, pw)}
-          onSetPermissions={(uid, patch) => void party.setPermissions(uid, patch)}
-          onApprove={(uid) => void party.approveMember(uid)}
-          onKick={(uid) => void party.kick(uid)}
-          onTransferHost={(uid) => party.transferHost(uid)}
+          onSetConfig={(patch, pw) => runAdmin("Couldn't update settings", party.setConfig(patch, pw))}
+          onSetPermissions={(uid, patch) => runAdmin("Couldn't update member", party.setPermissions(uid, patch))}
+          onApprove={(uid) => runAdmin("Couldn't approve", party.approveMember(uid))}
+          onKick={(uid) => runAdmin("Couldn't remove member", party.kick(uid))}
+          onTransferHost={(uid) => runAdmin("Couldn't transfer host", party.transferHost(uid))}
         />
       ) : null}
 

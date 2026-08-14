@@ -230,11 +230,14 @@ export class PartyClient {
   private applySnapshot(s: RoomSnapshot, fromSelf = false): void {
     if (this.destroyed || !s || !s.playback) return;
     const cur = this.snap;
-    if (cur && !fromSelf) {
+    if (cur) {
+      // Newest-wins by (epoch, seq) — applied to our OWN RPC results too, since
+      // concurrent fire-and-forget mutations can resolve out of order and an
+      // older self-snapshot must not regress local state / get re-broadcast.
       const a = s.playback,
         b = cur.playback;
       const newer = a.epoch > b.epoch || (a.epoch === b.epoch && a.seq >= b.seq);
-      if (!newer) return; // stale broadcast — drop
+      if (!newer) return; // stale — drop
     }
     // Kicked: a STRICTLY-NEWER authoritative snapshot no longer lists us (a real
     // kick bumps seq). We must require strictly-newer, not just `>=`: a stale host

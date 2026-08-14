@@ -26,7 +26,7 @@ export interface UseParty {
   play: () => void;
   pause: () => void;
   seekBy: (deltaSec: number) => void;
-  transferHost: (userId: string) => void;
+  transferHost: (userId: string) => Promise<void>;
   claimHost: () => void;
   // room administration (host-only server-side)
   setConfig: (patch: Partial<RoomConfig>, password?: string) => Promise<void>;
@@ -44,9 +44,11 @@ export function useParty(opts: {
   displayName: string;
   media?: PartyMedia;
   password?: string;
+  /** Bump to force a client rebuild even when `password` is unchanged (retry). */
+  retryNonce?: number;
   playerRef: RefObject<PlayerHandle | null>;
 }): UseParty {
-  const { code, role, displayName, media, password, playerRef } = opts;
+  const { code, role, displayName, media, password, retryNonce, playerRef } = opts;
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [connectedCount, setConnectedCount] = useState(1);
   const [detached, setDetached] = useState(false);
@@ -59,7 +61,7 @@ export function useParty(opts: {
 
   const client = useMemo(
     () => new PartyClient({ code, role, displayName, media: mediaRef.current, password }),
-    [code, role, displayName, password],
+    [code, role, displayName, password, retryNonce],
   );
 
   const engine = useMemo(() => {
@@ -116,7 +118,7 @@ export function useParty(opts: {
         const curSec = effectivePositionMs(s.playback, client.now()) / 1000;
         void client.seek(Math.max(0, curSec + deltaSec) * 1000);
       },
-      transferHost: (uid) => void client.transferHost(uid),
+      transferHost: (uid) => client.transferHost(uid),
       claimHost: () => void client.claimHost(),
       setConfig: (patch, pw) => client.setConfig(patch, pw),
       setPermissions: (uid, patch) => client.setPermissions(uid, patch),

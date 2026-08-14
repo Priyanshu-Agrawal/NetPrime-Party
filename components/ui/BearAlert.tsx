@@ -11,7 +11,7 @@
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { BlurView } from "expo-blur";
 import React, { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 export interface BearAlertButton {
   text: string;
@@ -35,91 +35,101 @@ export function bearAlert(title: string, message?: string, buttons?: BearAlertBu
 }
 
 export function AlertHost() {
-  const [state, setState] = useState<AlertState | null>(null);
+  // A queue so a second alert while one is showing doesn't discard the first.
+  const [queue, setQueue] = useState<AlertState[]>([]);
 
   useEffect(() => {
-    listener = setState;
+    listener = (s) => setQueue((q) => [...q, s]);
     return () => {
       listener = null;
     };
   }, []);
 
-  if (!state) return null;
-
-  const close = () => setState(null);
+  const state = queue[0] ?? null;
+  const close = () => setQueue((q) => q.slice(1));
   const run = (b: BearAlertButton) => {
+    const cb = b.onPress;
     close();
-    b.onPress?.();
+    cb?.();
   };
 
+  // Rendered inside a <Modal> so it reliably paints OVER other modals (e.g. the
+  // room-settings sheet) — a plain root View cannot cover a native Modal window.
+  return (
+    <Modal
+      visible={queue.length > 0}
+      transparent
+      animationType="fade"
+      onRequestClose={close}
+      statusBarTranslucent
+    >
+      {state ? (
+        <View style={styles.overlay} pointerEvents="box-none">
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+          <AlertCard state={state} run={run} />
+        </View>
+      ) : null}
+    </Modal>
+  );
+}
+
+function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton) => void }) {
   const { title, message, buttons } = state;
   const stacked = buttons.length > 2;
-
   return (
-    <View style={styles.overlay} pointerEvents="box-none">
-      <Pressable style={StyleSheet.absoluteFill} onPress={close} />
-      <View style={styles.card}>
-        <BlurView
-          intensity={40}
-          tint="dark"
-          experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[StyleSheet.absoluteFill, styles.cardTint]} />
-        <View style={styles.cardInner}>
-          <Text style={styles.title}>{title}</Text>
-          {message ? <Text style={styles.message}>{message}</Text> : null}
+    <View style={styles.card}>
+      <BlurView
+        intensity={40}
+        tint="dark"
+        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, styles.cardTint]} />
+      <View style={styles.cardInner}>
+        <Text style={styles.title}>{title}</Text>
+        {message ? <Text style={styles.message}>{message}</Text> : null}
 
-          {stacked ? (
-            <View style={styles.stack}>
-              {buttons
-                .filter((b) => b.style !== "cancel")
-                .map((b, i) => (
-                  <Pressable key={i} style={styles.stackRow} onPress={() => run(b)}>
-                    <Text style={[styles.stackText, b.style === "destructive" && styles.destructiveText]}>
-                      {b.text}
-                    </Text>
-                  </Pressable>
-                ))}
-              {buttons.find((b) => b.style === "cancel") ? (
-                <Pressable
-                  style={styles.cancelBtn}
-                  onPress={() => run(buttons.find((b) => b.style === "cancel")!)}
-                >
-                  <Text style={styles.cancelText}>
-                    {buttons.find((b) => b.style === "cancel")!.text}
+        {stacked ? (
+          <View style={styles.stack}>
+            {buttons
+              .filter((b) => b.style !== "cancel")
+              .map((b, i) => (
+                <Pressable key={i} style={styles.stackRow} onPress={() => run(b)}>
+                  <Text style={[styles.stackText, b.style === "destructive" && styles.destructiveText]}>
+                    {b.text}
                   </Text>
                 </Pressable>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.row}>
-              {buttons.map((b, i) => {
-                const isCancel = b.style === "cancel";
-                const isDestructive = b.style === "destructive";
-                return (
-                  <Pressable
-                    key={i}
+              ))}
+            {buttons.find((b) => b.style === "cancel") ? (
+              <Pressable style={styles.cancelBtn} onPress={() => run(buttons.find((b) => b.style === "cancel")!)}>
+                <Text style={styles.cancelText}>{buttons.find((b) => b.style === "cancel")!.text}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <View style={styles.row}>
+            {buttons.map((b, i) => {
+              const isCancel = b.style === "cancel";
+              const isDestructive = b.style === "destructive";
+              return (
+                <Pressable
+                  key={i}
+                  style={[styles.btn, isCancel ? styles.btnGhost : isDestructive ? styles.btnDanger : styles.btnHoney]}
+                  onPress={() => run(b)}
+                >
+                  <Text
                     style={[
-                      styles.btn,
-                      isCancel ? styles.btnGhost : isDestructive ? styles.btnDanger : styles.btnHoney,
+                      styles.btnText,
+                      isCancel ? styles.btnTextGhost : isDestructive ? styles.btnTextDanger : styles.btnTextHoney,
                     ]}
-                    onPress={() => run(b)}
                   >
-                    <Text
-                      style={[
-                        styles.btnText,
-                        isCancel ? styles.btnTextGhost : isDestructive ? styles.btnTextDanger : styles.btnTextHoney,
-                      ]}
-                    >
-                      {b.text}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
+                    {b.text}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
     </View>
   );
