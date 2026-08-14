@@ -1,5 +1,4 @@
 import {
-  detailColors as C,
   FactGrid,
   LinksRow,
   MetaBar,
@@ -8,8 +7,8 @@ import {
   ProvidersRow,
   Reviews,
   Section,
-  TrailerButton,
 } from "@/components/details/sections";
+import { colors, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import {
   externalLinks,
@@ -24,7 +23,8 @@ import {
   runtimeStr,
   topCast,
 } from "@/utils/tmdbDetails";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -32,23 +32,29 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  Image,
+  Linking,
+  Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height, width } = Dimensions.get("window");
+const HERO_H = Math.min(560, height * 0.62);
 
 const Details: React.FC = () => {
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { id } = useGlobalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [d, setD] = useState<any>(null);
   const [error, setError] = useState<string>();
+  const [expanded, setExpanded] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
@@ -68,8 +74,12 @@ const Details: React.FC = () => {
 
   const derived = useMemo(() => {
     if (!d) return null;
+    const vids = (d.videos?.results ?? []).filter(
+      (v: any) => v.site === "YouTube" && ["Trailer", "Teaser", "Clip"].includes(v.type),
+    );
     return {
       trailer: pickTrailer(d),
+      clips: vids.slice(0, 8),
       cert: pickCertification(d, "movie"),
       cast: topCast(d),
       crew: keyCrew(d, "movie"),
@@ -93,7 +103,7 @@ const Details: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.accent} />
+        <ActivityIndicator size="large" color={colors.honey} />
       </View>
     );
   }
@@ -124,63 +134,147 @@ const Details: React.FC = () => {
     });
   };
 
+  const handleWatchTogether = () => {
+    router.push({
+      pathname: "/party",
+      params: {
+        role: "host",
+        id: id!.toString(),
+        type: "movie",
+        title: d.title,
+      },
+    });
+  };
+
+  const openTrailer = (key?: string | null) => {
+    if (!key) return;
+    Linking.openURL(`https://www.youtube.com/watch?v=${key}`).catch(() => {});
+  };
+
+  const handleShare = () => {
+    void Share.share({
+      message: `Watch "${d.title}" with me on Bearoom 🐻`,
+    }).catch(() => {});
+  };
+
   const backdrop = img(d.backdrop_path, "w780") || img(d.poster_path, "w780");
 
   return (
     <View style={styles.container}>
-      <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
         {/* Hero */}
         <View style={styles.hero}>
           {backdrop ? (
-            <Image source={{ uri: backdrop }} style={styles.heroImg} resizeMode="cover" />
+            <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
           ) : null}
           <LinearGradient
-            colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)", "#0a0a0c"]}
+            colors={["rgba(16,13,10,0.4)", "transparent", colors.bg]}
             style={StyleSheet.absoluteFill}
           />
-          <TouchableOpacity style={styles.back} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={26} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.heroContent}>
-            <Image source={{ uri: img(d.poster_path, "w342") || undefined }} style={styles.poster} />
-            <View style={styles.heroText}>
-              <Text style={styles.title}>{d.title}</Text>
-              {d.tagline ? <Text style={styles.tagline}>{d.tagline}</Text> : null}
-            </View>
-          </View>
-        </View>
-
-        <View style={{ marginTop: 12 }}>
-          <MetaBar
-            rating={d.vote_average}
-            votes={d.vote_count}
-            year={d.release_date?.slice(0, 4)}
-            runtime={runtimeStr(d.runtime)}
-            certification={derived!.cert}
-            genres={(d.genres ?? []).map((g: any) => g.name)}
+          <LinearGradient
+            colors={[colors.bg, "rgba(16,13,10,0.5)", "transparent"]}
+            style={styles.topScrim}
           />
+          <View style={[styles.topBar, { top: insets.top + 8 }]}>
+            <Pressable style={styles.glassRound} onPress={() => router.back()} hitSlop={6}>
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </Pressable>
+            <Pressable style={styles.glassRound} onPress={() => setSaved((s) => !s)} hitSlop={6}>
+              <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
+            </Pressable>
+          </View>
+          <View style={styles.heroContent}>
+            <Text style={styles.title}>{d.title}</Text>
+            <MetaBar
+              rating={d.vote_average}
+              votes={d.vote_count}
+              year={d.release_date?.slice(0, 4)}
+              runtime={runtimeStr(d.runtime)}
+              certification={derived!.cert}
+              genres={(d.genres ?? []).map((g: any) => g.name)}
+            />
+          </View>
         </View>
 
-        {/* Actions */}
+        {/* Primary actions */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.playBtn} onPress={handlePlay}>
-            <MaterialIcons name="play-arrow" size={24} color="#fff" />
-            <Text style={styles.playText}>Play Now</Text>
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <TrailerButton trailerKey={derived!.trailer?.key} />
-          </View>
+          <Pressable style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]} onPress={handlePlay}>
+            <Ionicons name="play" size={20} color={colors.onHoney} />
+            <Text style={styles.playText}>Play</Text>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]} onPress={handleWatchTogether}>
+            <Ionicons name="paw" size={18} color={colors.honey} />
+            <Text style={styles.togetherText}>Watch together</Text>
+          </Pressable>
+        </View>
+
+        {/* Quick actions */}
+        <View style={styles.quickRow}>
+          <Pressable style={styles.quick} onPress={() => setSaved((s) => !s)}>
+            <View style={styles.quickIcon}>
+              <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
+            </View>
+            <Text style={styles.quickLabel}>My List</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={() => openTrailer(derived!.trailer?.key)} disabled={!derived!.trailer}>
+            <View style={styles.quickIcon}>
+              <Ionicons name="film-outline" size={22} color={derived!.trailer ? colors.textDim : colors.textFaint} />
+            </View>
+            <Text style={styles.quickLabel}>Trailer</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={handleShare}>
+            <View style={styles.quickIcon}>
+              <Ionicons name="share-social-outline" size={22} color={colors.textDim} />
+            </View>
+            <Text style={styles.quickLabel}>Share</Text>
+          </Pressable>
         </View>
 
         {d.overview ? (
-          <Section title="Overview">
-            <Text style={styles.overview}>{d.overview}</Text>
-          </Section>
+          <View style={styles.overviewWrap}>
+            <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
+              {d.overview}
+            </Text>
+            {d.overview.length > 140 ? (
+              <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={6}>
+                <Text style={styles.moreLink}>{expanded ? "less" : "more"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
 
         {derived!.cast.length ? (
           <Section title="Cast">
             <PeopleRow people={derived!.cast} />
+          </Section>
+        ) : null}
+
+        {derived!.clips.length ? (
+          <Section title="Trailers & Clips">
+            <FlatList
+              data={derived!.clips}
+              horizontal
+              keyExtractor={(v: any) => v.id}
+              showsHorizontalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              renderItem={({ item }: any) => (
+                <Pressable style={styles.clip} onPress={() => openTrailer(item.key)}>
+                  <Image
+                    source={{ uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg` }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={200}
+                  />
+                  <View style={styles.clipScrim} />
+                  <View style={styles.clipPlay}>
+                    <Ionicons name="play" size={18} color={colors.text} />
+                  </View>
+                  <View style={styles.clipTag}>
+                    <Text style={styles.clipTagText} numberOfLines={1}>{item.type}</Text>
+                  </View>
+                </Pressable>
+              )}
+            />
           </Section>
         ) : null}
 
@@ -225,9 +319,9 @@ const Details: React.FC = () => {
               horizontal
               keyExtractor={(m: any) => String(m.id)}
               showsHorizontalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
               renderItem={({ item }: any) => (
-                <TouchableOpacity
+                <Pressable
                   style={styles.recCard}
                   onPress={() =>
                     router.replace({
@@ -236,86 +330,156 @@ const Details: React.FC = () => {
                     })
                   }
                 >
-                  <Image
-                    source={{ uri: img(item.poster_path, "w342") || undefined }}
-                    style={styles.recImg}
-                  />
+                  <View style={styles.recImgWrap}>
+                    <Image
+                      source={{ uri: img(item.poster_path, "w342") || undefined }}
+                      style={styles.recImg}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                    {item.vote_average ? (
+                      <View style={styles.recBadge}>
+                        <Ionicons name="star" size={9} color={colors.honey} />
+                        <Text style={styles.recBadgeText}>{item.vote_average.toFixed(1)}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.recTitle} numberOfLines={1}>
                     {item.title || item.name}
                   </Text>
-                  <View style={styles.recRating}>
-                    <MaterialIcons name="star" size={12} color={C.gold} />
-                    <Text style={styles.recRatingText}>
-                      {item.vote_average ? item.vote_average.toFixed(1) : "—"}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                </Pressable>
               )}
             />
           </Section>
         ) : null}
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0c" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0a0c" },
-  errText: { color: "#ff6b6b", fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
+  errText: { color: colors.danger, fontFamily: font.body, fontSize: 15 },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 
-  hero: { width: "100%", height: height * 0.46 },
-  heroImg: { width: "100%", height: "100%" },
-  back: {
+  hero: { width: "100%", height: HERO_H, justifyContent: "flex-end" },
+  topScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 140 },
+  topBar: {
     position: "absolute",
-    top: 44,
-    left: 12,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 20,
-    padding: 4,
-  },
-  heroContent: {
-    position: "absolute",
-    bottom: 14,
     left: 16,
     right: 16,
     flexDirection: "row",
-    gap: 14,
-    alignItems: "flex-end",
+    justifyContent: "space-between",
   },
-  poster: {
-    width: width * 0.28,
-    height: width * 0.28 * 1.5,
-    borderRadius: 10,
-    backgroundColor: "#222",
+  glassRound: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  heroText: { flex: 1, paddingBottom: 4 },
-  title: { color: "#fff", fontSize: 24, fontWeight: "800" },
-  tagline: { color: "#c8ccd0", fontSize: 13, fontStyle: "italic", marginTop: 4 },
+  heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
+  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: 32, letterSpacing: -0.6, lineHeight: 36 },
 
-  actions: { flexDirection: "row", gap: 10, paddingHorizontal: 16, marginTop: 16, alignItems: "center" },
+  actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
   playBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    backgroundColor: C.accent,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 10,
+    gap: 6,
+    backgroundColor: colors.honey,
+    paddingVertical: 14,
+    borderRadius: radius.pill,
+    ...glow.honey,
   },
-  playText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: 15 },
+  togetherBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    paddingVertical: 14,
+    borderRadius: radius.pill,
+  },
+  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: 15 },
 
-  overview: { color: "#d3d7db", fontSize: 14, lineHeight: 21 },
+  quickRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 20,
+    marginTop: 12,
+    marginHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  quick: { alignItems: "center", gap: 6 },
+  quickIcon: { width: 48, height: 48, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  quickLabel: { color: colors.textDim, fontFamily: font.label, fontSize: 12 },
 
-  recCard: { width: 110 },
-  recImg: { width: 110, height: 165, borderRadius: 10, backgroundColor: "#222" },
-  recTitle: { color: C.text, fontSize: 12, fontWeight: "600", marginTop: 6 },
-  recRating: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
-  recRatingText: { color: C.sub, fontSize: 11 },
+  overviewWrap: { paddingHorizontal: 16, marginTop: 20 },
+  overview: { color: colors.textDim, fontFamily: font.body, fontSize: 14, lineHeight: 21 },
+  moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13, marginTop: 4 },
+
+  clip: {
+    width: 240,
+    height: 135,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    backgroundColor: colors.bgElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  clipScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(16,13,10,0.25)" },
+  clipPlay: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.scrim,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clipTag: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: colors.scrim,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  clipTagText: { color: colors.text, fontFamily: font.bodyMed, fontSize: 10 },
+
+  recCard: { width: 118 },
+  recImgWrap: { borderRadius: radius.lg, overflow: "hidden" },
+  recImg: { width: 118, height: 177, backgroundColor: colors.bgElevated },
+  recBadge: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: colors.scrim,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  recBadgeText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 9 },
+  recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, marginTop: 6 },
 });
 
 export default Details;

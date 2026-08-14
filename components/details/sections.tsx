@@ -1,12 +1,15 @@
 /**
- * Reusable dark-themed detail sections, shared by the movie + TV detail screens.
- * Each renders a slice of the rich TMDB data (see utils/tmdbDetails).
+ * Reusable Bearoom detail sections, shared by the movie + TV detail screens.
+ * Cozy cinema-lounge skin: honey accents on warm charcoal, Outfit/Inter type,
+ * round cast avatars, glass provider chips. Each renders a slice of the rich
+ * TMDB data (see utils/tmdbDetails).
  */
+import { colors, font, radius } from "@/theme/bearoom";
 import type { ExternalLink, Person, WatchProviders } from "@/utils/tmdbDetails";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React from "react";
 import {
-  Image,
   Linking,
   ScrollView,
   StyleSheet,
@@ -14,16 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-const C = {
-  text: "#f2f2f4",
-  sub: "#9aa0a6",
-  card: "#17171b",
-  chip: "#20202a",
-  accent: "#4ea1ff",
-  gold: "#f5c518",
-  line: "#242430",
-};
 
 export function Section({
   title,
@@ -45,7 +38,7 @@ export function Section({
   );
 }
 
-/** Rating + year + runtime + certification + genres, in one compact meta bar. */
+/** Rating · year · runtime · certification · genres, left-aligned with dot separators. */
 export function MetaBar({
   rating,
   votes,
@@ -61,33 +54,34 @@ export function MetaBar({
   certification?: string;
   genres?: string[];
 }) {
+  const dots: React.ReactNode[] = [];
+  if (year) dots.push(<Text key="y" style={styles.metaItem}>{year}</Text>);
+  if (runtime) dots.push(<Text key="r" style={styles.metaItem}>{runtime}</Text>);
+  if (certification)
+    dots.push(
+      <View key="c" style={styles.certBox}>
+        <Text style={styles.certText}>{certification}</Text>
+      </View>,
+    );
+  if (genres && genres.length)
+    dots.push(<Text key="g" style={styles.metaItem}>{genres.slice(0, 2).join(" · ")}</Text>);
+
   return (
-    <View style={styles.metaWrap}>
-      <View style={styles.metaRow}>
-        {rating ? (
-          <View style={styles.ratingPill}>
-            <MaterialIcons name="star" size={15} color={C.gold} />
-            <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-            {votes ? <Text style={styles.ratingVotes}>({fmtCount(votes)})</Text> : null}
-          </View>
-        ) : null}
-        {certification ? (
-          <View style={styles.certBox}>
-            <Text style={styles.certText}>{certification}</Text>
-          </View>
-        ) : null}
-        {year ? <MetaDot label={year} /> : null}
-        {runtime ? <MetaDot label={runtime} /> : null}
-      </View>
-      {genres && genres.length > 0 ? (
-        <Text style={styles.genres}>{genres.join(" · ")}</Text>
+    <View style={styles.metaRow}>
+      {rating ? (
+        <View style={styles.ratingPill}>
+          <Ionicons name="star" size={14} color={colors.honey} />
+          <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+        </View>
       ) : null}
+      {dots.map((node, i) => (
+        <React.Fragment key={i}>
+          {(rating || i > 0) ? <View style={styles.sep} /> : null}
+          {node}
+        </React.Fragment>
+      ))}
     </View>
   );
-}
-
-function MetaDot({ label }: { label: string }) {
-  return <Text style={styles.metaDot}>{label}</Text>;
 }
 
 export function Pills({ items }: { items: string[] }) {
@@ -114,10 +108,10 @@ export function PeopleRow({ people }: { people: Person[] }) {
       {people.map((p, i) => (
         <View key={`${p.id}-${i}`} style={styles.person}>
           {p.profile ? (
-            <Image source={{ uri: p.profile }} style={styles.personImg} />
+            <Image source={{ uri: p.profile }} style={styles.personImg} contentFit="cover" />
           ) : (
             <View style={[styles.personImg, styles.personNoImg]}>
-              <Ionicons name="person" size={26} color="#555" />
+              <Ionicons name="person" size={24} color={colors.textFaint} />
             </View>
           )}
           <Text style={styles.personName} numberOfLines={1}>
@@ -163,17 +157,20 @@ export function ProvidersRow({ providers }: { providers: WatchProviders | null }
         <View key={g.label} style={styles.provGroup}>
           <Text style={styles.provLabel}>{g.label}</Text>
           <View style={styles.provList}>
-            {g.list.map((p) =>
-              p.logo ? (
-                <Image key={p.id} source={{ uri: p.logo }} style={styles.provLogo} />
-              ) : (
-                <View key={p.id} style={[styles.provLogo, styles.provNoLogo]}>
-                  <Text style={styles.provNoLogoText} numberOfLines={1}>
-                    {p.name.slice(0, 3)}
-                  </Text>
-                </View>
-              ),
-            )}
+            {g.list.map((p) => (
+              <View key={p.id} style={styles.provChip}>
+                {p.logo ? (
+                  <Image source={{ uri: p.logo }} style={styles.provLogo} contentFit="cover" />
+                ) : (
+                  <View style={[styles.provLogo, styles.provNoLogo]}>
+                    <Text style={styles.provNoLogoText} numberOfLines={1}>
+                      {p.name.slice(0, 2)}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.provName} numberOfLines={1}>{p.name}</Text>
+              </View>
+            ))}
           </View>
         </View>
       ))}
@@ -193,7 +190,7 @@ export function Reviews({ reviews }: { reviews: any[] }) {
             <Text style={styles.reviewAuthor}>{r.author}</Text>
             {r.author_details?.rating ? (
               <View style={styles.reviewRating}>
-                <MaterialIcons name="star" size={12} color={C.gold} />
+                <Ionicons name="star" size={12} color={colors.honey} />
                 <Text style={styles.reviewRatingText}>
                   {r.author_details.rating}/10
                 </Text>
@@ -219,7 +216,7 @@ export function LinksRow({ links }: { links: ExternalLink[] }) {
           style={styles.linkBtn}
           onPress={() => Linking.openURL(l.url).catch(() => {})}
         >
-          <Ionicons name="open-outline" size={13} color={C.accent} />
+          <Ionicons name="open-outline" size={13} color={colors.honey} />
           <Text style={styles.linkText}>{l.label}</Text>
         </TouchableOpacity>
       ))}
@@ -236,113 +233,145 @@ export function TrailerButton({ trailerKey }: { trailerKey?: string | null }) {
         Linking.openURL(`https://www.youtube.com/watch?v=${trailerKey}`).catch(() => {})
       }
     >
-      <Ionicons name="logo-youtube" size={18} color="#fff" />
+      <Ionicons name="logo-youtube" size={18} color={colors.text} />
       <Text style={styles.trailerText}>Watch Trailer</Text>
     </TouchableOpacity>
   );
 }
 
-function fmtCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
-}
-
 const styles = StyleSheet.create({
-  section: { paddingHorizontal: 16, marginTop: 22 },
+  section: { paddingHorizontal: 16, marginTop: 24 },
   sectionHead: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  sectionTitle: { color: C.text, fontSize: 18, fontWeight: "700" },
+  sectionTitle: { color: colors.text, fontFamily: font.headline, fontSize: 18 },
 
-  metaWrap: { alignItems: "center", gap: 8 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center" },
-  ratingPill: { flexDirection: "row", alignItems: "center", gap: 3 },
-  ratingText: { color: C.text, fontWeight: "800", fontSize: 15 },
-  ratingVotes: { color: C.sub, fontSize: 12, marginLeft: 2 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  ratingPill: { flexDirection: "row", alignItems: "center", gap: 4 },
+  ratingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13 },
+  metaItem: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: 13 },
+  sep: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.textFaint },
   certBox: {
-    borderWidth: 1,
-    borderColor: C.sub,
-    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
     paddingHorizontal: 6,
     paddingVertical: 1,
   },
-  certText: { color: C.text, fontSize: 12, fontWeight: "700" },
-  metaDot: { color: C.sub, fontSize: 14, fontWeight: "600" },
-  genres: { color: C.sub, fontSize: 13, textAlign: "center" },
+  certText: { color: colors.text, fontFamily: font.label, fontSize: 10, letterSpacing: 0.5 },
 
   pillsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   pill: {
-    backgroundColor: C.chip,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: radius.pill,
   },
-  pillText: { color: "#cfd2d6", fontSize: 12, fontWeight: "500" },
+  pillText: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: 12 },
 
-  peopleRow: { gap: 14, paddingRight: 16 },
-  person: { width: 92 },
-  personImg: { width: 92, height: 112, borderRadius: 10, backgroundColor: "#222" },
+  peopleRow: { gap: 16, paddingRight: 16 },
+  person: { width: 72, alignItems: "center" },
+  personImg: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
   personNoImg: { alignItems: "center", justifyContent: "center" },
-  personName: { color: C.text, fontSize: 12, fontWeight: "600", marginTop: 6 },
-  personRole: { color: C.sub, fontSize: 11, marginTop: 1 },
+  personName: { color: colors.text, fontFamily: font.bodySemi, fontSize: 12, marginTop: 8, textAlign: "center" },
+  personRole: { color: colors.textDim, fontFamily: font.body, fontSize: 10, marginTop: 1, textAlign: "center" },
 
   factGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    backgroundColor: C.card,
-    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
     padding: 4,
   },
   fact: { width: "50%", padding: 12 },
-  factLabel: { color: C.sub, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 },
-  factValue: { color: C.text, fontSize: 14, fontWeight: "600", marginTop: 3 },
+  factLabel: { color: colors.textDim, fontFamily: font.label, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+  factValue: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14, marginTop: 3 },
 
   provGroup: { marginBottom: 14 },
-  provLabel: { color: C.sub, fontSize: 12, marginBottom: 8, fontWeight: "600" },
+  provLabel: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: 12, marginBottom: 8 },
   provList: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  provLogo: { width: 44, height: 44, borderRadius: 10, backgroundColor: "#222" },
+  provChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  provLogo: { width: 28, height: 28, borderRadius: radius.sm, backgroundColor: colors.bgElevated },
   provNoLogo: { alignItems: "center", justifyContent: "center" },
-  provNoLogoText: { color: "#aaa", fontSize: 11, fontWeight: "700" },
-  provRegion: { color: "#666", fontSize: 11, marginTop: 4 },
+  provNoLogoText: { color: colors.textDim, fontFamily: font.label, fontSize: 11 },
+  provName: { color: colors.text, fontFamily: font.bodyMed, fontSize: 13 },
+  provRegion: { color: colors.textFaint, fontFamily: font.body, fontSize: 11, marginTop: 4 },
 
-  review: { backgroundColor: C.card, borderRadius: 14, padding: 14 },
+  review: {
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: 14,
+  },
   reviewHead: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 6,
   },
-  reviewAuthor: { color: C.text, fontWeight: "700", fontSize: 14 },
+  reviewAuthor: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14 },
   reviewRating: { flexDirection: "row", alignItems: "center", gap: 3 },
-  reviewRatingText: { color: C.gold, fontSize: 12, fontWeight: "700" },
-  reviewBody: { color: "#c8ccd0", fontSize: 13, lineHeight: 19 },
+  reviewRatingText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 12 },
+  reviewBody: { color: colors.textDim, fontFamily: font.body, fontSize: 13, lineHeight: 19 },
 
   linksRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   linkBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: C.chip,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: radius.pill,
   },
-  linkText: { color: C.accent, fontSize: 13, fontWeight: "600" },
+  linkText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13 },
 
   trailerBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#c4302b",
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: radius.pill,
     marginTop: 10,
   },
-  trailerText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  trailerText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 15 },
 });
 
-export const detailColors = C;
+export const detailColors = {
+  text: colors.text,
+  sub: colors.textDim,
+  accent: colors.honey,
+  gold: colors.honey,
+  card: colors.bgElevated,
+};

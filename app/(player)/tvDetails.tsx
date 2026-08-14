@@ -1,5 +1,4 @@
 import {
-  detailColors as C,
   FactGrid,
   LinksRow,
   MetaBar,
@@ -8,9 +7,9 @@ import {
   ProvidersRow,
   Reviews,
   Section,
-  TrailerButton,
 } from "@/components/details/sections";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
+import { colors, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import {
   externalLinks,
@@ -24,7 +23,8 @@ import {
   runtimeStr,
   topCast,
 } from "@/utils/tmdbDetails";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -32,19 +32,23 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  Image,
+  Linking,
+  Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { height, width } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
+const HERO_H = Math.min(560, height * 0.62);
 
 const TvDetails: React.FC = () => {
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { id } = useGlobalSearchParams<{ id: string }>();
 
   const [loading, setLoading] = useState(true);
@@ -52,6 +56,8 @@ const TvDetails: React.FC = () => {
   const [error, setError] = useState<string>();
   const [season, setSeason] = useState<number | null>(null);
   const [seasonData, setSeasonData] = useState<any>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
@@ -120,7 +126,7 @@ const TvDetails: React.FC = () => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.accent} />
+        <ActivityIndicator size="large" color={colors.honey} />
       </View>
     );
   }
@@ -132,12 +138,12 @@ const TvDetails: React.FC = () => {
     );
   }
 
-  const playEpisode = (ep: number) => {
+  const playEpisode = (ep: number, sea = season) => {
     void addToWatchHistory({
       id: id?.toString(),
       title: d.name,
       type: "tv",
-      season,
+      season: sea ?? undefined,
       episode: ep,
       poster_path: d.poster_path,
     });
@@ -146,7 +152,7 @@ const TvDetails: React.FC = () => {
       params: {
         id: id!.toString(),
         type: "tv",
-        season: String(season),
+        season: String(sea),
         ep: String(ep),
         title: d.name,
         poster_path: d.poster_path || "",
@@ -155,67 +161,130 @@ const TvDetails: React.FC = () => {
     });
   };
 
+  const handlePlay = () => {
+    const firstEp = seasonData?.episodes?.[0]?.episode_number ?? 1;
+    playEpisode(firstEp);
+  };
+
+  const handleWatchTogether = () => {
+    const firstEp = seasonData?.episodes?.[0]?.episode_number ?? 1;
+    router.push({
+      pathname: "/party",
+      params: {
+        role: "host",
+        id: id!.toString(),
+        type: "tv",
+        season: String(season ?? 1),
+        ep: String(firstEp),
+        title: d.name,
+      },
+    });
+  };
+
+  const openTrailer = (key?: string | null) => {
+    if (!key) return;
+    Linking.openURL(`https://www.youtube.com/watch?v=${key}`).catch(() => {});
+  };
+
+  const handleShare = () => {
+    void Share.share({ message: `Watch "${d.name}" with me on Bearoom 🐻` }).catch(() => {});
+  };
+
   const backdrop = img(d.backdrop_path, "w780") || img(d.poster_path, "w780");
   const seasons = (d.seasons ?? []).filter((s: any) => s.episode_count > 0);
   const next = d.next_episode_to_air;
 
   return (
     <View style={styles.container}>
-      <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
         {/* Hero */}
         <View style={styles.hero}>
           {backdrop ? (
-            <Image source={{ uri: backdrop }} style={styles.heroImg} resizeMode="cover" />
+            <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
           ) : null}
           <LinearGradient
-            colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)", "#0a0a0c"]}
+            colors={["rgba(16,13,10,0.4)", "transparent", colors.bg]}
             style={StyleSheet.absoluteFill}
           />
-          <TouchableOpacity style={styles.back} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={26} color="#fff" />
-          </TouchableOpacity>
+          <LinearGradient colors={[colors.bg, "rgba(16,13,10,0.5)", "transparent"]} style={styles.topScrim} />
+          <View style={[styles.topBar, { top: insets.top + 8 }]}>
+            <Pressable style={styles.glassRound} onPress={() => router.back()} hitSlop={6}>
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </Pressable>
+            <Pressable style={styles.glassRound} onPress={() => setSaved((s) => !s)} hitSlop={6}>
+              <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
+            </Pressable>
+          </View>
           <View style={styles.heroContent}>
-            <Image source={{ uri: img(d.poster_path, "w342") || undefined }} style={styles.poster} />
-            <View style={styles.heroText}>
-              <Text style={styles.title}>{d.name}</Text>
-              {d.tagline ? <Text style={styles.tagline}>{d.tagline}</Text> : null}
-              <Text style={styles.seasonsLine}>
-                {d.number_of_seasons} Seasons · {d.number_of_episodes} Episodes
-              </Text>
-            </View>
+            <Text style={styles.title}>{d.name}</Text>
+            <Text style={styles.seasonsLine}>
+              {d.number_of_seasons} Seasons · {d.number_of_episodes} Episodes
+            </Text>
+            <MetaBar
+              rating={d.vote_average}
+              votes={d.vote_count}
+              year={d.first_air_date?.slice(0, 4)}
+              runtime={runtimeStr(d.episode_run_time?.[0])}
+              certification={derived!.cert}
+              genres={(d.genres ?? []).map((g: any) => g.name)}
+            />
           </View>
         </View>
 
-        <View style={{ marginTop: 12 }}>
-          <MetaBar
-            rating={d.vote_average}
-            votes={d.vote_count}
-            year={d.first_air_date?.slice(0, 4)}
-            runtime={runtimeStr(d.episode_run_time?.[0])}
-            certification={derived!.cert}
-            genres={(d.genres ?? []).map((g: any) => g.name)}
-          />
+        {/* Primary actions */}
+        <View style={styles.actions}>
+          <Pressable style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]} onPress={handlePlay}>
+            <Ionicons name="play" size={20} color={colors.onHoney} />
+            <Text style={styles.playText}>Play</Text>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]} onPress={handleWatchTogether}>
+            <Ionicons name="paw" size={18} color={colors.honey} />
+            <Text style={styles.togetherText}>Watch together</Text>
+          </Pressable>
+        </View>
+
+        {/* Quick actions */}
+        <View style={styles.quickRow}>
+          <Pressable style={styles.quick} onPress={() => setSaved((s) => !s)}>
+            <View style={styles.quickIcon}>
+              <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
+            </View>
+            <Text style={styles.quickLabel}>My List</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={() => openTrailer(derived!.trailer?.key)} disabled={!derived!.trailer}>
+            <View style={styles.quickIcon}>
+              <Ionicons name="film-outline" size={22} color={derived!.trailer ? colors.textDim : colors.textFaint} />
+            </View>
+            <Text style={styles.quickLabel}>Trailer</Text>
+          </Pressable>
+          <Pressable style={styles.quick} onPress={handleShare}>
+            <View style={styles.quickIcon}>
+              <Ionicons name="share-social-outline" size={22} color={colors.textDim} />
+            </View>
+            <Text style={styles.quickLabel}>Share</Text>
+          </Pressable>
         </View>
 
         {next ? (
           <View style={styles.nextBanner}>
-            <Ionicons name="calendar" size={14} color={C.accent} />
+            <Ionicons name="calendar-outline" size={14} color={colors.honey} />
             <Text style={styles.nextText}>
               Next: S{next.season_number}E{next.episode_number} “{next.name}” · {next.air_date}
             </Text>
           </View>
         ) : null}
 
-        {derived!.trailer ? (
-          <View style={{ paddingHorizontal: 16 }}>
-            <TrailerButton trailerKey={derived!.trailer.key} />
-          </View>
-        ) : null}
-
         {d.overview ? (
-          <Section title="Overview">
-            <Text style={styles.overview}>{d.overview}</Text>
-          </Section>
+          <View style={styles.overviewWrap}>
+            <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
+              {d.overview}
+            </Text>
+            {d.overview.length > 140 ? (
+              <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={6}>
+                <Text style={styles.moreLink}>{expanded ? "less" : "more"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
 
         {/* Seasons + Episodes */}
@@ -226,38 +295,38 @@ const TvDetails: React.FC = () => {
               horizontal
               keyExtractor={(s: any) => String(s.id)}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 12 }}
+              contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
               renderItem={({ item }: any) => {
                 const active = item.season_number === season;
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     style={[styles.seasonChip, active && styles.seasonChipActive]}
                     onPress={() => setSeason(item.season_number)}
                   >
                     <Text style={[styles.seasonChipText, active && styles.seasonChipTextActive]}>
                       {item.season_number === 0 ? "Specials" : `Season ${item.season_number}`}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               }}
             />
             {seasonData ? (
               (seasonData.episodes ?? []).map((ep: any) => (
-                <TouchableOpacity
+                <Pressable
                   key={ep.id}
                   style={styles.episode}
                   onPress={() => playEpisode(ep.episode_number)}
                 >
                   <View style={styles.epStillWrap}>
                     {ep.still_path ? (
-                      <Image source={{ uri: img(ep.still_path, "w300") || undefined }} style={styles.epStill} />
+                      <Image source={{ uri: img(ep.still_path, "w300") || undefined }} style={styles.epStill} contentFit="cover" />
                     ) : (
                       <View style={[styles.epStill, styles.epNoStill]}>
-                        <Ionicons name="tv" size={20} color="#555" />
+                        <Ionicons name="tv-outline" size={20} color={colors.textFaint} />
                       </View>
                     )}
                     <View style={styles.epPlay}>
-                      <MaterialIcons name="play-arrow" size={22} color="#fff" />
+                      <Ionicons name="play" size={18} color={colors.text} />
                     </View>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -269,7 +338,7 @@ const TvDetails: React.FC = () => {
                       {ep.air_date ? <Text style={styles.epMetaText}>{ep.air_date}</Text> : null}
                       {ep.vote_average ? (
                         <View style={styles.epRating}>
-                          <MaterialIcons name="star" size={11} color={C.gold} />
+                          <Ionicons name="star" size={10} color={colors.honey} />
                           <Text style={styles.epMetaText}>{ep.vote_average.toFixed(1)}</Text>
                         </View>
                       ) : null}
@@ -280,10 +349,10 @@ const TvDetails: React.FC = () => {
                       </Text>
                     ) : null}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               ))
             ) : (
-              <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} />
+              <ActivityIndicator color={colors.honey} style={{ marginTop: 20 }} />
             )}
           </Section>
         ) : null}
@@ -335,9 +404,9 @@ const TvDetails: React.FC = () => {
               horizontal
               keyExtractor={(m: any) => String(m.id)}
               showsHorizontalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
               renderItem={({ item }: any) => (
-                <TouchableOpacity
+                <Pressable
                   style={styles.recCard}
                   onPress={() =>
                     router.replace({
@@ -346,91 +415,154 @@ const TvDetails: React.FC = () => {
                     })
                   }
                 >
-                  <Image source={{ uri: img(item.poster_path, "w342") || undefined }} style={styles.recImg} />
+                  <View style={styles.recImgWrap}>
+                    <Image source={{ uri: img(item.poster_path, "w342") || undefined }} style={styles.recImg} contentFit="cover" transition={200} />
+                    {item.vote_average ? (
+                      <View style={styles.recBadge}>
+                        <Ionicons name="star" size={9} color={colors.honey} />
+                        <Text style={styles.recBadgeText}>{item.vote_average.toFixed(1)}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.recTitle} numberOfLines={1}>
                     {item.name || item.title}
                   </Text>
-                  <View style={styles.recRating}>
-                    <MaterialIcons name="star" size={12} color={C.gold} />
-                    <Text style={styles.recRatingText}>
-                      {item.vote_average ? item.vote_average.toFixed(1) : "—"}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                </Pressable>
               )}
             />
           </Section>
         ) : null}
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0a0c" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0a0c" },
-  errText: { color: "#ff6b6b", fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
+  errText: { color: colors.danger, fontFamily: font.body, fontSize: 15 },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 
-  hero: { width: "100%", height: height * 0.46 },
-  heroImg: { width: "100%", height: "100%" },
-  back: { position: "absolute", top: 44, left: 12, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, padding: 4 },
-  heroContent: { position: "absolute", bottom: 14, left: 16, right: 16, flexDirection: "row", gap: 14, alignItems: "flex-end" },
-  poster: { width: width * 0.28, height: width * 0.28 * 1.5, borderRadius: 10, backgroundColor: "#222" },
-  heroText: { flex: 1, paddingBottom: 4 },
-  title: { color: "#fff", fontSize: 24, fontWeight: "800" },
-  tagline: { color: "#c8ccd0", fontSize: 13, fontStyle: "italic", marginTop: 4 },
-  seasonsLine: { color: C.accent, fontSize: 13, fontWeight: "600", marginTop: 6 },
+  hero: { width: "100%", height: HERO_H, justifyContent: "flex-end" },
+  topScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 140 },
+  topBar: { position: "absolute", left: 16, right: 16, flexDirection: "row", justifyContent: "space-between" },
+  glassRound: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
+  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: 30, letterSpacing: -0.6, lineHeight: 34 },
+  seasonsLine: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13 },
+
+  actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
+  playBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.honey,
+    paddingVertical: 14,
+    borderRadius: radius.pill,
+    ...glow.honey,
+  },
+  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: 15 },
+  togetherBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    paddingVertical: 14,
+    borderRadius: radius.pill,
+  },
+  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: 15 },
+
+  quickRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 20,
+    marginTop: 12,
+    marginHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  quick: { alignItems: "center", gap: 6 },
+  quickIcon: { width: 48, height: 48, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  quickLabel: { color: colors.textDim, fontFamily: font.label, fontSize: 12 },
 
   nextBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(78,161,255,0.12)",
+    backgroundColor: colors.honeySoft,
     marginHorizontal: 16,
-    marginTop: 14,
+    marginTop: 16,
     padding: 10,
-    borderRadius: 10,
+    borderRadius: radius.md,
   },
-  nextText: { color: C.text, fontSize: 12, flex: 1 },
+  nextText: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, flex: 1 },
 
-  overview: { color: "#d3d7db", fontSize: 14, lineHeight: 21 },
+  overviewWrap: { paddingHorizontal: 16, marginTop: 18 },
+  overview: { color: colors.textDim, fontFamily: font.body, fontSize: 14, lineHeight: 21 },
+  moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: 13, marginTop: 4 },
 
   seasonChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: C.chip,
-    borderWidth: 1,
-    borderColor: C.line,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
-  seasonChipActive: { backgroundColor: C.accent, borderColor: C.accent },
-  seasonChipText: { color: "#cfd2d6", fontSize: 13, fontWeight: "600" },
-  seasonChipTextActive: { color: "#fff" },
+  seasonChipActive: { backgroundColor: colors.honeySoft, borderColor: colors.honey },
+  seasonChipText: { color: colors.textDim, fontFamily: font.bodySemi, fontSize: 13 },
+  seasonChipTextActive: { color: colors.honey },
 
-  episode: { flexDirection: "row", gap: 12, marginBottom: 14, alignItems: "center" },
+  episode: { flexDirection: "row", gap: 12, marginBottom: 16, alignItems: "center" },
   epStillWrap: { width: 120, height: 68 },
-  epStill: { width: 120, height: 68, borderRadius: 8, backgroundColor: "#222" },
+  epStill: { width: 120, height: 68, borderRadius: radius.md, backgroundColor: colors.bgElevated },
   epNoStill: { alignItems: "center", justifyContent: "center" },
   epPlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.25)",
-    borderRadius: 8,
+    backgroundColor: "rgba(16,13,10,0.28)",
+    borderRadius: radius.md,
   },
-  epTitle: { color: C.text, fontSize: 14, fontWeight: "700" },
+  epTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: 14 },
   epMeta: { flexDirection: "row", gap: 10, marginTop: 3, alignItems: "center" },
-  epMetaText: { color: C.sub, fontSize: 11 },
+  epMetaText: { color: colors.textDim, fontFamily: font.body, fontSize: 11 },
   epRating: { flexDirection: "row", alignItems: "center", gap: 2 },
-  epOverview: { color: "#a9adb2", fontSize: 12, marginTop: 4, lineHeight: 16 },
+  epOverview: { color: colors.textDim, fontFamily: font.body, fontSize: 12, marginTop: 4, lineHeight: 16 },
 
-  recCard: { width: 110 },
-  recImg: { width: 110, height: 165, borderRadius: 10, backgroundColor: "#222" },
-  recTitle: { color: C.text, fontSize: 12, fontWeight: "600", marginTop: 6 },
-  recRating: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
-  recRatingText: { color: C.sub, fontSize: 11 },
+  recCard: { width: 118 },
+  recImgWrap: { borderRadius: radius.lg, overflow: "hidden" },
+  recImg: { width: 118, height: 177, backgroundColor: colors.bgElevated },
+  recBadge: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: colors.scrim,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  recBadgeText: { color: colors.text, fontFamily: font.bodySemi, fontSize: 9 },
+  recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: 12, marginTop: 6 },
 });
 
 export default React.memo(TvDetails);
