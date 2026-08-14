@@ -67,33 +67,29 @@ export default {
 
 /**
  * Normalize one KLIPY item → { id, url, previewUrl, width, height }.
- * KLIPY (Tenor-compatible) nests media under `file` as format → size → {url,width,height}.
- * Defensive across the documented shapes; returns null for ad slots / no url.
+ * KLIPY nests media as file[SIZE][FORMAT] → {url,width,height,size}, with
+ * SIZE ∈ {hd,md,sm,xs} and FORMAT ∈ {gif,webp,jpg,mp4,webm}. We use animated
+ * `gif`: md for display, xs for the grid preview. Ad slots (type:"ad") skipped.
  */
 function pickGif(item) {
   if (!item || item.type === "ad") return null;
   const file = item.file || item.files || {};
-  const gif = file.gif || file.webp || {};
 
-  const sizeUrl = (size) => {
-    const s = gif[size];
-    if (s && s.url) return { url: s.url, width: num(s.width), height: num(s.height) };
-    return null;
+  const gifAt = (size) => {
+    const g = file[size] && file[size].gif;
+    return g && g.url ? { url: g.url, width: num(g.width), height: num(g.height) } : null;
   };
 
-  const display = sizeUrl("md") || sizeUrl("sm") || sizeUrl("hd") || sizeUrl("xs");
-  const preview = sizeUrl("xs") || sizeUrl("sm") || display;
-
-  // Fallbacks for a flatter shape (url/src + width/height at the item level).
-  const url = display?.url || item.url || item.src || null;
-  if (!url) return null;
+  const display = gifAt("md") || gifAt("sm") || gifAt("hd") || gifAt("xs");
+  if (!display) return null;
+  const preview = gifAt("xs") || gifAt("sm") || display;
 
   return {
-    id: String(item.id ?? item.slug ?? url),
-    url,
-    previewUrl: preview?.url || url,
-    width: display?.width || num(item.width) || 200,
-    height: display?.height || num(item.height) || 200,
+    id: String(item.id ?? item.slug ?? display.url),
+    url: display.url,
+    previewUrl: preview.url,
+    width: display.width || 200,
+    height: display.height || 200,
   };
 }
 
