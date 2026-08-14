@@ -136,6 +136,10 @@ export class PartyClient {
     }
 
     await this.subscribe();
+    // Our create/join RPC already ran + broadcast, but the channel wasn't
+    // subscribed yet so peers never received it. Re-announce our snapshot now
+    // that we're listening, so the host (and others) pick up our membership.
+    if (this.snap) this.broadcast(this.snap);
     this.clockTimer = setInterval(() => void this.pingClock(), CLOCK_PING_INTERVAL_MS);
     this.watchdog = setInterval(() => this.checkHost(), WATCHDOG_INTERVAL_MS);
     this.reconcileRole();
