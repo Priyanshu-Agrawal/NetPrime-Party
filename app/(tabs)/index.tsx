@@ -3,7 +3,7 @@ import HeroCarousel from "@/components/home/HeroCarousel";
 import MediaRail from "@/components/home/MediaRail";
 import AppHeader from "@/components/ui/AppHeader";
 import GlassCard from "@/components/ui/GlassCard";
-import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
+import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { hasOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,7 +24,7 @@ export default React.memo(function HomePage() {
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
-  const headerBlurStyle = fadeInStyle(scrollY, 24, 120);
+  const headerBlurStyle = useFadeInStyle(scrollY, 24, 120);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false });

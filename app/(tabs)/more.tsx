@@ -9,7 +9,7 @@
 import appJson from "@/app.json";
 import AppHeader from "@/components/ui/AppHeader";
 import { bearAlert } from "@/components/ui/BearAlert";
-import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
+import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { getDisplayName, setDisplayName } from "@/services/party/identity";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { checkGithubRelease } from "@/utils/checkGithubRelease";
@@ -47,7 +47,7 @@ export default function MoreScreen() {
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
-  const headerBlurStyle = fadeInStyle(scrollY, 24, 120);
+  const headerBlurStyle = useFadeInStyle(scrollY, 24, 120);
 
   const handle = "@" + (name || "guest").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 

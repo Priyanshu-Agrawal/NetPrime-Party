@@ -40,6 +40,8 @@ export interface VidLinkHandle {
   pause(): void;
   seek(seconds: number): void;
   setRate(rate: number): void;
+  /** Ask the provider's <video> to enter native HTML5 fullscreen. */
+  fullscreen(): void;
 }
 
 interface Props {
@@ -145,6 +147,10 @@ const BRIDGE_JS = `
       else if (cmd.action === 'pause') vid.pause();
       else if (cmd.action === 'seek') vid.currentTime = cmd.time;
       else if (cmd.action === 'rate') vid.playbackRate = cmd.rate;
+      else if (cmd.action === 'fullscreen') {
+        var fs = vid.requestFullscreen || vid.webkitRequestFullscreen || vid.webkitEnterFullscreen || vid.mozRequestFullScreen;
+        if (fs) fs.call(vid);
+      }
     } catch(e){}
   };
   true;
@@ -168,6 +174,7 @@ export const VidLinkPlayer = forwardRef<VidLinkHandle, Props>(
         pause: () => cmd({ action: "pause" }),
         seek: (seconds: number) => cmd({ action: "seek", time: seconds }),
         setRate: (rate: number) => cmd({ action: "rate", rate }),
+        fullscreen: () => cmd({ action: "fullscreen" }),
       }),
       [cmd],
     );

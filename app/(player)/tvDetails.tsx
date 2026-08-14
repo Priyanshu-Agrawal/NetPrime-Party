@@ -27,7 +27,7 @@ import {
   runtimeStr,
   topCast,
 } from "@/utils/tmdbDetails";
-import { fadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
+import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
@@ -68,8 +68,8 @@ const TvDetails: React.FC = () => {
 
   const headerH = insets.top + ms(52);
   const { scrollHandler, scrollY } = useCollapsingHeader(headerH);
-  const headerTitleStyle = fadeInStyle(scrollY, HERO_H * 0.5, HERO_H * 0.72);
-  const headerBgStyle = fadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
+  const headerTitleStyle = useFadeInStyle(scrollY, HERO_H * 0.5, HERO_H * 0.72);
+  const headerBgStyle = useFadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });

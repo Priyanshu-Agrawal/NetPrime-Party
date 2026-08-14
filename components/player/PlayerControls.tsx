@@ -13,7 +13,7 @@
  * tap-to-seek and drag. When `canControl` is false the bar is shown read-only
  * (progress + time) with the action buttons hidden.
  */
-import { colors, font, ms, radius } from "@/theme/bearoom";
+import { colors, font, ms } from "@/theme/bearoom";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -171,7 +171,8 @@ export default function PlayerControls({
             <Pressable
               style={styles.playBtn}
               onPress={() => {
-                paused ? onPlay() : onPause();
+                if (paused) onPlay();
+                else onPause();
                 show();
               }}
               hitSlop={10}

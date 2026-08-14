@@ -41,8 +41,8 @@ export function useCollapsingHeader(headerHeight: number) {
   return { scrollHandler, barStyle, scrollY };
 }
 
-/** Fade a value in as the user scrolls through [start, end]. */
-export function fadeInStyle(scrollY: SharedValue<number>, start: number, end: number) {
+/** Fade a value in as the user scrolls through [start, end]. Hook: call at render top-level. */
+export function useFadeInStyle(scrollY: SharedValue<number>, start: number, end: number) {
   return useAnimatedStyle(() => ({
     opacity: interpolate(scrollY.value, [start, end], [0, 1], Extrapolation.CLAMP),
   }));
