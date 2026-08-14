@@ -425,7 +425,7 @@ export default function Party() {
         </Pressable>
       </Modal>
 
-      {/* GIF picker (Giphy via our Cloudflare proxy) */}
+      {/* GIF picker (KLIPY via our Cloudflare proxy) */}
       <GifPicker visible={showGif} onClose={() => setShowGif(false)} onPick={(g) => chat.sendGif(g)} />
     </View>
   );

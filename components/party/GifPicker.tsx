@@ -1,9 +1,9 @@
 /**
  * GifPicker — a frosted bottom-sheet GIF browser for the watch-party chat.
- * Trending on open, live search as you type (debounced), tap to send. All Giphy
- * calls go through our Cloudflare proxy (services/giphy) so no key ships here.
+ * Trending on open, live search as you type (debounced), tap to send. All GIF
+ * calls go through our KLIPY Cloudflare proxy (services/gifs) so no key ships here.
  */
-import { searchGifs, trendingGifs, type GifItem } from "@/services/giphy";
+import { searchGifs, trendingGifs, type GifItem } from "@/services/gifs";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -142,7 +142,7 @@ export function GifPicker({ visible, onClose, onPick }: Props) {
           }
         />
         <View style={styles.attribution}>
-          <Text style={styles.attrText}>Powered by GIPHY</Text>
+          <Text style={styles.attrText}>Powered by KLIPY</Text>
         </View>
       </KeyboardAvoidingView>
     </Modal>

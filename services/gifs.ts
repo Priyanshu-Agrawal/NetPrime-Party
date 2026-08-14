@@ -1,11 +1,11 @@
 /**
- * Giphy client — talks ONLY to our Cloudflare Worker proxy (giphy-proxy-worker.js),
- * which injects the API key server-side. No key ships in the app. The proxy
- * returns a trimmed shape: { gifs: GifItem[] }.
+ * GIF client — talks ONLY to our KLIPY Cloudflare Worker proxy
+ * (klipy-proxy-worker.js), which injects the key server-side. No key ships in
+ * the app. The proxy returns a trimmed { gifs: GifItem[] }.
  *
- * If you deploy the worker under a different name/subdomain, update GIPHY_PROXY.
+ * If you deploy the worker under a different name/subdomain, update GIF_PROXY.
  */
-export const GIPHY_PROXY = "https://giphy.spiderfan-no1.workers.dev/";
+export const GIF_PROXY = "https://klipy.spiderfan-no1.workers.dev/";
 
 export interface GifItem {
   id: string;
@@ -17,7 +17,7 @@ export interface GifItem {
 
 async function get(path: string): Promise<GifItem[]> {
   try {
-    const res = await fetch(GIPHY_PROXY.replace(/\/+$/, "") + path);
+    const res = await fetch(GIF_PROXY.replace(/\/+$/, "") + path);
     if (!res.ok) return [];
     const data = (await res.json()) as { gifs?: GifItem[] };
     return Array.isArray(data.gifs) ? data.gifs : [];
