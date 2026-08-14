@@ -232,10 +232,17 @@ export class PartyClient {
       const newer = a.epoch > b.epoch || (a.epoch === b.epoch && a.seq >= b.seq);
       if (!newer) return; // stale broadcast — drop
     }
-    // Kicked: we were in the room and this authoritative snapshot no longer lists
-    // us. (Only from a peer/host broadcast — never from our own RPC result.)
-    if (!fromSelf && this.userId && cur?.members?.some((m) => m.userId === this.userId)) {
-      if (!s.members?.some((m) => m.userId === this.userId)) {
+    // Kicked: a STRICTLY-NEWER authoritative snapshot no longer lists us (a real
+    // kick bumps seq). We must require strictly-newer, not just `>=`: a stale host
+    // lease-heartbeat broadcast carries an equal seq but a member list that
+    // predates our own join, and would otherwise look like a removal.
+    if (!fromSelf && this.userId && cur) {
+      const strictlyNewer =
+        s.playback.epoch > cur.playback.epoch ||
+        (s.playback.epoch === cur.playback.epoch && s.playback.seq > cur.playback.seq);
+      const wasMember = cur.members?.some((m) => m.userId === this.userId);
+      const stillMember = s.members?.some((m) => m.userId === this.userId);
+      if (strictlyNewer && wasMember && !stillMember) {
         this.snap = s;
         this.kickedCb?.();
         return;
