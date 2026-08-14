@@ -34,11 +34,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
-const COLS = 2;
+const COLS = 3;
 const GAP = ms(8);
 const PAD = ms(14);
-const TILE_W = Math.floor((width - PAD * 2 - GAP) / COLS);
-const TILE_H = Math.round(TILE_W * 0.75);
+const TILE_W = Math.floor((width - PAD * 2 - GAP * (COLS - 1)) / COLS);
+const GIF_H = Math.round(TILE_W * 0.95);
 
 const TABS: { key: MediaKind; label: string }[] = [
   { key: "gifs", label: "GIFs" },
@@ -214,18 +214,18 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <Pressable
-                style={[styles.tile, sticker && styles.tileSticker]}
+                style={[styles.tile, { height: sticker ? TILE_W : GIF_H }, sticker && styles.tileSticker]}
                 onPress={() => pick(item)}
                 onLongPress={() => report(item)}
                 delayLongPress={400}
               >
                 <Image
                   source={{ uri: item.previewUrl }}
-                  placeholder={item.blur ? { uri: item.blur } : undefined}
+                  placeholder={sticker || !item.blur ? undefined : { uri: item.blur }}
                   placeholderContentFit="cover"
                   style={styles.tileImg}
                   contentFit={sticker ? "contain" : "cover"}
-                  transition={220}
+                  transition={200}
                 />
               </Pressable>
             )}
@@ -260,8 +260,8 @@ function SkeletonGrid() {
   }, [pulse]);
   return (
     <View style={[styles.grid, styles.skeletonWrap]}>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <Animated.View key={i} style={[styles.tile, styles.skeleton, { opacity: pulse }]} />
+      {Array.from({ length: 9 }).map((_, i) => (
+        <Animated.View key={i} style={[styles.skeleton, { opacity: pulse }]} />
       ))}
     </View>
   );
@@ -326,11 +326,11 @@ const styles = StyleSheet.create({
   catText: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12) },
 
   grid: { paddingHorizontal: PAD, paddingBottom: ms(20), gap: GAP },
-  skeletonWrap: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
-  tile: { width: TILE_W, height: TILE_H, borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.surface },
-  tileSticker: { backgroundColor: colors.surfaceStrong },
+  skeletonWrap: { flexDirection: "row", flexWrap: "wrap" },
+  tile: { width: TILE_W, borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.surface },
+  tileSticker: { backgroundColor: "transparent" },
   tileImg: { width: "100%", height: "100%" },
-  skeleton: { backgroundColor: colors.surfaceStrong, marginBottom: GAP },
+  skeleton: { width: TILE_W, height: GIF_H, borderRadius: radius.md, backgroundColor: colors.surfaceStrong, marginBottom: GAP },
   empty: { paddingVertical: ms(40), alignItems: "center", gap: ms(8) },
   emptyText: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13) },
   attribution: { alignItems: "center", paddingVertical: ms(6) },

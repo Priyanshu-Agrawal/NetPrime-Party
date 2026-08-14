@@ -77,7 +77,8 @@ function pickMedia(item: any, order: string[]): MediaItem | null {
   const display =
     mediaAt(file, "md", order) || mediaAt(file, "sm", order) || mediaAt(file, "hd", order) || mediaAt(file, "xs", order);
   if (!display) return null; // unrenderable item (no matching media) — skip; order otherwise preserved
-  const preview = mediaAt(file, "xs", order) || mediaAt(file, "sm", order) || display;
+  // Grid preview: prefer `sm` so small tiles stay sharp (xs upscales/pixelates).
+  const preview = mediaAt(file, "sm", order) || mediaAt(file, "md", order) || display;
   return {
     id: String(item.id ?? item.slug ?? display.url),
     slug: String(item.slug ?? item.id ?? ""),
