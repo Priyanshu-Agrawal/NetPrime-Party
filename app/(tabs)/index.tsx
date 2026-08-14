@@ -2,19 +2,27 @@ import ContinueWatching from "@/components/home/ContinueWatching";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import MediaRail from "@/components/home/MediaRail";
 import GlassCard from "@/components/ui/GlassCard";
+import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default React.memo(function HomePage() {
   const navigation = useNavigation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const headerBlurStyle = fadeInStyle(scrollY, 24, 120);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
@@ -24,9 +32,11 @@ export default React.memo(function HomePage() {
     <View style={styles.root}>
       <StatusBar style="light" translucent />
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: 108 }}
       >
         <HeroCarousel />
@@ -68,14 +78,25 @@ export default React.memo(function HomePage() {
         <MediaRail title="Popular Series" path="tv/popular" kind="tv" />
         <MediaRail title="Top Rated Series" path="tv/top_rated" kind="tv" icon="star" />
         <MediaRail title="Airing Today" path="tv/airing_today" kind="tv" />
-      </ScrollView>
+      </Animated.ScrollView>
 
-      {/* Floating top bar over the hero */}
-      <LinearGradient
-        colors={[colors.bg, "rgba(16,13,10,0.6)", "transparent"]}
-        style={[styles.topBarBg, { paddingTop: insets.top }]}
-        pointerEvents="box-none"
-      >
+      {/* Persistent top bar — gains a frosted-glass background once content
+          scrolls under it so it never merges with the rails. */}
+      <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
+          <BlurView
+            intensity={40}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.headerBgLine} />
+        </Animated.View>
+        <LinearGradient
+          colors={[colors.bg, "rgba(16,13,10,0.55)", "transparent"]}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
         <View style={styles.topBar}>
           <View style={styles.brandRow}>
             <Ionicons name="paw" size={20} color={colors.honey} />
@@ -101,7 +122,7 @@ export default React.memo(function HomePage() {
             </Pressable>
           </View>
         </View>
-      </LinearGradient>
+      </View>
     </View>
   );
 });
@@ -116,6 +137,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    overflow: "hidden",
+  },
+  headerBgLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
   },
   topBar: {
     flexDirection: "row",

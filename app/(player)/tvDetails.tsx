@@ -25,7 +25,9 @@ import {
   runtimeStr,
   topCast,
 } from "@/utils/tmdbDetails";
+import { fadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
@@ -35,13 +37,14 @@ import {
   Dimensions,
   FlatList,
   Linking,
+  Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { height, width } = Dimensions.get("window");
@@ -60,6 +63,11 @@ const TvDetails: React.FC = () => {
   const [seasonData, setSeasonData] = useState<any>(null);
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const headerH = insets.top + ms(52);
+  const { scrollHandler, barStyle, scrollY } = useCollapsingHeader(headerH);
+  const headerTitleStyle = fadeInStyle(scrollY, HERO_H * 0.5, HERO_H * 0.72);
+  const headerBgStyle = fadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
@@ -200,7 +208,37 @@ const TvDetails: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+      {/* Sticky, auto-hiding header */}
+      <Animated.View style={[styles.header, { height: headerH }, barStyle]} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, headerBgStyle]}>
+          <BlurView
+            intensity={40}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.headerBgLine} />
+        </Animated.View>
+        <View style={[styles.headerRow, { marginTop: insets.top }]}>
+          <Pressable style={styles.glassRound} onPress={() => router.back()} hitSlop={6}>
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+          </Pressable>
+          <Animated.Text numberOfLines={1} style={[styles.headerTitle, headerTitleStyle]}>
+            {d.name}
+          </Animated.Text>
+          <Pressable style={styles.glassRound} onPress={() => setSaved((s) => !s)} hitSlop={6}>
+            <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
+          </Pressable>
+        </View>
+      </Animated.View>
+
+      <Animated.ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingBottom: 48 + insets.bottom }}
+      >
         {/* Hero */}
         <View style={styles.hero}>
           {backdrop ? (
@@ -210,15 +248,6 @@ const TvDetails: React.FC = () => {
             colors={["transparent", "transparent", colors.bg]}
             style={StyleSheet.absoluteFill}
           />
-          <LinearGradient colors={[colors.bg, "rgba(16,13,10,0.5)", "transparent"]} style={styles.topScrim} />
-          <View style={[styles.topBar, { top: insets.top + 8 }]}>
-            <Pressable style={styles.glassRound} onPress={() => router.back()} hitSlop={6}>
-              <Ionicons name="chevron-back" size={22} color={colors.text} />
-            </Pressable>
-            <Pressable style={styles.glassRound} onPress={() => setSaved((s) => !s)} hitSlop={6}>
-              <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
-            </Pressable>
-          </View>
           <View style={styles.heroContent}>
             <Text style={styles.title}>{d.name}</Text>
             <Text style={styles.seasonsLine}>
@@ -436,7 +465,7 @@ const TvDetails: React.FC = () => {
             />
           </Section>
         ) : null}
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 };
@@ -448,11 +477,33 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 
   hero: { width: "100%", height: HERO_H, justifyContent: "flex-end" },
-  topScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 140 },
-  topBar: { position: "absolute", left: 16, right: 16, flexDirection: "row", justifyContent: "space-between" },
+  header: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 20 },
+  headerBgLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
+  headerRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  headerTitle: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: font.headlineSemi,
+    fontSize: ms(16),
+    textAlign: "center",
+  },
   glassRound: {
-    width: 40,
-    height: 40,
+    width: ms(40),
+    height: ms(40),
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceStrong,
     borderWidth: StyleSheet.hairlineWidth,
@@ -461,7 +512,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
-  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(30), letterSpacing: -0.6, lineHeight: 34 },
+  title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(30), letterSpacing: -0.6, lineHeight: ms(34) },
   seasonsLine: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13) },
 
   actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
