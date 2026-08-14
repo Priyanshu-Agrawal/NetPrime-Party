@@ -1,789 +1,436 @@
-import { Colors } from "@/constants/Colors";
+import {
+  detailColors as C,
+  FactGrid,
+  LinksRow,
+  MetaBar,
+  PeopleRow,
+  Pills,
+  ProvidersRow,
+  Reviews,
+  Section,
+  TrailerButton,
+} from "@/components/details/sections";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { addToWatchHistory } from "@/utils/history";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  externalLinks,
+  fetchDetails,
+  img,
+  keyCrew,
+  keywords,
+  pickCertification,
+  pickProviders,
+  pickTrailer,
+  runtimeStr,
+  topCast,
+} from "@/utils/tmdbDetails";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
-  ImageBackground,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
-import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
 
-const { height } = Dimensions.get("window");
-const API_URI = "https://db.bitcine.app/3/";
-
-const API_KEY = "ad301b7cc82ffe19273e55e4d4206885";
-
-export const options = {
-  animation: "fade",
-};
-
-// --- Type Definitions (Updated/Added) ---
-interface Genre {
-  id: number;
-  name: string;
-}
-
-interface Network {
-  id: number;
-  logo_path: string | null;
-  name: string;
-  origin_country: string;
-}
-
-interface SeasonOverview {
-  // This is for the `seasons` array in TV show details
-  air_date: string;
-  episode_count: number;
-  id: number;
-  name: string;
-  overview: string;
-  poster_path: string | null;
-  season_number: number;
-  vote_average: number;
-}
-
-interface Episode {
-  air_date: string;
-  episode_number: number;
-  episode_type: string;
-  id: number;
-  name: string;
-  overview: string;
-  runtime: number;
-  season_number: number;
-  still_path: string | null;
-  vote_average: number;
-  vote_count: number;
-}
-
-interface SeasonDetailsData {
-  // This is for the detailed season API response
-  _id: string;
-  air_date: string;
-  episodes: Episode[];
-  name: string;
-  overview: string;
-  id: number;
-  poster_path: string | null;
-  season_number: number;
-  vote_average: number;
-}
-
-interface TvShowDetailsData {
-  // Main TV Show details
-  adult: boolean;
-  backdrop_path: string | null;
-  created_by: any[];
-  episode_run_time: number[];
-  first_air_date: string;
-  genres: Genre[];
-  homepage: string;
-  id: number;
-  in_production: boolean;
-  languages: string[];
-  last_air_date: string;
-  last_episode_to_air: Episode | null; // Use Episode interface
-  name: string;
-  networks: Network[];
-  next_episode_to_air: any;
-  number_of_episodes: number;
-  number_of_seasons: number;
-  origin_country: string[];
-  original_language: string;
-  original_name: string;
-  overview: string;
-  popularity: number;
-  poster_path: string | null;
-  production_companies: any[];
-  production_countries: any[];
-  seasons: SeasonOverview[]; // Use SeasonOverview
-  spoken_languages: any[];
-  status: string;
-  tagline: string;
-  type: string;
-  vote_average: number;
-  vote_count: number;
-}
+const { height, width } = Dimensions.get("window");
 
 const TvDetails: React.FC = () => {
   const router = useRouter();
-  const [loading, setLoading] = useState<boolean>(true);
-  const [details, setDetails] = useState<TvShowDetailsData | null>(null);
-  const [seasonDetails, setSeasonDetails] = useState<SeasonDetailsData | null>(
-    null,
-  ); // State for selected season's episodes
-  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<
-    number | null
-  >(null); // Track selected season
-  const [error, setError] = useState<string | null>(null);
-
-  const colorScheme = useColorScheme();
-  const color = Colors[colorScheme ?? "dark"];
-  const { id } = useGlobalSearchParams();
-  const tvShowId =
-    typeof id === "string" ? id : Array.isArray(id) ? id[0] : null;
-
   const navigation = useNavigation();
+  const { id } = useGlobalSearchParams<{ id: string }>();
+
+  const [loading, setLoading] = useState(true);
+  const [d, setD] = useState<any>(null);
+  const [error, setError] = useState<string>();
+  const [season, setSeason] = useState<number | null>(null);
+  const [seasonData, setSeasonData] = useState<any>(null);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
   }, [navigation]);
 
-  // --- Effect to fetch TV Show Details ---
   useEffect(() => {
-    if (!tvShowId) {
-      setError("TV Show ID is missing.");
-      setLoading(false);
-      return;
-    }
+    let aborted = false;
+    setLoading(true);
+    fetchDetails("tv", id!)
+      .then((data) => {
+        if (aborted) return;
+        setD(data);
+        setError(undefined);
+        const first =
+          (data.seasons ?? []).find(
+            (s: any) => s.season_number > 0 && s.episode_count > 0,
+          ) ?? (data.seasons ?? [])[0];
+        if (first) setSeason(first.season_number);
+      })
+      .catch((e) => !aborted && setError(e.message))
+      .finally(() => !aborted && setLoading(false));
+    return () => {
+      aborted = true;
+    };
+  }, [id]);
 
-    async function fetchTvShowDetail() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(
-          `${API_URL}tv/${tvShowId}?language=en-US`,
-          {
-            headers: API_HEADERS,
-          },
-        );
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.status_message ||
-              `HTTP error! status: ${response.status}`,
-          );
-        }
-        const data: TvShowDetailsData = await response.json();
-        setDetails(data);
-
-        // --- Automatically select the first season with episodes if available ---
-        if (data.seasons && data.seasons.length > 0) {
-          // Find the first season that is not "Specials" (season_number 0) and has episodes
-          const defaultSeason =
-            data.seasons.find(
-              (season) => season.season_number > 0 && season.episode_count > 0,
-            ) || data.seasons[0]; // Fallback to Season 0 or first if no other valid found
-
-          if (defaultSeason) {
-            setSelectedSeasonNumber(defaultSeason.season_number);
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError("An unknown error occurred while fetching TV show details.");
-        }
-        setDetails(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchTvShowDetail();
-  }, [tvShowId]);
-
-  // --- Effect to fetch Season Details when selectedSeasonNumber changes ---
   useEffect(() => {
-    if (!tvShowId || selectedSeasonNumber === null) {
-      setSeasonDetails(null); // Clear season details if no season is selected
-      return;
-    }
+    if (!id || season === null) return;
+    let aborted = false;
+    setSeasonData(null);
+    fetch(`${API_URL}tv/${id}/season/${season}?language=en-US`, {
+      headers: API_HEADERS,
+    })
+      .then((r) => r.json())
+      .then((data) => !aborted && setSeasonData(data))
+      .catch(() => !aborted && setSeasonData(null));
+    return () => {
+      aborted = true;
+    };
+  }, [id, season]);
 
-    async function fetchSelectedSeasonDetails() {
-      // You might want a separate loading state for season details to avoid flashing main loader
-      // setLoading(true); // Or use a dedicated `seasonLoading` state
-      setError(null); // Clear errors related to season fetch
-
-      try {
-        const response = await fetch(
-          `${API_URL}tv/${tvShowId}/season/${selectedSeasonNumber}?language=en-US`,
-          {
-            headers: API_HEADERS,
-          },
-        );
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.status_message ||
-              `HTTP error! status: ${response.status}`,
-          );
-        }
-        const data: SeasonDetailsData = await response.json();
-        setSeasonDetails(data);
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError(
-            `An unknown error occurred while fetching Season ${selectedSeasonNumber} details.`,
-          );
-        }
-        setSeasonDetails(null);
-      } finally {
-        // setLoading(false); // Only if using main loading state
-      }
-    }
-    fetchSelectedSeasonDetails();
-  }, [tvShowId, selectedSeasonNumber]); // Re-fetch when TV show ID or selected season changes
-
-  const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
+  const derived = useMemo(() => {
+    if (!d) return null;
+    return {
+      trailer: pickTrailer(d),
+      cert: pickCertification(d, "tv"),
+      cast: topCast(d),
+      crew: keyCrew(d, "tv"),
+      providers: pickProviders(d),
+      keywords: keywords(d),
+      links: externalLinks(d),
+      recs: (d.recommendations?.results ?? d.similar?.results ?? []).slice(0, 20),
+      facts: [
+        { label: "Status", value: d.status || "" },
+        { label: "First Air", value: d.first_air_date || "" },
+        { label: "Last Air", value: d.last_air_date || "" },
+        { label: "Networks", value: (d.networks ?? []).map((n: any) => n.name).join(", ") },
+        { label: "Type", value: d.type || "" },
+        { label: "Episode Runtime", value: runtimeStr(d.episode_run_time?.[0]) },
+        { label: "Original Language", value: (d.original_language || "").toUpperCase() },
+        { label: "In Production", value: d.in_production ? "Yes" : "No" },
+      ],
+    };
+  }, [d]);
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.centeredContainer,
-          {
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: color.background,
-          },
-        ]}
-      >
-        <ShimmerPlaceholder
-          shimmerColors={
-            colorScheme === "dark" ? ["#222", "#111", "#222"] : undefined
-          }
-          style={{
-            height: "60%",
-            width: "95%",
-            borderRadius: 8,
-            marginBottom: 20,
-            alignSelf: "center",
-          }}
-        />
-        <ShimmerPlaceholder
-          shimmerColors={
-            colorScheme === "dark" ? ["#222", "#111", "#222"] : undefined
-          }
-          style={{
-            height: 210,
-            width: "90%",
-            borderRadius: 18,
-            marginBottom: 30,
-          }}
-        />
-        {/* <ShimmerPlaceholder
-          shimmerColors={
-            colorScheme === "dark" ? ["#222", "#111", "#222"] : undefined
-          }
-          style={{
-            height: 30,
-            width: 120,
-            borderRadius: 8,
-            marginBottom: 20,
-            alignSelf: "flex-start",
-          }}
-        /> */}
-        {/* Episode shimmer row */}
-        <View style={{ width: "70%", margin: 10 }}>
-          {[1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 15,
-              }}
-            >
-              <ShimmerPlaceholder
-                shimmerColors={
-                  colorScheme === "dark" ? ["#222", "#111", "#222"] : undefined
-                }
-                style={{
-                  width: 100,
-                  height: 50,
-                  borderRadius: 8,
-                  marginRight: 15,
-                }}
-              />
-              <View style={{ flex: 1 }}>
-                <ShimmerPlaceholder
-                  shimmerColors={
-                    colorScheme === "dark"
-                      ? ["#222", "#111", "#222"]
-                      : undefined
-                  }
-                  style={{
-                    height: 18,
-                    width: "60%",
-                    borderRadius: 6,
-                    marginBottom: 8,
-                  }}
-                />
-                <ShimmerPlaceholder
-                  shimmerColors={
-                    colorScheme === "dark"
-                      ? ["#222", "#111", "#222"]
-                      : undefined
-                  }
-                  style={{ height: 12, width: "80%", borderRadius: 6 }}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={C.accent} />
       </View>
     );
   }
-
-  if (error) {
+  if (error || !d) {
     return (
-      <View style={styles.centeredContainer}>
-        <Text style={styles.errorText}>Error: {error}</Text>
+      <View style={styles.center}>
+        <Text style={styles.errText}>{error || "Not found"}</Text>
       </View>
     );
   }
 
-  if (!details) {
-    return (
-      <View style={styles.centeredContainer}>
-        <Text style={{ color: color.text }}>No details available.</Text>
-      </View>
-    );
-  }
-
-  const handlePress = (ep: number) => {
+  const playEpisode = (ep: number) => {
     void addToWatchHistory({
-      id: tvShowId,
-      title: details.name,
+      id: id?.toString(),
+      title: d.name,
       type: "tv",
-      season: selectedSeasonNumber,
+      season,
       episode: ep,
-      poster_path: details.poster_path,
+      poster_path: d.poster_path,
     });
     router.push({
       pathname: "/(player)/player",
       params: {
-        id: tvShowId!,
+        id: id!.toString(),
         type: "tv",
-        season: selectedSeasonNumber,
-        ep,
-        title: details.name,
-        poster_path: details.poster_path || "",
+        season: String(season),
+        ep: String(ep),
+        title: d.name,
+        poster_path: d.poster_path || "",
+        year: d.first_air_date?.slice(0, 4) || "",
       },
     });
   };
 
-  const imageUrl = details.backdrop_path
-    ? `https://image.tmdb.org/t/p/w780${details.backdrop_path}`
-    : details.poster_path
-      ? `https://image.tmdb.org/t/p/w500${details.poster_path}`
-      : null;
+  const backdrop = img(d.backdrop_path, "w780") || img(d.poster_path, "w780");
+  const seasons = (d.seasons ?? []).filter((s: any) => s.episode_count > 0);
+  const next = d.next_episode_to_air;
 
   return (
-    <>
-      <StatusBar style={colorScheme === "dark" ? "dark" : "light"} />
-      <ScrollView style={{ flex: 1 }}>
-        <View style={styles.headerContainer}>
-          {imageUrl ? (
-            <ImageBackground
-              source={{ uri: imageUrl }}
-              style={styles.backgroundImage}
-              resizeMode="cover"
-            >
-              <View style={styles.overlay} />
-              <View style={styles.headerContent}>
-                <Text style={styles.title}>{details.name}</Text>
-
-                <Text
-                  style={[
-                    styles.value,
-                    { marginBottom: 5, textAlign: "center" },
-                  ]}
-                >
-                  {details.genres?.map((g: Genre) => g.name).join(", ") ||
-                    "N/A"}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.tagline,
-                    { fontStyle: "normal", fontWeight: "bold" },
-                  ]}
-                >
-                  {details.number_of_seasons || "N/A"} Seasons •{" "}
-                  {details.number_of_episodes} Episodes
-                </Text>
-              </View>
-            </ImageBackground>
-          ) : (
-            <View style={[styles.backgroundImage, styles.noImageBackground]}>
-              <View style={styles.overlay} />
-              <View style={styles.headerContent}>
-                <Text style={styles.title}>{details.name}</Text>
-                {details.tagline ? (
-                  <Text style={styles.tagline}>{details.tagline}</Text>
-                ) : null}
-                <Text style={styles.noImageText}>No image available</Text>
-              </View>
+    <View style={styles.container}>
+      <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+        {/* Hero */}
+        <View style={styles.hero}>
+          {backdrop ? (
+            <Image source={{ uri: backdrop }} style={styles.heroImg} resizeMode="cover" />
+          ) : null}
+          <LinearGradient
+            colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)", "#0a0a0c"]}
+            style={StyleSheet.absoluteFill}
+          />
+          <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={26} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.heroContent}>
+            <Image source={{ uri: img(d.poster_path, "w342") || undefined }} style={styles.poster} />
+            <View style={styles.heroText}>
+              <Text style={styles.title}>{d.name}</Text>
+              {d.tagline ? <Text style={styles.tagline}>{d.tagline}</Text> : null}
+              <Text style={styles.seasonsLine}>
+                {d.number_of_seasons} Seasons · {d.number_of_episodes} Episodes
+              </Text>
             </View>
-          )}
+          </View>
         </View>
 
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: Colors[colorScheme ?? "dark"].background },
-          ]}
-        >
-          <Text style={[styles.overview, { color: color.text }]}>
-            {details.overview.substring(0, details.overview.indexOf(".") + 1)}
-          </Text>
+        <View style={{ marginTop: 12 }}>
+          <MetaBar
+            rating={d.vote_average}
+            votes={d.vote_count}
+            year={d.first_air_date?.slice(0, 4)}
+            runtime={runtimeStr(d.episode_run_time?.[0])}
+            certification={derived!.cert}
+            genres={(d.genres ?? []).map((g: any) => g.name)}
+          />
+        </View>
 
-          {/* --- Seasons Section --- */}
-          {details.seasons && details.seasons.length > 0 && (
-            <View style={styles.seasonsContainer}>
-              <FlatList
-                horizontal
-                data={details.seasons.filter((s) => s.episode_count > 0)} // Only show seasons with episodes
-                keyExtractor={(item) => item.id.toString()}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.seasonListContent}
-                renderItem={({ item }) => (
+        {next ? (
+          <View style={styles.nextBanner}>
+            <Ionicons name="calendar" size={14} color={C.accent} />
+            <Text style={styles.nextText}>
+              Next: S{next.season_number}E{next.episode_number} “{next.name}” · {next.air_date}
+            </Text>
+          </View>
+        ) : null}
+
+        {derived!.trailer ? (
+          <View style={{ paddingHorizontal: 16 }}>
+            <TrailerButton trailerKey={derived!.trailer.key} />
+          </View>
+        ) : null}
+
+        {d.overview ? (
+          <Section title="Overview">
+            <Text style={styles.overview}>{d.overview}</Text>
+          </Section>
+        ) : null}
+
+        {/* Seasons + Episodes */}
+        {seasons.length ? (
+          <Section title="Episodes">
+            <FlatList
+              data={seasons}
+              horizontal
+              keyExtractor={(s: any) => String(s.id)}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingBottom: 12 }}
+              renderItem={({ item }: any) => {
+                const active = item.season_number === season;
+                return (
                   <TouchableOpacity
-                    style={[
-                      styles.seasonButton,
-                      { borderColor: color.text },
-                      item.season_number === selectedSeasonNumber && {
-                        backgroundColor: color.tint,
-                      },
-                    ]}
-                    onPress={() => setSelectedSeasonNumber(item.season_number)}
+                    style={[styles.seasonChip, active && styles.seasonChipActive]}
+                    onPress={() => setSeason(item.season_number)}
                   >
-                    <Text
-                      style={[
-                        styles.seasonButtonText,
-                        {
-                          color:
-                            item.season_number === selectedSeasonNumber
-                              ? Colors.light.text
-                              : color.text,
-                        },
-                      ]}
-                    >
-                      {item.season_number === 0
-                        ? "Specials"
-                        : `Season ${item.season_number}`}
+                    <Text style={[styles.seasonChipText, active && styles.seasonChipTextActive]}>
+                      {item.season_number === 0 ? "Specials" : `Season ${item.season_number}`}
                     </Text>
                   </TouchableOpacity>
-                )}
-              />
-            </View>
-          )}
-
-          {/* --- Episodes Section --- */}
-          {selectedSeasonNumber !== null && (
-            <View style={styles.episodesContainer}>
-              {seasonDetails ? (
-                seasonDetails.episodes.length > 0 ? (
-                  seasonDetails.episodes.map((episode) => (
-                    <TouchableOpacity
-                      onPress={() => handlePress(episode.episode_number)}
-                      key={episode.id}
-                      style={[styles.episodeItem, { borderColor: color.icon }]}
-                      // onPress={() => handlePlayEpisode(episode)} // Implement this for specific episode playback
-                    >
-                      {episode.still_path && (
-                        <ImageBackground
-                          source={{
-                            uri: `https://image.tmdb.org/t/p/w300${episode.still_path}`,
-                          }}
-                          style={styles.episodeStill}
-                          imageStyle={{ borderRadius: 8 }}
-                        >
-                          <MaterialIcons
-                            name="play-circle"
-                            size={40}
-                            color="rgba(255,255,255,0.8)"
-                          />
-                        </ImageBackground>
-                      )}
-                      <View style={styles.episodeInfo}>
-                        <Text
-                          style={[styles.episodeTitle, { color: color.text }]}
-                        >
-                          E{episode.episode_number}: {episode.name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.episodeOverview,
-                            { color: color.icon },
-                          ]}
-                        >
-                          {episode.overview
-                            ? episode.overview.substring(0, 50) + "..."
-                            : "No overview available."}
-                        </Text>
+                );
+              }}
+            />
+            {seasonData ? (
+              (seasonData.episodes ?? []).map((ep: any) => (
+                <TouchableOpacity
+                  key={ep.id}
+                  style={styles.episode}
+                  onPress={() => playEpisode(ep.episode_number)}
+                >
+                  <View style={styles.epStillWrap}>
+                    {ep.still_path ? (
+                      <Image source={{ uri: img(ep.still_path, "w300") || undefined }} style={styles.epStill} />
+                    ) : (
+                      <View style={[styles.epStill, styles.epNoStill]}>
+                        <Ionicons name="tv" size={20} color="#555" />
                       </View>
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <Text style={[styles.noEpisodesText, { color: color.icon }]}>
-                    No episodes found for this season.
-                  </Text>
-                )
-              ) : (
-                // shimmer loading for episode list
-                <View style={{ width: "100%" }}>
-                  {[1, 2, 3].map((i) => (
-                    <View
-                      key={i}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        marginBottom: 15,
-                      }}
-                    >
-                      <ShimmerPlaceholder
-                        shimmerColors={
-                          colorScheme === "dark"
-                            ? ["#222", "#111", "#222"]
-                            : undefined
-                        }
-                        style={{
-                          width: 100,
-                          height: 50,
-                          borderRadius: 8,
-                          marginRight: 15,
-                        }}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <ShimmerPlaceholder
-                          shimmerColors={
-                            colorScheme === "dark"
-                              ? ["#222", "#111", "#222"]
-                              : undefined
-                          }
-                          style={{
-                            height: 18,
-                            width: "60%",
-                            borderRadius: 6,
-                            marginBottom: 8,
-                          }}
-                        />
-                        <ShimmerPlaceholder
-                          shimmerColors={
-                            colorScheme === "dark"
-                              ? ["#222", "#111", "#222"]
-                              : undefined
-                          }
-                          style={{ height: 12, width: "80%", borderRadius: 6 }}
-                        />
-                      </View>
+                    )}
+                    <View style={styles.epPlay}>
+                      <MaterialIcons name="play-arrow" size={22} color="#fff" />
                     </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.epTitle} numberOfLines={1}>
+                      {ep.episode_number}. {ep.name}
+                    </Text>
+                    <View style={styles.epMeta}>
+                      {ep.runtime ? <Text style={styles.epMetaText}>{runtimeStr(ep.runtime)}</Text> : null}
+                      {ep.air_date ? <Text style={styles.epMetaText}>{ep.air_date}</Text> : null}
+                      {ep.vote_average ? (
+                        <View style={styles.epRating}>
+                          <MaterialIcons name="star" size={11} color={C.gold} />
+                          <Text style={styles.epMetaText}>{ep.vote_average.toFixed(1)}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {ep.overview ? (
+                      <Text style={styles.epOverview} numberOfLines={2}>
+                        {ep.overview}
+                      </Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} />
+            )}
+          </Section>
+        ) : null}
 
-          <TouchableOpacity style={[styles.btn, { borderColor: color.icon }]}>
-            <Text style={{ color: color.text }}>💓cody</Text>
-          </TouchableOpacity>
-        </View>
+        {derived!.cast.length ? (
+          <Section title="Cast">
+            <PeopleRow people={derived!.cast} />
+          </Section>
+        ) : null}
+
+        {derived!.crew.length ? (
+          <Section title="Creators & Crew">
+            <PeopleRow people={derived!.crew} />
+          </Section>
+        ) : null}
+
+        {derived!.providers ? (
+          <Section title="Where to Watch">
+            <ProvidersRow providers={derived!.providers} />
+          </Section>
+        ) : null}
+
+        <Section title="Details">
+          <FactGrid facts={derived!.facts} />
+        </Section>
+
+        {derived!.keywords.length ? (
+          <Section title="Keywords">
+            <Pills items={derived!.keywords} />
+          </Section>
+        ) : null}
+
+        {d.reviews?.results?.length ? (
+          <Section title="Reviews">
+            <Reviews reviews={d.reviews.results} />
+          </Section>
+        ) : null}
+
+        {derived!.links.length ? (
+          <Section title="Links">
+            <LinksRow links={derived!.links} />
+          </Section>
+        ) : null}
+
+        {derived!.recs.length ? (
+          <Section title="More Like This">
+            <FlatList
+              data={derived!.recs}
+              horizontal
+              keyExtractor={(m: any) => String(m.id)}
+              showsHorizontalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              renderItem={({ item }: any) => (
+                <TouchableOpacity
+                  style={styles.recCard}
+                  onPress={() =>
+                    router.replace({
+                      pathname: "/(player)/tvDetails",
+                      params: { id: String(item.id), type: "tv" },
+                    })
+                  }
+                >
+                  <Image source={{ uri: img(item.poster_path, "w342") || undefined }} style={styles.recImg} />
+                  <Text style={styles.recTitle} numberOfLines={1}>
+                    {item.name || item.title}
+                  </Text>
+                  <View style={styles.recRating}>
+                    <MaterialIcons name="star" size={12} color={C.gold} />
+                    <Text style={styles.recRatingText}>
+                      {item.vote_average ? item.vote_average.toFixed(1) : "—"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          </Section>
+        ) : null}
+
+        <View style={{ height: 40 }} />
       </ScrollView>
-    </>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  btn: {
-    flexDirection: "row",
-    justifyContent: "center",
-    height: 50,
-    width: "100%",
-    alignItems: "center",
-    // borderWidth: 2,
-    marginTop: 20,
-    borderRadius: 10,
-    padding: 5,
-    gap: 4,
-  },
-  headerContainer: {
-    width: "100%",
-    height: height * 0.6,
-    // position: "relative",
-    marginBottom: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backgroundImage: {
-    flex: 1,
-    justifyContent: "flex-end",
-    width: "100%",
-    height: "100%",
-    // borderBottomLeftRadius: 30,
-    // borderBottomRightRadius: 30,
-    // overflow: "hidden",
-  },
-  noImageBackground: {
-    backgroundColor: "#333",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noImageText: {
-    color: "#ccc",
-    fontSize: 18,
-    textAlign: "center",
-    marginTop: 20,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    height: "100%",
-    width: "100%",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  headerContent: {
-    position: "absolute",
-    bottom: 30,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    color: "#fff",
-    textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.7)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-    marginBottom: 6,
-  },
-  tagline: {
-    fontSize: 16,
-    fontStyle: "italic",
-    color: "#e0e0e0",
-    textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-    marginBottom: 20,
-  },
-  card: {
-    marginHorizontal: 0,
-    marginTop: -50,
-    borderRadius: 18,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-    width: "100%",
-    // backgroundColor: "rgba(0,0,0,0.05)",
-  },
-  overview: {
-    fontSize: 16,
-    color: "#eee",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  label: {
-    fontWeight: "bold",
-    color: "#fff",
-    marginTop: 10,
-  },
-  value: {
-    fontWeight: "normal",
-    color: "#eee",
-  },
-  centeredContainer: {
-    flex: 1,
-    // justifyContent: "center",
-    // alignItems: "center",
-    backgroundColor: "#111",
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  // --- New Styles for Seasons and Episodes ---
-  seasonsContainer: {
-    marginTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 10,
-    // textAlign: "center",
-  },
-  seasonListContent: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-  },
-  seasonButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderRadius: 20,
-    marginHorizontal: 5,
-    minWidth: 60, // Ensure some minimum width
-    justifyContent: "center",
-    alignItems: "center",
-    // width: 50,
-  },
-  seasonButtonText: {
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  episodesContainer: {
-    marginTop: 20,
-    paddingHorizontal: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  episodeItem: {
+  container: { flex: 1, backgroundColor: "#0a0a0c" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0a0c" },
+  errText: { color: "#ff6b6b", fontSize: 15 },
+
+  hero: { width: "100%", height: height * 0.46 },
+  heroImg: { width: "100%", height: "100%" },
+  back: { position: "absolute", top: 44, left: 12, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 20, padding: 4 },
+  heroContent: { position: "absolute", bottom: 14, left: 16, right: 16, flexDirection: "row", gap: 14, alignItems: "flex-end" },
+  poster: { width: width * 0.28, height: width * 0.28 * 1.5, borderRadius: 10, backgroundColor: "#222" },
+  heroText: { flex: 1, paddingBottom: 4 },
+  title: { color: "#fff", fontSize: 24, fontWeight: "800" },
+  tagline: { color: "#c8ccd0", fontSize: 13, fontStyle: "italic", marginTop: 4 },
+  seasonsLine: { color: C.accent, fontSize: 13, fontWeight: "600", marginTop: 6 },
+
+  nextBanner: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
-    borderWidth: 0.2,
-    borderRadius: 20,
+    gap: 6,
+    backgroundColor: "rgba(78,161,255,0.12)",
+    marginHorizontal: 16,
+    marginTop: 14,
     padding: 10,
-    backgroundColor: "rgba(255,255,255,0.05)", // Slightly translucent background
-    width: "100%",
+    borderRadius: 10,
   },
-  episodeStill: {
-    width: 100,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 15,
-    justifyContent: "center",
+  nextText: { color: C.text, fontSize: 12, flex: 1 },
+
+  overview: { color: "#d3d7db", fontSize: 14, lineHeight: 21 },
+
+  seasonChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: C.chip,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  seasonChipActive: { backgroundColor: C.accent, borderColor: C.accent },
+  seasonChipText: { color: "#cfd2d6", fontSize: 13, fontWeight: "600" },
+  seasonChipTextActive: { color: "#fff" },
+
+  episode: { flexDirection: "row", gap: 12, marginBottom: 14, alignItems: "center" },
+  epStillWrap: { width: 120, height: 68 },
+  epStill: { width: 120, height: 68, borderRadius: 8, backgroundColor: "#222" },
+  epNoStill: { alignItems: "center", justifyContent: "center" },
+  epPlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderRadius: 8,
   },
-  episodeInfo: {
-    flex: 1,
-  },
-  episodeTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  episodeOverview: {
-    fontSize: 12,
-  },
-  noEpisodesText: {
-    textAlign: "center",
-    marginTop: 10,
-    fontStyle: "italic",
-  },
+  epTitle: { color: C.text, fontSize: 14, fontWeight: "700" },
+  epMeta: { flexDirection: "row", gap: 10, marginTop: 3, alignItems: "center" },
+  epMetaText: { color: C.sub, fontSize: 11 },
+  epRating: { flexDirection: "row", alignItems: "center", gap: 2 },
+  epOverview: { color: "#a9adb2", fontSize: 12, marginTop: 4, lineHeight: 16 },
+
+  recCard: { width: 110 },
+  recImg: { width: 110, height: 165, borderRadius: 10, backgroundColor: "#222" },
+  recTitle: { color: C.text, fontSize: 12, fontWeight: "600", marginTop: 6 },
+  recRating: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
+  recRatingText: { color: C.sub, fontSize: 11 },
 });
 
 export default React.memo(TvDetails);

@@ -1,41 +1,65 @@
+import HijackHint from "@/components/player/HijackHint";
+import ProviderSheet from "@/components/player/ProviderSheet";
+import {
+  buildEmbedUrl,
+  getProvider,
+  isAllowedTopNav,
+  isHijackable,
+  PROVIDERS,
+  providerHosts,
+  type Provider,
+} from "@/components/player/providerRegistry";
 import { addToWatchHistory } from "@/utils/history";
+import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
+import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useKeepAwake } from "expo-keep-awake";
-import { useGlobalSearchParams, useNavigation } from "expo-router";
+import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
-import { FlatList } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import WebView from "react-native-webview";
-import { Colors } from "react-native/Libraries/NewAppScreen"; // Make sure Colors is correctly imported or defined
 
-const GITHUB_RAW_JSON_URL =
-  "https://raw.githubusercontent.com/roshang1t/NetPrime/refs/heads/master/providers.json";
+/**
+ * SOLO playback = the multi-aggregator embed with a provider selector (full
+ * catalog; solo watching only needs the embed to PLAY, no injection). Providers
+ * we've verified are HIJACKABLE additionally expose a "Watch Party" button, which
+ * launches the synchronized party on that provider (see providerRegistry /
+ * hijackCapabilities). The server list lives in a bottom sheet (search + filter).
+ */
+const ALL_HOSTS = Array.from(new Set(PROVIDERS.flatMap(providerHosts)));
 
-interface Provider {
-  // Renamed from 'providers' to 'Provider' for single item type
-  id: string;
-  name: string;
-  urls: {
-    movie: string;
-    tv: string;
-  };
-  allowedDomain: string;
-}
+/** Popup / ad-redirect blocking + fullscreen relay. */
+const BLOCK_POPUPS_JS = `
+(function(){
+  try { window.open = function(){ return null; }; } catch(e){}
+  try {
+    document.addEventListener('click', function(ev){
+      var a = ev.target && ev.target.closest && ev.target.closest('a[target=_blank]');
+      if (a){ ev.preventDefault(); ev.stopPropagation(); }
+    }, true);
+  } catch(e){}
+  try {
+    document.addEventListener('fullscreenchange', function(){
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type:'fullscreenchange', isFullscreen: !!document.fullscreenElement }));
+    });
+  } catch(e){}
+  true;
+})();
+`;
 
 export const Player: React.FC = () => {
   useKeepAwake();
-  // Ensure these params are converted to string if they might be arrays or undefined
-  const { id, type, season, ep } = useGlobalSearchParams<{
+
+  const { id, type, season, ep, title, poster_path } = useGlobalSearchParams<{
     id: string;
     type: string;
     season?: string;
@@ -43,369 +67,191 @@ export const Player: React.FC = () => {
     title?: string;
     poster_path?: string;
   }>();
-  const { title, poster_path } = useGlobalSearchParams<{
-    title?: string;
-    poster_path?: string;
-  }>();
-
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
-    null,
-  ); // State to hold the currently selected provider
-  const [loading, setLoading] = useState(true); // Added loading state for initial fetch
-  const [error, setError] = useState<unknown>(null); // Explicitly setting to null
-
-  const colorScheme = useColorScheme();
-  const color = Colors[colorScheme ?? "dark"]; // Ensure Colors is properly defined/imported
 
   const navigation = useNavigation();
-
-  useEffect(() => {
-    if (id) {
-      void addToWatchHistory({
-        id,
-        title: title || `${type === "tv" ? "TV" : "Movie"} ${id}`,
-        type,
-        season,
-        episode: ep,
-        poster_path,
-      });
-    }
-
-    const fetchEmbedProviders = async () => {
-      try {
-        const response = await fetch(GITHUB_RAW_JSON_URL);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data: Provider[] = await response.json();
-        setProviders(data);
-
-        if (data.length > 0) {
-          setSelectedProvider(data[0]); // Set the first provider as selected by default
-        }
-      } catch (e) {
-        setError(e);
-        console.error("Failed to fetch embed providers:", e);
-      } finally {
-        setLoading(false); // Set loading to false once fetch is complete (success or error)
-      }
-    };
-
-    fetchEmbedProviders();
-  }, [id, title, type, season, ep, poster_path]);
+  const router = useRouter();
+  const sheetRef = useRef<BottomSheetModal>(null);
+  const [selected, setSelected] = useState<Provider>(PROVIDERS[0]);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
   }, [navigation]);
 
-  interface ShouldStartLoadEvent {
-    url: string;
-    [key: string]: any;
-  }
+  useEffect(() => {
+    if (!id) return;
+    void addToWatchHistory({
+      id,
+      title: title || `${type === "tv" ? "TV" : "Movie"} ${id}`,
+      type,
+      season,
+      episode: ep,
+      poster_path,
+    });
+  }, [id, title, type, season, ep, poster_path]);
 
-  // Handle URL navigation inside WebView
-  const handleShouldStartLoadWithRequest = (
-    event: ShouldStartLoadEvent,
-  ): boolean => {
-    const { url } = event;
+  const media = useMemo(
+    () => ({
+      tmdbId: id ?? "",
+      type: (type === "tv" ? "tv" : "movie") as "movie" | "tv",
+      season: season ? Number(season) : undefined,
+      episode: ep ? Number(ep) : undefined,
+    }),
+    [id, type, season, ep],
+  );
 
-    // Dynamically check against the base domains of all fetched providers
-    const allowedDomains: string[] = providers
-      .map((p) => {
-        try {
-          return `${p.allowedDomain}`;
-        } catch (e) {
-          console.warn(
-            `Invalid URL format in provider ${p.name}: ${p.urls.movie}`,
-            e,
-          );
-          return null;
-        }
-      })
-      .filter((domain): domain is string => Boolean(domain)); // Filter out any null values from invalid URLs
+  const uri = useMemo(
+    () => (id ? buildEmbedUrl(selected, media) : "about:blank"),
+    [selected, media, id],
+  );
 
-    if (allowedDomains.some((domain) => url.startsWith(domain))) {
-      return true; // Allow navigation to any of the fetched provider domains
-    } else {
-      console.warn(`Blocked external navigation from WebView: ${url}`);
-      return false; // Prevent WebView from loading the external URL
-    }
-  };
+  const onShouldStartLoad = useCallback(
+    (req: { url: string; isTopFrame?: boolean }) => isAllowedTopNav(ALL_HOSTS, req),
+    [],
+  );
 
-  // Prevent WebView from opening new windows (pop-ups)
-  const handleOnOpenWindow = ({
-    nativeEvent,
-  }: {
-    nativeEvent: { targetUrl: string };
-  }) => {
-    console.log("WebView tried to open new window:", nativeEvent.targetUrl);
-    return false;
-  };
-
-  // Listen for fullscreen events from the WebView
-  const handleMessage = (event: any) => {
+  const onMessage = useCallback((e: { nativeEvent: { data: string } }) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data && data.type === "fullscreenchange" && data.isFullscreen) {
-        ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE,
-        );
-      } else if (
-        data &&
-        data.type === "fullscreenchange" &&
-        !data.isFullscreen
-      ) {
-        ScreenOrientation.unlockAsync();
+      const data = JSON.parse(e.nativeEvent.data);
+      if (data?.type === "fullscreenchange") {
+        if (data.isFullscreen) {
+          void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        } else {
+          void ScreenOrientation.unlockAsync();
+        }
       }
-    } catch (e) {
-      console.error("Error parsing WebView message:", e);
+    } catch {
+      /* ignore non-JSON page noise */
     }
-  };
+  }, []);
 
-  // Function to construct the WebView URL based on selectedProvider
-  const getWebViewUrl = () => {
-    if (!selectedProvider || !id) {
-      // Return a blank page or a placeholder URL if no provider is selected or id is missing
-      return "about:blank";
-    }
+  const startWatchParty = useCallback(() => {
+    if (!isHijackable(selected) || !id) return;
+    router.push({
+      pathname: "/party",
+      params: {
+        role: "host",
+        room: genRoomCode(),
+        provider: selected.id,
+        id,
+        type: media.type,
+        ...(media.season ? { season: String(media.season) } : {}),
+        ...(media.episode ? { ep: String(media.episode) } : {}),
+        ...(title ? { title } : {}),
+      },
+    });
+  }, [selected, id, media, router, title]);
 
-    let urlTemplate = "";
-    if (type === "tv" && season && ep) {
-      urlTemplate = selectedProvider.urls.tv;
+  const onSelectProvider = useCallback((pid: string) => {
+    const p = getProvider(pid);
+    if (p) setSelected(p);
+  }, []);
 
-      return (
-        urlTemplate
-          .replace(/\$\{id\}/g, id)
-          .replace(/\$\{season\}/g, season)
-          .replace(/\$\{episode\}/g, ep) +
-        (selectedProvider.id === "videasy"
-          ? "?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true"
-          : "")
-      );
-    } else if (type === "movie") {
-      urlTemplate = selectedProvider.urls.movie;
-      // Replace placeholders for movies
-      return urlTemplate.replace(/\$\{id\}/g, id);
-    }
-    return "about:blank"; // Fallback if type is neither movie nor tv, or params are missing
-  };
-
-  // Render loading state
-  if (loading) {
-    return (
-      <View
-        style={[
-          styles.container,
-          styles.centerContent,
-          { backgroundColor: "#000" },
-        ]}
-      >
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text style={styles.loadingText}>Loading providers...</Text>
-      </View>
-    );
-  }
-
-  // Render error state
-  if (error) {
-    return (
-      <View
-        style={[
-          styles.container,
-          styles.centerContent,
-          { backgroundColor: "#000" },
-        ]}
-      >
-        <Text style={styles.errorText}>Error loading providers:</Text>
-        <Text style={styles.errorText}>
-          {error instanceof Error ? error.message : String(error)}
-        </Text>
-        <TouchableOpacity onPress={() => setLoading(true)}>
-          {" "}
-          {/* Allow retry */}
-          <Text style={styles.retryText}>Tap to Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const canParty = isHijackable(selected);
 
   return (
     <>
-      <StatusBar style={"light"} translucent />
-      <SafeAreaView style={[styles.container, { backgroundColor: "#000" }]}>
-        <WebView
-          key={selectedProvider?.id || "default"} // Key changes to force WebView re-render when provider changes
-          style={[
-            styles.webview,
-            {
-              backgroundColor: "#000",
-            },
-          ]}
-          javaScriptEnabled={true}
-          allowsFullscreenVideo={true}
-          injectedJavaScriptBeforeContentLoaded=""
-          overScrollMode="never"
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <ActivityIndicator size="large" color="#007bff" />
-            </View>
-          )}
-          source={{ uri: getWebViewUrl() }} // Dynamic URL from getWebViewUrl
-          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-          setSupportMultipleWindows={false}
-          onOpenWindow={handleOnOpenWindow}
-          onMessage={handleMessage}
-          injectedJavaScript={`
-            document.documentElement.style.backgroundColor = '#000000';
-            document.body.style.backgroundColor = '#000000';
-            // Post message when fullscreen changes
-            document.addEventListener('fullscreenchange', function() {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'fullscreenchange', isFullscreen: !!document.fullscreenElement }));
-            });
-            // Auto-play the video if possible (this is often blocked by browsers/WebViews for user experience)
-            const video = document.querySelector('video');
-            if (video) {
-                video.play().catch(e => console.log("Autoplay failed:", e));
-            }
-            true;
-          `}
-        />
-
-        <View style={styles.providerListSection}>
-          <Text style={styles.infoText}>
-            Please select another provider if getting an error in the current
-            one.{"\n"}or select diffrent server in player
-          </Text>
-
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.flatListContentContainer}
-            data={providers}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedProvider(item); // Set the selected provider on press
-                }}
-                style={[
-                  styles.providerItem,
-                  selectedProvider?.id === item.id &&
-                    styles.providerItemSelected, // Apply selected style
-                ]}
-              >
-                <Ionicons
-                  name="play"
-                  color={
-                    selectedProvider?.id === item.id ? Colors.white : color.text
-                  }
-                  size={20}
-                />
-                <Text
-                  style={[
-                    styles.providerName,
-                    selectedProvider?.id === item.id &&
-                      styles.providerNameSelected, // Apply selected text style
-                  ]}
-                >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
+      <StatusBar style="light" translucent />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.playerArea}>
+          <WebView
+            key={selected.id}
+            style={styles.webview}
+            source={{ uri }}
+            javaScriptEnabled
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            overScrollMode="never"
+            startInLoadingState
+            renderLoading={() => (
+              <View style={[StyleSheet.absoluteFill, styles.center]}>
+                <ActivityIndicator size="large" color="#007bff" />
+              </View>
             )}
+            setSupportMultipleWindows={false}
+            onOpenWindow={() => {
+              /* swallow popups */
+            }}
+            onShouldStartLoadWithRequest={onShouldStartLoad}
+            injectedJavaScriptBeforeContentLoaded={BLOCK_POPUPS_JS}
+            onMessage={onMessage}
           />
         </View>
+
+        <View style={styles.controlBar}>
+          <TouchableOpacity
+            style={styles.serverBtn}
+            onPress={() => sheetRef.current?.present()}
+          >
+            <Ionicons name="server-outline" size={15} color="#fff" />
+            <Text style={styles.serverBtnText} numberOfLines={1}>
+              {selected.name}
+            </Text>
+            {canParty && <Ionicons name="people" size={12} color="#4ea1ff" />}
+            <Ionicons name="chevron-up" size={15} color="#9aa0a6" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={startWatchParty}
+            disabled={!canParty}
+            style={[styles.partyBtn, !canParty && styles.partyBtnDisabled]}
+          >
+            <Ionicons name="people" size={15} color={canParty ? "#fff" : "#666"} />
+            <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>
+              Watch Party
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <HijackHint provider={selected} />
       </SafeAreaView>
+
+      <ProviderSheet
+        ref={sheetRef}
+        selectedId={selected.id}
+        onSelect={onSelectProvider}
+      />
     </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centerContent: {
-    flex: 1, // Ensure it takes full space for centering
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  webview: {
-    flex: 1, // WebView takes up remaining space
-  },
-  providerListSection: {
-    height: "15%", // Adjusted height slightly for better visual balance, or set to a fixed number like 180
-    backgroundColor: Colors.background, // Use Colors.background for consistency
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth, // Small line to separate from WebView
-    borderTopColor: "#fff",
-    // borderTopLeftRadius: 0,
-  },
-  infoText: {
-    color: "#fff", // Orange color for warning
-
-    fontWeight: "400", // Slightly bolder than 200
-    fontSize: 10, // Slightly larger
-    textAlign: "center",
-    fontStyle: "italic",
-    marginBottom: 5,
-  },
-  flatListContentContainer: {
-    alignItems: "center",
-    paddingHorizontal: 10,
-  },
-  providerItem: {
-    backgroundColor: "#333", // Use Colors.card or a light color from Colors
-    borderRadius: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+  container: { flex: 1, backgroundColor: "#000" },
+  playerArea: { flex: 1, backgroundColor: "#000" },
+  webview: { flex: 1, backgroundColor: "#000" },
+  center: { justifyContent: "center", alignItems: "center" },
+  controlBar: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    gap: 8, // Increased gap for better spacing between icon and text
-    marginHorizontal: 5, // Spacing between items
-    // Min width and height for consistent button size
-    minWidth: 120,
-    height: 50,
-    elevation: 3,
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+    backgroundColor: "#0a0a0a",
   },
-  providerItemSelected: {
-    backgroundColor: "#0a7ea4", // Blue background for selected item
-    borderColor: "#0a7ea4",
-    borderWidth: 2, // Thicker border for selected
-    fontWeight: "bold",
+  serverBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#1c1c1e",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  providerName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.text, // Use Colors.text for dynamic color
+  serverBtnText: { color: "#fff", fontWeight: "600", fontSize: 14, flexShrink: 1 },
+  partyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#0a7ea4",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  providerNameSelected: {
-    color: Colors.white, // White text for selected item
-  },
-  loadingText: {
-    color: Colors.text,
-    marginTop: 10,
-    fontSize: 16,
-  },
-  errorText: {
-    color: Colors.error, // Assuming Colors.error exists or define 'red'
-    fontSize: 16,
-    textAlign: "center",
-    marginTop: 20,
-  },
-  retryText: {
-    color: "#007bff", // Blue for retry text
-    fontSize: 16,
-    marginTop: 10,
-    textDecorationLine: "underline",
-  },
+  partyBtnDisabled: { backgroundColor: "#1c1c1e" },
+  partyText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  partyTextDisabled: { color: "#666" },
 });
 
 export default Player;

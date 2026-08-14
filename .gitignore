@@ -38,3 +38,11 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Claude Code / MCP tooling (machine-local)
+.claude/
+.mcp.json
+.playwright-mcp/
+
+# local UI render captures
+bearoom_*_render.png

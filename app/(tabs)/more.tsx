@@ -73,6 +73,14 @@ export default function MoreScreen() {
     >
       <Text style={[styles.header, { color: textColor }]}>Options</Text>
 
+      <TouchableOpacity style={styles.partyItem} onPress={() => router.push("/joinParty")}>
+        <View style={styles.left}>
+          <Ionicons name="people" size={22} color="#fff" />
+          <Text style={styles.partyLabel}>Join a Watch Party</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={22} color="#fff" />
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.item} onPress={handleClearCache}>
         <View style={styles.left}>
           <MaterialIcons name="delete" size={22} color={textColor} />
@@ -162,7 +170,7 @@ export default function MoreScreen() {
               About
             </Text>
             <TouchableOpacity onPress={() => Linking.openURL("https://github.com/roshan669/Uott")} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <Text style={{ color: textColor, fontSize: 18, fontWeight: "500" }}>NetPrime</Text>
+              <Text style={{ color: textColor, fontSize: 18, fontWeight: "500" }}>Bearoom</Text>
               <Ionicons name="logo-github" size={22} color={textColor} />
             </TouchableOpacity>
             <Text style={{ color: textColor }}>
@@ -202,6 +210,17 @@ const styles = StyleSheet.create({
   },
   left: { flexDirection: "row", alignItems: "center", gap: 12 },
   label: { marginLeft: 12, fontSize: 16 },
+  partyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  partyLabel: { marginLeft: 12, fontSize: 16, fontWeight: "700", color: "#fff" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",

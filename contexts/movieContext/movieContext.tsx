@@ -8,14 +8,17 @@ import React, {
 } from "react";
 import { Movie, MovieContextType, Series } from "./types";
 
-// TMDb API Configuration
-export const API_URL = "https://netstream.dhamiroshan730.workers.dev/";
+// TMDb API Configuration.
+// TMDB's API host (api.themoviedb.org) is blocked/RST on many Indian ISPs, so
+// data flows through YOUR OWN Cloudflare Worker proxy (tmdb-proxy-worker.js),
+// which reaches TMDB from Cloudflare's network AND injects your TMDB token
+// server-side (Worker secret TMDB_TOKEN). The token is therefore NOT in the app.
+export const API_URL = "https://tmdb.spiderfan-no1.workers.dev/";
 
-export const API_BEARER_TOKEN =
-  "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhZjZkZDVhOWQwZjgzYmQ4M2QxZjIxNmQ2N2RlYWNmMyIsIm5iZiI6MTcxNTUxOTIyNy4wMTIsInN1YiI6IjY2NDBiZWZiMThhZDFlNzU4ODIwN2VmMyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.ZPlxXSMmTnIvs-nuuwalmPbtPXW383jBxiAheNnAKWA";
+// Deprecated: the proxy injects the token; nothing sensitive lives in the app.
+export const API_BEARER_TOKEN = "";
 
 export const API_HEADERS = {
-  Authorization: `Bearer ${API_BEARER_TOKEN}`,
   accept: "application/json",
   "Accept-Encoding": "identity",
   "Cache-Control": "no-cache",

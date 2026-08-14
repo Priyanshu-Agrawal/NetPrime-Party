@@ -52,5 +52,77 @@
       "tv": "https://vidsrc.to/embed/tv/${id}/${season}/${episode}"
     },
     "allowedDomain": "https://vidsrc.su"
+  },
+  {
+    "id": "vidfast",
+    "name": "VidFast",
+    "urls": {
+      "movie": "https://vidfast.pro/movie/${id}",
+      "tv": "https://vidfast.pro/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://vidfast.pro"
+  },
+  {
+    "id": "vixsrc",
+    "name": "VixSrc",
+    "urls": {
+      "movie": "https://vixsrc.to/movie/${id}",
+      "tv": "https://vixsrc.to/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://vixsrc.to"
+  },
+  {
+    "id": "vidlink",
+    "name": "VidLink",
+    "urls": {
+      "movie": "https://vidlink.pro/movie/${id}",
+      "tv": "https://vidlink.pro/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://vidlink.pro"
+  },
+  {
+    "id": "vidcore",
+    "name": "VidCore",
+    "urls": {
+      "movie": "https://vidcore.org/embed/movie/${id}",
+      "tv": "https://vidcore.org/embed/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://vidcore.org"
+  },
+  {
+    "id": "111movies",
+    "name": "111Movies",
+    "urls": {
+      "movie": "https://111movies.com/movie/${id}",
+      "tv": "https://111movies.com/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://111movies.com"
+  },
+  {
+    "id": "vidnest",
+    "name": "VidNest",
+    "urls": {
+      "movie": "https://vidnest.fun/movie/${id}",
+      "tv": "https://vidnest.fun/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://vidnest.fun"
+  },
+  {
+    "id": "vidphantom",
+    "name": "VidPhantom",
+    "urls": {
+      "movie": "https://vidphantom.com/movie/${id}",
+      "tv": "https://vidphantom.com/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://vidphantom.com"
+  },
+  {
+    "id": "mycineby",
+    "name": "MyCineBy",
+    "urls": {
+      "movie": "https://mycineby.cc/embed/movie/${id}",
+      "tv": "https://mycineby.cc/embed/tv/${id}/${season}/${episode}"
+    },
+    "allowedDomain": "https://mycineby.cc"
   }
 ]

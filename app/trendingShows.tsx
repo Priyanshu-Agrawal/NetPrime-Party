@@ -50,21 +50,36 @@ export default function TrendingShowsScreen() {
   const renderItem = ({ item }: { item: Series }) => (
     <TouchableOpacity
       style={styles.movieCard}
+      activeOpacity={0.85}
       onPress={() => handlePress(item.id)}
     >
-      {item.poster_path ? (
-        <Image
-          source={{ uri: `https://image.tmdb.org/t/p/w200${item.poster_path}` }}
-          style={[styles.posterImage, { backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#ebebeb" }]}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={600}
-        />
-      ) : (
-        <View style={styles.noPoster}>
-          <Text style={styles.noPosterText}>No Image</Text>
-        </View>
-      )}
+      <View>
+        {item.poster_path ? (
+          <Image
+            source={{ uri: `https://image.tmdb.org/t/p/w342${item.poster_path}` }}
+            style={styles.posterImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={400}
+          />
+        ) : (
+          <View style={[styles.posterImage, styles.noPoster]}>
+            <MaterialIcons name="live-tv" size={30} color="#555" />
+          </View>
+        )}
+        {item.vote_average ? (
+          <View style={styles.ratingBadge}>
+            <MaterialIcons name="star" size={11} color="#f5c518" />
+            <Text style={styles.ratingText}>{item.vote_average.toFixed(1)}</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={styles.cardTitle} numberOfLines={1}>
+        {item.name || (item as any).title}
+      </Text>
+      {item.first_air_date ? (
+        <Text style={styles.cardYear}>{item.first_air_date.slice(0, 4)}</Text>
+      ) : null}
     </TouchableOpacity>
   );
 
@@ -206,29 +221,32 @@ const styles = StyleSheet.create({
   },
   movieCard: {
     width: (width - 30) / 2,
-    justifyContent: "center",
-    alignItems: "center",
   },
   posterImage: {
     width: "100%",
-    height: 250,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 10, height: 10 },
+    height: (width - 30) / 2 * 1.5,
+    borderRadius: 12,
+    backgroundColor: "#1a1a1e",
   },
   noPoster: {
-    width: "100%",
-    height: 250,
-    backgroundColor: "#ccc",
-    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
   },
-  noPosterText: {
-    color: "#666",
-    fontSize: 16,
-    textAlign: "center",
+  ratingBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
+  ratingText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  cardTitle: { color: "#f2f2f4", fontSize: 13, fontWeight: "600", marginTop: 7 },
+  cardYear: { color: "#9aa0a6", fontSize: 11, marginTop: 1 },
   fabContainer: {
     position: "absolute",
     bottom: 25,

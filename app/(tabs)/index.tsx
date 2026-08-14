@@ -1,81 +1,181 @@
-// app/index.tsx (if using Expo Router and _layout.tsx)
-
-import MovieList from "@/components/movieList"; // Adjust path based on your structure
-import PopularList from "@/components/popularList";
-import { Colors } from "@/constants/Colors";
-import { useNavigation } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-
-import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
-import { StyleSheet, Text, TouchableOpacity, useColorScheme, View } from "react-native";
-// import { ScrollView } from "react-native-gesture-handler";
-
+import ContinueWatching from "@/components/home/ContinueWatching";
+import HeroCarousel from "@/components/home/HeroCarousel";
+import MediaRail from "@/components/home/MediaRail";
+import GlassCard from "@/components/ui/GlassCard";
+import { colors, font, glow, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default React.memo(function HomePage() {
-  const colorScheme = useColorScheme();
-  const color = Colors[colorScheme ?? "dark"];
   const navigation = useNavigation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  // Simulate loading for shimmer demo (replace with real loading logic)
-
   return (
-    <SafeAreaView
-      edges={['top']}
-      style={{
-        backgroundColor: colorScheme === "dark" ? "#000" : "#fff",
-        flex: 1,
-      }}
-    >
-      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      <PopularList
+    <View style={styles.root}>
+      <StatusBar style="light" translucent />
 
-        ListHeaderComponent={
-          <>
-            <View style={styles.headerRow}>
-              <Text style={[styles.title, { color: color.text }]}>Trending Shows</Text>
-              <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 5 }} onPress={() => router.push("/trendingShows")}>
-                <Text style={[styles.seeAll, { color: color.tabIconDefault }]}>See All</Text>
-                <Ionicons name="arrow-forward" size={18} color={color.tabIconDefault} />
-              </TouchableOpacity>
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 108 }}
+      >
+        <HeroCarousel />
+
+        {/* Watch-party CTA */}
+        <View style={styles.ctaWrap}>
+          <GlassCard rounded={radius.xl} padded={14} style={styles.cta}>
+            <View style={styles.ctaRow}>
+              <View style={styles.ctaIcon}>
+                <Ionicons name="people" size={20} color={colors.honey} />
+              </View>
+              <View style={styles.ctaText}>
+                <Text style={styles.ctaTitle}>Start a watch party</Text>
+                <Text style={styles.ctaSub}>Watch in sync with your pack, anywhere.</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
+                onPress={() => router.push("/party")}
+                hitSlop={6}
+              >
+                <Text style={styles.ctaBtnText}>Invite</Text>
+              </Pressable>
             </View>
-            <MovieList />
-            <Text style={[styles.title, { color: color.text, paddingHorizontal: 20, marginBottom: 15 }]}>Now Playing</Text>
-          </>
-        }
-      />
-    </SafeAreaView>
+          </GlassCard>
+        </View>
+
+        <ContinueWatching />
+        <MediaRail
+          title="Trending Shows"
+          path="trending/tv/week"
+          kind="tv"
+          icon="flame"
+          onSeeAll={() => router.push("/trendingShows")}
+        />
+        <MediaRail title="Now Playing" path="movie/now_playing" kind="movie" />
+        <MediaRail title="Popular Movies" path="movie/popular" kind="movie" />
+        <MediaRail title="Top Rated Movies" path="movie/top_rated" kind="movie" icon="star" />
+        <MediaRail title="Upcoming" path="movie/upcoming" kind="movie" />
+        <MediaRail title="Popular Series" path="tv/popular" kind="tv" />
+        <MediaRail title="Top Rated Series" path="tv/top_rated" kind="tv" icon="star" />
+        <MediaRail title="Airing Today" path="tv/airing_today" kind="tv" />
+      </ScrollView>
+
+      {/* Floating top bar over the hero */}
+      <LinearGradient
+        colors={[colors.bg, "rgba(16,13,10,0.6)", "transparent"]}
+        style={[styles.topBarBg, { paddingTop: insets.top }]}
+        pointerEvents="box-none"
+      >
+        <View style={styles.topBar}>
+          <View style={styles.brandRow}>
+            <Ionicons name="paw" size={20} color={colors.honey} />
+            <Text style={styles.brand}>
+              Bea<Text style={styles.brandAccent}>r</Text>oom
+            </Text>
+          </View>
+          <View style={styles.topActions}>
+            <Pressable
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
+              onPress={() => router.push("/(tabs)/search")}
+              hitSlop={6}
+            >
+              <Ionicons name="search" size={18} color={colors.text} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.hostBtn, pressed && styles.pressed]}
+              onPress={() => router.push("/party")}
+              hitSlop={6}
+            >
+              <Ionicons name="people" size={15} color={colors.onHoney} />
+              <Text style={styles.hostText}>Host Party</Text>
+            </Pressable>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
-  container: {
-    // flex: 1,
-    // padding: 10,
-    // overflow: "visible",
-    // paddingBottom: 80, // Add bottom padding to ensure content is not hidden behind the tab bar
+  root: { flex: 1, backgroundColor: colors.bg },
+  scroll: { flex: 1 },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
+
+  topBarBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
   },
-  title: {
-    fontWeight: "bold",
-    fontSize: 30,
-    fontStyle: "normal",
-  },
-  headerRow: {
+  topBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginVertical: 10,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  seeAll: {
-    fontSize: 16,
-    fontWeight: "600",
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  brand: {
+    color: colors.text,
+    fontFamily: font.headlineXbold,
+    fontSize: 22,
+    letterSpacing: 0.2,
   },
+  brandAccent: { color: colors.honey },
+  topActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hostBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.honey,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: radius.pill,
+    ...glow.honey,
+  },
+  hostText: { color: colors.onHoney, fontFamily: font.label, fontSize: 12 },
+
+  ctaWrap: { paddingHorizontal: 16, marginTop: -14 },
+  cta: {},
+  ctaRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  ctaIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaText: { flex: 1 },
+  ctaTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: 15 },
+  ctaSub: { color: colors.textDim, fontFamily: font.body, fontSize: 12, marginTop: 2 },
+  ctaBtn: {
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honey,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+  },
+  ctaBtnText: { color: colors.honey, fontFamily: font.label, fontSize: 12 },
 });

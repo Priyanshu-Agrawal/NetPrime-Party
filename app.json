@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "NetPrime",
-    "slug": "NetPrime",
+    "name": "Bearoom",
+    "slug": "bearoom",
     "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "netprime",
+    "scheme": "bearoom",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -33,6 +33,13 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": true
         }
       ]
     ],

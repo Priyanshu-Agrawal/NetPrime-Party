@@ -7,19 +7,14 @@ import {
   Dimensions, // For pagination buttons
   FlatList,
   LayoutAnimation,
-  Platform,
+  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
-  UIManager,
-  useColorScheme,
-  View,
-  ScrollView,
+  TouchableOpacity, useColorScheme,
+  View
 } from "react-native";
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+
 
 import { useMovieContext } from "@/contexts/movieContext";
 import { Series } from "@/contexts/movieContext/types";
