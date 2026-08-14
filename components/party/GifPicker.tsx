@@ -1,16 +1,29 @@
 /**
- * GifPicker — a frosted bottom-sheet GIF browser for the watch-party chat.
- * Trending on open, live search as you type (debounced), tap to send. All GIF
- * calls go through our KLIPY Cloudflare proxy (services/gifs) so no key ships here.
+ * GifPicker — a frosted bottom-sheet GIF + sticker browser for the watch-party
+ * chat. Tabs for GIFs / Stickers, trending on open, debounced search, blur-up
+ * loading (KLIPY blur_preview) + a shimmer skeleton on first load. Tap to send.
+ * All calls go through our KLIPY Cloudflare proxy (services/gifs) — no key here.
  */
-import { searchGifs, trendingGifs, type GifItem } from "@/services/gifs";
+import {
+  getCategories,
+  reportMedia,
+  searchMedia,
+  shareTrigger,
+  trendingMedia,
+  type MediaCategory,
+  type MediaItem,
+  type MediaKind,
+  type ReportReason,
+} from "@/services/gifs";
+import { bearAlert } from "@/components/ui/BearAlert";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Animated,
   Dimensions,
+  Easing,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -30,52 +43,93 @@ const PAD = ms(14);
 const TILE_W = Math.floor((width - PAD * 2 - GAP) / COLS);
 const TILE_H = Math.round(TILE_W * 0.75);
 
+const TABS: { key: MediaKind; label: string }[] = [
+  { key: "gifs", label: "GIFs" },
+  { key: "stickers", label: "Stickers" },
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onPick: (gif: GifItem) => void;
+  onPick: (item: MediaItem, kind: MediaKind) => void;
+  /** Per-user id KLIPY requires (frequency capping / analytics). */
+  customerId: string;
 }
 
-export function GifPicker({ visible, onClose, onPick }: Props) {
+export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
   const insets = useSafeAreaInsets();
+  const [kind, setKind] = useState<MediaKind>("gifs");
   const [query, setQuery] = useState("");
-  const [gifs, setGifs] = useState<GifItem[]>([]);
+  const [items, setItems] = useState<MediaItem[]>([]);
+  const [categories, setCategories] = useState<MediaCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load trending when opened; reset on close.
+  // Reset on close.
   useEffect(() => {
     if (!visible) {
       setQuery("");
-      setGifs([]);
-      return;
+      setItems([]);
+      setKind("gifs");
     }
+  }, [visible]);
+
+  // Category chips per content type (for discovery when not searching).
+  useEffect(() => {
+    if (!visible) return;
     let alive = true;
-    setLoading(true);
-    trendingGifs().then((g) => alive && (setGifs(g), setLoading(false)));
+    getCategories(kind).then((c) => alive && setCategories(c));
     return () => {
       alive = false;
     };
-  }, [visible]);
+  }, [kind, visible]);
 
-  // Debounced search.
+  // Send an item: fire KLIPY's Share Trigger (personalization + reporting), then hand it up.
+  const pick = (item: MediaItem) => {
+    shareTrigger(kind, item.slug, customerId, query.trim());
+    onPick(item, kind);
+    onClose();
+  };
+
+  // Long-press → report. KLIPY accepts a short reason; keep the common few.
+  const report = (item: MediaItem) => {
+    const send = (reason: ReportReason) => {
+      reportMedia(kind, item.slug, customerId, reason);
+      bearAlert("Reported", "Thanks — KLIPY will review it.");
+    };
+    bearAlert("Report this GIF?", "Help keep the pack's chat clean.", [
+      { text: "Inappropriate", style: "destructive", onPress: () => send("offensive") },
+      { text: "Spam", onPress: () => send("spam") },
+      { text: "Broken", onPress: () => send("broken") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  // Load (trending or search) whenever open + kind/query change (debounced).
   useEffect(() => {
     if (!visible) return;
     if (debounce.current) clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => {
-      let alive = true;
-      setLoading(true);
-      (query.trim() ? searchGifs(query) : trendingGifs()).then(
-        (g) => alive && (setGifs(g), setLoading(false)),
-      );
-      return () => {
-        alive = false;
-      };
-    }, 350);
+    let alive = true;
+    setLoading(true);
+    setItems([]);
+    debounce.current = setTimeout(
+      () => {
+        (query.trim() ? searchMedia(kind, query, customerId) : trendingMedia(kind, customerId)).then((r) => {
+          if (alive) {
+            setItems(r);
+            setLoading(false);
+          }
+        });
+      },
+      query.trim() ? 350 : 0,
+    );
     return () => {
+      alive = false;
       if (debounce.current) clearTimeout(debounce.current);
     };
-  }, [query, visible]);
+  }, [query, kind, visible]);
+
+  const sticker = kind === "stickers";
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
@@ -85,13 +139,14 @@ export function GifPicker({ visible, onClose, onPick }: Props) {
         style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, ms(10)) }]}
       >
         <View style={styles.grabber} />
+
         <View style={styles.header}>
           <View style={styles.searchBox}>
             <Ionicons name="search" size={ms(16)} color={colors.textDim} />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search GIFs"
+              placeholder={`Search ${sticker ? "stickers" : "KLIPY"}`}
               placeholderTextColor={colors.textFaint}
               style={styles.searchInput}
               selectionColor={colors.honey}
@@ -109,43 +164,100 @@ export function GifPicker({ visible, onClose, onPick }: Props) {
           </Pressable>
         </View>
 
-        <FlatList
-          data={gifs}
-          keyExtractor={(g) => g.id}
-          numColumns={COLS}
-          columnWrapperStyle={{ gap: GAP }}
-          contentContainerStyle={styles.grid}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.tile}
-              onPress={() => {
-                onPick(item);
-                onClose();
-              }}
-            >
-              <Image source={{ uri: item.previewUrl }} style={styles.tileImg} contentFit="cover" transition={120} />
-            </Pressable>
-          )}
-          ListFooterComponent={
-            loading ? (
-              <View style={styles.loading}>
-                <ActivityIndicator color={colors.honey} />
-              </View>
-            ) : gifs.length === 0 ? (
-              <View style={styles.loading}>
+        {/* Tabs */}
+        <View style={styles.tabs}>
+          {TABS.map((t) => {
+            const active = kind === t.key;
+            return (
+              <Pressable key={t.key} style={[styles.tab, active && styles.tabActive]} onPress={() => setKind(t.key)}>
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Category chips (discovery when not searching) */}
+        {!query.trim() && categories.length > 0 ? (
+          <View style={styles.catWrap}>
+            <FlatList
+              horizontal
+              data={categories}
+              keyExtractor={(c) => c.query}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.catRow}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item: c }) => (
+                <Pressable style={styles.catChip} onPress={() => setQuery(c.query)}>
+                  <Text style={styles.catText}>{c.category}</Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        ) : null}
+
+        {loading && items.length === 0 ? (
+          <SkeletonGrid />
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(g) => g.id}
+            numColumns={COLS}
+            columnWrapperStyle={{ gap: GAP }}
+            contentContainerStyle={styles.grid}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <Pressable
+                style={[styles.tile, sticker && styles.tileSticker]}
+                onPress={() => pick(item)}
+                onLongPress={() => report(item)}
+                delayLongPress={400}
+              >
+                <Image
+                  source={{ uri: item.previewUrl }}
+                  placeholder={item.blur ? { uri: item.blur } : undefined}
+                  placeholderContentFit="cover"
+                  style={styles.tileImg}
+                  contentFit={sticker ? "contain" : "cover"}
+                  transition={220}
+                />
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <View style={styles.empty}>
                 <Ionicons name="images-outline" size={ms(28)} color={colors.textFaint} />
-                <Text style={styles.emptyText}>No GIFs found</Text>
+                <Text style={styles.emptyText}>Nothing found</Text>
               </View>
-            ) : null
-          }
-        />
+            }
+          />
+        )}
         <View style={styles.attribution}>
           <Text style={styles.attrText}>Powered by KLIPY</Text>
         </View>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+/** Shimmering skeleton tiles for the first load. */
+function SkeletonGrid() {
+  const pulse = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.4, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  return (
+    <View style={[styles.grid, styles.skeletonWrap]}>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <Animated.View key={i} style={[styles.tile, styles.skeleton, { opacity: pulse }]} />
+      ))}
+    </View>
   );
 }
 
@@ -156,7 +268,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: "70%",
+    height: "72%",
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
@@ -182,16 +294,38 @@ const styles = StyleSheet.create({
   close: { paddingHorizontal: ms(4) },
   closeText: { color: colors.honey, fontFamily: font.label, fontSize: ms(14) },
 
-  grid: { paddingHorizontal: PAD, paddingBottom: ms(20), gap: GAP },
-  tile: {
-    width: TILE_W,
-    height: TILE_H,
-    borderRadius: radius.md,
-    overflow: "hidden",
+  tabs: { flexDirection: "row", gap: ms(8), paddingHorizontal: PAD, marginBottom: ms(10) },
+  tab: {
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(7),
+    borderRadius: radius.pill,
     backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
+  tabActive: { backgroundColor: colors.honeySoft, borderColor: colors.honey },
+  tabText: { color: colors.textDim, fontFamily: font.label, fontSize: ms(13) },
+  tabTextActive: { color: colors.honey },
+
+  catWrap: { marginBottom: ms(8) },
+  catRow: { paddingHorizontal: PAD, gap: ms(8) },
+  catChip: {
+    paddingHorizontal: ms(14),
+    paddingVertical: ms(7),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  catText: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12) },
+
+  grid: { paddingHorizontal: PAD, paddingBottom: ms(20), gap: GAP },
+  skeletonWrap: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+  tile: { width: TILE_W, height: TILE_H, borderRadius: radius.md, overflow: "hidden", backgroundColor: colors.surface },
+  tileSticker: { backgroundColor: colors.surfaceStrong },
   tileImg: { width: "100%", height: "100%" },
-  loading: { paddingVertical: ms(40), alignItems: "center", gap: ms(8) },
+  skeleton: { backgroundColor: colors.surfaceStrong, marginBottom: GAP },
+  empty: { paddingVertical: ms(40), alignItems: "center", gap: ms(8) },
   emptyText: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13) },
   attribution: { alignItems: "center", paddingVertical: ms(6) },
   attrText: { color: colors.textFaint, fontFamily: font.label, fontSize: ms(10), letterSpacing: 1 },

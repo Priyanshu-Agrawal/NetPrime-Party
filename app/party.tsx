@@ -425,8 +425,13 @@ export default function Party() {
         </Pressable>
       </Modal>
 
-      {/* GIF picker (KLIPY via our Cloudflare proxy) */}
-      <GifPicker visible={showGif} onClose={() => setShowGif(false)} onPick={(g) => chat.sendGif(g)} />
+      {/* GIF + sticker picker (KLIPY, called directly per their integration rules) */}
+      <GifPicker
+        visible={showGif}
+        onClose={() => setShowGif(false)}
+        customerId={party.userId}
+        onPick={(g, k) => chat.sendGif(g, k === "stickers")}
+      />
     </View>
   );
 }
@@ -474,12 +479,18 @@ function AvatarStack({
 }
 
 function GifBubble({ msg }: { msg: ChatMessage }) {
-  const maxW = ms(180);
+  // Stickers are transparent + smaller; render with no card background.
+  const maxW = msg.sticker ? ms(120) : ms(180);
   const w = msg.gifW && msg.gifH ? Math.min(maxW, msg.gifW) : maxW;
   const h = msg.gifW && msg.gifH ? Math.round(w * (msg.gifH / msg.gifW)) : Math.round(w * 0.75);
   return (
-    <View style={[styles.gifBubble, { width: w, height: h }]}>
-      <Image source={{ uri: msg.gifUrl }} style={styles.gifBubbleImg} contentFit="cover" transition={120} />
+    <View style={[msg.sticker ? styles.stickerBubble : styles.gifBubble, { width: w, height: h }]}>
+      <Image
+        source={{ uri: msg.gifUrl }}
+        style={styles.gifBubbleImg}
+        contentFit={msg.sticker ? "contain" : "cover"}
+        transition={150}
+      />
     </View>
   );
 }
@@ -730,6 +741,7 @@ const styles = StyleSheet.create({
   },
   gifBtnText: { color: colors.honey, fontFamily: font.label, fontSize: ms(13), letterSpacing: 0.5 },
   gifBubble: { borderRadius: radius.lg, overflow: "hidden", backgroundColor: colors.surfaceStrong },
+  stickerBubble: { backgroundColor: "transparent" },
   gifBubbleImg: { width: "100%", height: "100%" },
   inputBox: {
     flex: 1,

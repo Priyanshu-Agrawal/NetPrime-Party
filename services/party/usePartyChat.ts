@@ -22,6 +22,8 @@ export interface ChatMessage {
   gifUrl?: string;
   gifW?: number;
   gifH?: number;
+  /** true when the media is a (transparent) sticker rather than a GIF. */
+  sticker?: boolean;
 }
 
 export interface FloatingReaction {
@@ -40,7 +42,7 @@ export function usePartyChat(opts: {
   messages: ChatMessage[];
   reactions: FloatingReaction[];
   sendChat: (text: string) => void;
-  sendGif: (gif: { url: string; width?: number; height?: number }) => void;
+  sendGif: (gif: { url: string; width?: number; height?: number }, sticker?: boolean) => void;
   sendReaction: (emoji: string) => void;
   ready: boolean;
 } {
@@ -105,7 +107,7 @@ export function usePartyChat(opts: {
   );
 
   const sendGif = useCallback(
-    (gif: { url: string; width?: number; height?: number }) => {
+    (gif: { url: string; width?: number; height?: number }, sticker = false) => {
       if (!gif?.url) return;
       const msg = {
         id: uid(),
@@ -117,6 +119,7 @@ export function usePartyChat(opts: {
         gifUrl: gif.url,
         gifW: gif.width,
         gifH: gif.height,
+        sticker,
       };
       setMessages((m) => [...m, { ...msg, mine: true }].slice(-200));
       void channelRef.current?.send({ type: "broadcast", event: "chat", payload: msg });

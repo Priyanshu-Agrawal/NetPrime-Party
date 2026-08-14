@@ -46,3 +46,8 @@ app-example
 
 # local UI render captures
 bearoom_*_render.png
+
+# local secrets
+.env
+.env.local
+!.env.example
