@@ -8,7 +8,7 @@ import type { PlayerEvent, PlayerHandle } from "@/components/player/HijackPlayer
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { PartyClient, type RoomSnapshot } from "./PartyClient";
 import { PartySyncEngine, type PlayerControl } from "./PartySyncEngine";
-import { effectivePositionMs, type PartyMedia } from "./protocol";
+import { effectivePositionMs, type PartyMedia, type Permissions, type RoomConfig } from "./protocol";
 
 export interface UseParty {
   snapshot: RoomSnapshot | null;
@@ -16,6 +16,8 @@ export interface UseParty {
   userId: string;
   connectedCount: number;
   detached: boolean;
+  /** True once the host has removed us from the room. */
+  kicked: boolean;
   /** Non-null if joining/creating failed (e.g. "no such room"). */
   error: string | null;
   /** Forward every HijackPlayer event here. */
@@ -26,7 +28,13 @@ export interface UseParty {
   seekBy: (deltaSec: number) => void;
   transferHost: (userId: string) => void;
   claimHost: () => void;
+  // room administration (host-only server-side)
+  setConfig: (patch: Partial<RoomConfig>, password?: string) => Promise<void>;
+  setPermissions: (userId: string, patch: Partial<Permissions>) => Promise<void>;
+  approveMember: (userId: string) => Promise<void>;
+  kick: (userId: string) => Promise<void>;
   // guest
+  grabControl: () => Promise<void>;
   jumpToLive: () => void;
 }
 
@@ -35,12 +43,14 @@ export function useParty(opts: {
   role: "host" | "guest";
   displayName: string;
   media?: PartyMedia;
+  password?: string;
   playerRef: RefObject<PlayerHandle | null>;
 }): UseParty {
-  const { code, role, displayName, media, playerRef } = opts;
+  const { code, role, displayName, media, password, playerRef } = opts;
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [connectedCount, setConnectedCount] = useState(1);
   const [detached, setDetached] = useState(false);
+  const [kicked, setKicked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Media is fixed for the room's life; keep it out of the client's deps so a
@@ -48,8 +58,8 @@ export function useParty(opts: {
   const mediaRef = useRef(media);
 
   const client = useMemo(
-    () => new PartyClient({ code, role, displayName, media: mediaRef.current }),
-    [code, role, displayName],
+    () => new PartyClient({ code, role, displayName, media: mediaRef.current, password }),
+    [code, role, displayName, password],
   );
 
   const engine = useMemo(() => {
@@ -64,6 +74,8 @@ export function useParty(opts: {
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
+    setKicked(false);
     client.onConnectedCount((n) => {
       if (!cancelled) setConnectedCount(n);
     });
@@ -71,6 +83,9 @@ export function useParty(opts: {
       if (cancelled) return;
       setSnapshot(s);
       engine.setAnchor(s.playback);
+    });
+    client.onKicked(() => {
+      if (!cancelled) setKicked(true);
     });
     client.start().catch((e) => {
       const msg = e?.message ?? String(e);
@@ -90,6 +105,7 @@ export function useParty(opts: {
       userId: client.userId,
       connectedCount,
       detached,
+      kicked,
       error,
       onPlayerEvent: (e) => engine.onPlayerEvent(e),
       play: () => void client.play(),
@@ -102,8 +118,13 @@ export function useParty(opts: {
       },
       transferHost: (uid) => void client.transferHost(uid),
       claimHost: () => void client.claimHost(),
+      setConfig: (patch, pw) => client.setConfig(patch, pw),
+      setPermissions: (uid, patch) => client.setPermissions(uid, patch),
+      approveMember: (uid) => client.approveMember(uid),
+      kick: (uid) => client.kick(uid),
+      grabControl: () => client.grabControl(),
       jumpToLive: () => engine.jumpToLive(),
     }),
-    [snapshot, connectedCount, detached, error, client, engine],
+    [snapshot, connectedCount, detached, kicked, error, client, engine],
   );
 }

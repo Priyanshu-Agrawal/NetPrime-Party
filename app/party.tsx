@@ -12,6 +12,7 @@ import HijackPlayer, {
   type PlayerEvent,
   type PlayerHandle,
 } from "@/components/player/HijackPlayer";
+import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { getDisplayName } from "@/services/party/identity";
 import type { PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
@@ -26,6 +27,7 @@ import {
   Easing,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   Share,
@@ -75,17 +77,23 @@ export default function Party() {
   );
 
   const playerRef = useRef<PlayerHandle>(null);
+  const [password, setPassword] = useState<string | undefined>(undefined);
+  const [pwPrompt, setPwPrompt] = useState(false);
+  const [pwInput, setPwInput] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
 
   const party = useParty({
     code: room,
     role: isHostParam ? "host" : "guest",
     displayName,
     media: hostMedia,
+    password,
     playerRef,
   });
 
   const snap = party.snapshot;
   const media = snap?.media;
+  const config = snap?.config;
   const providerId = media?.providerId;
   const roomCode = snap?.code || room;
   const hostPresent = !!snap?.lease.hostId;
@@ -95,6 +103,33 @@ export default function Party() {
     () => members.filter((m) => m.userId !== party.userId),
     [members, party.userId],
   );
+  const selfMember = members.find((m) => m.userId === party.userId);
+  const selfApproved = selfMember?.approved !== false;
+  const reactionsOn = config?.gifsEnabled !== false;
+  const canSendChat = party.isHost || (config?.chatEnabled !== false && selfMember?.permissions?.canChat !== false);
+  const canGrabControl = !party.isHost && selfApproved && !!config?.guestControlDefault;
+  const pendingCount = guests.filter((g) => g.approved === false).length;
+
+  // Removed by the host → bounce out with a note.
+  useEffect(() => {
+    if (!party.kicked) return;
+    Alert.alert("Removed", "The host removed you from this room.", [
+      { text: "OK", onPress: () => router.back() },
+    ]);
+  }, [party.kicked, router]);
+
+  // Password-gated room → surface a password prompt (retry with the entered pw).
+  useEffect(() => {
+    if (!isHostParam && party.error && /password/i.test(party.error)) setPwPrompt(true);
+  }, [party.error, isHostParam]);
+
+  const submitPassword = () => {
+    const p = pwInput.trim();
+    if (!p) return;
+    setPassword(p); // rebuilds the client → retries join with the password
+    setPwPrompt(false);
+    setPwInput("");
+  };
 
   const chat = usePartyChat({ code: roomCode, userId: party.userId, name: displayName });
   const [draft, setDraft] = useState("");
@@ -157,10 +192,23 @@ export default function Party() {
 
         {/* Player */}
         <View style={styles.player}>
-          {party.error ? (
+          {party.error && /password/i.test(party.error) ? (
+            <View style={styles.waiting}>
+              <Ionicons name="lock-closed-outline" size={30} color={colors.honey} />
+              <Text style={styles.waitingText}>This room is password-protected.</Text>
+              <Pressable style={styles.retryBtn} onPress={() => setPwPrompt(true)}>
+                <Text style={styles.retryText}>Enter password</Text>
+              </Pressable>
+            </View>
+          ) : party.error ? (
             <View style={styles.waiting}>
               <Ionicons name="alert-circle-outline" size={30} color={colors.danger} />
-              <Text style={styles.waitingText}>{party.error}</Text>
+              <Text style={styles.waitingText}>{party.error.replace(/^party_\w+:\s*/, "")}</Text>
+            </View>
+          ) : !isHostParam && snap && !selfApproved ? (
+            <View style={styles.waiting}>
+              <Ionicons name="hourglass-outline" size={30} color={colors.honey} />
+              <Text style={styles.waitingText}>Waiting for the host to let you in…</Text>
             </View>
           ) : providerId && media ? (
             <HijackPlayer
@@ -207,6 +255,14 @@ export default function Party() {
             </Pressable>
           ) : null}
 
+          {/* host allows guests to drive → take control (becomes host) */}
+          {canGrabControl && hostPresent && !party.detached ? (
+            <Pressable style={[styles.floatBtn, styles.grabBtn]} onPress={() => void party.grabControl()}>
+              <Ionicons name="game-controller" size={16} color={colors.onHoney} />
+              <Text style={styles.floatText}>Take control</Text>
+            </Pressable>
+          ) : null}
+
           {/* floating reactions */}
           <View style={styles.reactionLayer} pointerEvents="none">
             {chat.reactions.map((r, i) => (
@@ -221,14 +277,24 @@ export default function Party() {
           <View style={styles.hostBar}>
             <View style={styles.hostHintRow}>
               <Ionicons name="ellipse" size={8} color={colors.honey} />
-              <Text style={styles.hostHint}>You're hosting · your playback syncs to everyone</Text>
+              <Text style={styles.hostHint}>
+                {pendingCount > 0
+                  ? `${pendingCount} waiting to join · tap settings`
+                  : "You're hosting · your playback syncs to everyone"}
+              </Text>
             </View>
-            {guests.length > 0 ? (
-              <Pressable style={styles.transferBtn} onPress={transferHost}>
-                <Ionicons name="swap-horizontal" size={14} color={colors.honey} />
-                <Text style={styles.transferText}>Transfer</Text>
+            <View style={styles.hostActions}>
+              <Pressable style={styles.settingsBtn} onPress={() => setShowSettings(true)}>
+                <Ionicons name="settings-outline" size={16} color={colors.text} />
+                {pendingCount > 0 ? <View style={styles.settingsDot} /> : null}
               </Pressable>
-            ) : null}
+              {guests.length > 0 ? (
+                <Pressable style={styles.transferBtn} onPress={transferHost}>
+                  <Ionicons name="swap-horizontal" size={14} color={colors.honey} />
+                  <Text style={styles.transferText}>Transfer</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         ) : null}
 
@@ -252,33 +318,89 @@ export default function Party() {
 
         {/* Input area */}
         <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          <View style={styles.quickRow}>
-            {QUICK_REACTIONS.map((e) => (
-              <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
-                <Text style={styles.quickEmoji}>{e}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.inputRow}>
-            <View style={styles.inputBox}>
-              <TextInput
-                style={styles.input}
-                placeholder="Say something to the pack…"
-                placeholderTextColor={colors.textDim}
-                value={draft}
-                onChangeText={setDraft}
-                selectionColor={colors.honey}
-                returnKeyType="send"
-                onSubmitEditing={send}
-                blurOnSubmit={false}
-              />
+          {reactionsOn ? (
+            <View style={styles.quickRow}>
+              {QUICK_REACTIONS.map((e) => (
+                <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
+                  <Text style={styles.quickEmoji}>{e}</Text>
+                </Pressable>
+              ))}
             </View>
-            <Pressable style={styles.sendBtn} onPress={send}>
-              <Ionicons name="send" size={16} color={colors.onHoney} />
-            </Pressable>
-          </View>
+          ) : null}
+          {canSendChat ? (
+            <View style={styles.inputRow}>
+              <View style={styles.inputBox}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Say something to the pack…"
+                  placeholderTextColor={colors.textDim}
+                  value={draft}
+                  onChangeText={setDraft}
+                  selectionColor={colors.honey}
+                  returnKeyType="send"
+                  onSubmitEditing={send}
+                  blurOnSubmit={false}
+                />
+              </View>
+              <Pressable style={styles.sendBtn} onPress={send}>
+                <Ionicons name="send" size={16} color={colors.onHoney} />
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.chatOffRow}>
+              <Ionicons name="lock-closed" size={14} color={colors.textFaint} />
+              <Text style={styles.chatOffText}>
+                {config?.chatEnabled === false ? "Chat is off for guests" : "You're muted by the host"}
+              </Text>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Host: room administration sheet */}
+      {party.isHost && config ? (
+        <RoomSettingsSheet
+          visible={showSettings}
+          onClose={() => setShowSettings(false)}
+          config={config}
+          members={members}
+          hostId={hostId}
+          selfId={party.userId}
+          onSetConfig={(patch, pw) => void party.setConfig(patch, pw)}
+          onSetPermissions={(uid, patch) => void party.setPermissions(uid, patch)}
+          onApprove={(uid) => void party.approveMember(uid)}
+          onKick={(uid) => void party.kick(uid)}
+          onTransferHost={(uid) => party.transferHost(uid)}
+        />
+      ) : null}
+
+      {/* Guest: password prompt for a protected room */}
+      <Modal visible={pwPrompt} transparent animationType="fade" onRequestClose={() => setPwPrompt(false)}>
+        <Pressable style={styles.pwBackdrop} onPress={() => setPwPrompt(false)}>
+          <Pressable style={styles.pwSheet} onPress={() => {}}>
+            <Ionicons name="lock-closed" size={ms(26)} color={colors.honey} />
+            <Text style={styles.pwTitle}>Room password</Text>
+            <Text style={styles.pwSub}>Enter the password the host set for this room.</Text>
+            <TextInput
+              value={pwInput}
+              onChangeText={setPwInput}
+              placeholder="Password"
+              placeholderTextColor={colors.textFaint}
+              style={styles.pwPromptInput}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              selectionColor={colors.honey}
+              returnKeyType="go"
+              onSubmitEditing={submitPassword}
+            />
+            <Pressable style={styles.pwGo} onPress={submitPassword}>
+              <Text style={styles.pwGoText}>Join</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -570,4 +692,99 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...glow.honey,
   },
+
+  retryBtn: {
+    marginTop: ms(4),
+    backgroundColor: colors.honey,
+    paddingHorizontal: ms(18),
+    paddingVertical: ms(9),
+    borderRadius: radius.pill,
+    ...glow.honey,
+  },
+  retryText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
+  grabBtn: { bottom: ms(68) },
+
+  hostActions: { flexDirection: "row", alignItems: "center", gap: ms(8) },
+  settingsBtn: {
+    width: ms(34),
+    height: ms(34),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsDot: {
+    position: "absolute",
+    top: ms(4),
+    right: ms(4),
+    width: ms(8),
+    height: ms(8),
+    borderRadius: ms(4),
+    backgroundColor: colors.honey,
+    borderWidth: 1,
+    borderColor: colors.bgElevated,
+  },
+
+  chatOffRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: ms(8),
+    paddingHorizontal: ms(12),
+    paddingTop: ms(10),
+    paddingBottom: ms(4),
+  },
+  chatOffText: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13) },
+
+  pwBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(8,6,4,0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: ms(28),
+  },
+  pwSheet: {
+    width: "100%",
+    alignItems: "center",
+    backgroundColor: colors.bgElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.xxl,
+    padding: ms(24),
+  },
+  pwTitle: { color: colors.text, fontFamily: font.headline, fontSize: ms(19), marginTop: ms(10) },
+  pwSub: {
+    color: colors.textDim,
+    fontFamily: font.body,
+    fontSize: ms(13),
+    textAlign: "center",
+    marginTop: ms(6),
+  },
+  pwPromptInput: {
+    alignSelf: "stretch",
+    marginTop: ms(18),
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: ms(16),
+    height: ms(50),
+    color: colors.text,
+    fontFamily: font.bodySemi,
+    fontSize: ms(16),
+    letterSpacing: 2,
+  },
+  pwGo: {
+    alignSelf: "stretch",
+    marginTop: ms(16),
+    height: ms(50),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+    alignItems: "center",
+    justifyContent: "center",
+    ...glow.honey,
+  },
+  pwGoText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(16) },
 });

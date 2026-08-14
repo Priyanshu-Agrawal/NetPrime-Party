@@ -26,6 +26,7 @@ import type {
   HostLease,
   Member,
   PartyMedia,
+  Permissions,
   PlaybackAnchor,
   RoomConfig,
 } from "./protocol";
@@ -52,6 +53,7 @@ export class PartyClient {
   private displayName: string;
   private wantHost: boolean;
   private initialMedia?: PartyMedia;
+  private password?: string;
 
   private channel: RealtimeChannel | null = null;
   private snap: RoomSnapshot | null = null;
@@ -68,17 +70,20 @@ export class PartyClient {
 
   private snapCb: ((s: RoomSnapshot) => void) | null = null;
   private connCb: ((n: number) => void) | null = null;
+  private kickedCb: (() => void) | null = null;
 
   constructor(opts: {
     code: string;
     role: "host" | "guest";
     displayName: string;
     media?: PartyMedia;
+    password?: string;
   }) {
     this.code = opts.code;
     this.displayName = opts.displayName;
     this.wantHost = opts.role === "host";
     this.initialMedia = opts.media;
+    this.password = opts.password;
   }
 
   // --- public accessors -----------------------------------------------------
@@ -88,6 +93,10 @@ export class PartyClient {
   }
   onConnectedCount(cb: (n: number) => void): void {
     this.connCb = cb;
+  }
+  /** Fires once when the host removes us from the room. */
+  onKicked(cb: () => void): void {
+    this.kickedCb = cb;
   }
   /** Reference (server) clock in ms — stable across host changes. */
   now(): number {
@@ -122,6 +131,7 @@ export class PartyClient {
         p_code: this.code,
         p_installation_id: instId,
         p_display_name: this.displayName,
+        p_password: this.password ?? null,
       });
     }
 
@@ -170,6 +180,32 @@ export class PartyClient {
     await this.tryClaim(true);
   }
 
+  // --- room administration (host-only server-side; guest calls are rejected) --
+  async setConfig(patch: Partial<RoomConfig>, password?: string): Promise<void> {
+    await this.rpcSnap("party_set_config", {
+      p_code: this.code,
+      p_patch: patch,
+      p_password: password ?? null,
+    });
+  }
+  async setPermissions(userId: string, patch: Partial<Permissions>): Promise<void> {
+    await this.rpcSnap("party_set_permissions", {
+      p_code: this.code,
+      p_target: userId,
+      p_patch: patch,
+    });
+  }
+  async approveMember(userId: string): Promise<void> {
+    await this.rpcSnap("party_approve_member", { p_code: this.code, p_target: userId });
+  }
+  async kick(userId: string): Promise<void> {
+    await this.rpcSnap("party_kick", { p_code: this.code, p_target: userId });
+  }
+  /** Guest takes control — only succeeds when the host enabled guest control. */
+  async grabControl(): Promise<void> {
+    await this.rpcSnap("party_grab_control", { p_code: this.code });
+  }
+
   private async setPlayback(action: string, positionMs: number | null, rate: number | null): Promise<void> {
     await this.rpcSnap("party_set_playback", {
       p_code: this.code,
@@ -195,6 +231,15 @@ export class PartyClient {
         b = cur.playback;
       const newer = a.epoch > b.epoch || (a.epoch === b.epoch && a.seq >= b.seq);
       if (!newer) return; // stale broadcast — drop
+    }
+    // Kicked: we were in the room and this authoritative snapshot no longer lists
+    // us. (Only from a peer/host broadcast — never from our own RPC result.)
+    if (!fromSelf && this.userId && cur?.members?.some((m) => m.userId === this.userId)) {
+      if (!s.members?.some((m) => m.userId === this.userId)) {
+        this.snap = s;
+        this.kickedCb?.();
+        return;
+      }
     }
     this.snap = s;
     this.lastSnapAt = Date.now();

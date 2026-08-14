@@ -38,6 +38,8 @@ export interface Member {
   /** Server-stamped (DO clock) — safe to sort on for deterministic election. */
   joinedAt: number;
   permissions: Permissions;
+  /** False while a gated guest is waiting for the host to approve them. */
+  approved: boolean;
   /** Whether the member currently has at least one live connection. */
   connected: boolean;
 }
@@ -66,6 +68,8 @@ export interface RoomConfig {
   pollsEnabled: boolean;
   /** Default canControlPlayback granted to a newly-joined guest. */
   guestControlDefault: boolean;
+  /** New guests join un-approved and wait for the host to let them in. */
+  approveGuests: boolean;
 }
 
 export const DEFAULT_ROOM_CONFIG: RoomConfig = {
@@ -76,6 +80,7 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
   queueEnabled: true,
   pollsEnabled: true,
   guestControlDefault: false,
+  approveGuests: false,
 };
 
 export const DEFAULT_GUEST_PERMISSIONS: Permissions = {
@@ -180,8 +185,10 @@ export type ClientIntent =
   | { t: "buffering"; buffering: boolean }
   // host / room administration
   | { t: "transferHost"; targetUserId: string }
+  | { t: "grabControl" } // guest takes control when the host has opted in
   | { t: "setConfig"; patch: Partial<RoomConfig> }
   | { t: "setPermissions"; targetUserId: string; patch: Partial<Permissions> }
+  | { t: "approveMember"; targetUserId: string }
   | { t: "kick"; targetUserId: string }
   // chat / gifs
   | { t: "chat"; kind: "text" | "gif"; body: string; gifUrl?: string }

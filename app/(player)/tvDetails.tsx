@@ -13,6 +13,7 @@ import { GlassIconButton } from "@/components/ui/GlassIconButton";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
+import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import { genRoomCode } from "@/utils/roomCode";
 import {
   externalLinks,
@@ -81,6 +82,7 @@ const TvDetails: React.FC = () => {
       .then((data) => {
         if (aborted) return;
         setD(data);
+        setSaved(isInWatchlist(id!, "tv"));
         setError(undefined);
         const first =
           (data.seasons ?? []).find(
@@ -227,7 +229,11 @@ const TvDetails: React.FC = () => {
           <Animated.Text numberOfLines={1} style={[styles.headerTitle, headerTitleStyle]}>
             {d.name}
           </Animated.Text>
-          <GlassIconButton onPress={() => setSaved((s) => !s)}>
+          <GlassIconButton
+            onPress={() =>
+              setSaved(toggleWatchlist({ id: id!, type: "tv", title: d.name, poster_path: d.poster_path }))
+            }
+          >
             <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
           </GlassIconButton>
         </View>
@@ -279,7 +285,12 @@ const TvDetails: React.FC = () => {
 
         {/* Quick actions */}
         <View style={styles.quickRow}>
-          <Pressable style={styles.quick} onPress={() => setSaved((s) => !s)}>
+          <Pressable
+            style={styles.quick}
+            onPress={() =>
+              setSaved(toggleWatchlist({ id: id!, type: "tv", title: d.name, poster_path: d.poster_path }))
+            }
+          >
             <View style={styles.quickIcon}>
               <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
             </View>

@@ -8,19 +8,21 @@
  */
 import appJson from "@/app.json";
 import AppHeader from "@/components/ui/AppHeader";
+import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { getDisplayName, setDisplayName } from "@/services/party/identity";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { checkGithubRelease } from "@/utils/checkGithubRelease";
 import { clearAppCache, clearWatchHistory, getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -28,6 +30,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -40,6 +43,11 @@ export default function MoreScreen() {
   const [aboutVisible, setAboutVisible] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const [stats, setStats] = useState({ watched: 0, hours: 0, inProgress: 0 });
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const headerBlurStyle = fadeInStyle(scrollY, 24, 120);
 
   const handle = "@" + (name || "guest").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -127,13 +135,11 @@ export default function MoreScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={{ paddingTop: insets.top }}>
-        <AppHeader showSearch={false} />
-      </View>
-
-      <ScrollView
+      <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + ms(56) }]}
       >
         {/* Identity */}
         <View style={styles.identity}>
@@ -179,7 +185,7 @@ export default function MoreScreen() {
         {/* Library */}
         <Card>
           <Row icon="time-outline" label="Watch history" onPress={() => router.push("/watchHistory")} />
-          <Row icon="bookmark-outline" label="My list" onPress={() => comingSoon("My list")} />
+          <Row icon="bookmark-outline" label="My list" onPress={() => router.push("/myList")} />
           <Row icon="download-outline" label="Downloads" onPress={() => comingSoon("Downloads")} last />
         </Card>
 
@@ -205,7 +211,22 @@ export default function MoreScreen() {
         <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Persistent brand header — gains a frosted-glass background once content
+          scrolls under it, matching Home. */}
+      <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
+          <BlurView
+            intensity={40}
+            tint="dark"
+            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.headerBgLine} />
+        </Animated.View>
+        <AppHeader showSearch={false} />
+      </View>
 
       {/* Edit display name */}
       <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
@@ -305,7 +326,16 @@ function Row({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: ms(16), paddingTop: ms(8), paddingBottom: ms(130) },
+  content: { paddingHorizontal: ms(16), paddingBottom: ms(130) },
+  topBarBg: { position: "absolute", top: 0, left: 0, right: 0, overflow: "hidden" },
+  headerBgLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
 
   identity: { alignItems: "center", marginTop: ms(6) },
   avatarWrap: { alignItems: "center", justifyContent: "center", marginBottom: ms(12) },

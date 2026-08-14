@@ -14,6 +14,7 @@ import { fadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingH
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { genRoomCode } from "@/utils/roomCode";
+import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import {
   externalLinks,
   fetchDetails,
@@ -75,13 +76,18 @@ const Details: React.FC = () => {
     let aborted = false;
     setLoading(true);
     fetchDetails("movie", id!)
-      .then((data) => !aborted && (setD(data), setError(undefined)))
+      .then((data) => !aborted && (setD(data), setSaved(isInWatchlist(id!, "movie")), setError(undefined)))
       .catch((e) => !aborted && setError(e.message))
       .finally(() => !aborted && setLoading(false));
     return () => {
       aborted = true;
     };
   }, [id]);
+
+  const toggleSave = () => {
+    if (!d) return;
+    setSaved(toggleWatchlist({ id: id!, type: "movie", title: d.title, poster_path: d.poster_path }));
+  };
 
   const derived = useMemo(() => {
     if (!d) return null;
@@ -192,7 +198,7 @@ const Details: React.FC = () => {
           <Animated.Text numberOfLines={1} style={[styles.headerTitle, headerTitleStyle]}>
             {d.title}
           </Animated.Text>
-          <GlassIconButton onPress={() => setSaved((s) => !s)}>
+          <GlassIconButton onPress={toggleSave}>
             <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
           </GlassIconButton>
         </View>
@@ -241,7 +247,7 @@ const Details: React.FC = () => {
 
         {/* Quick actions */}
         <View style={styles.quickRow}>
-          <Pressable style={styles.quick} onPress={() => setSaved((s) => !s)}>
+          <Pressable style={styles.quick} onPress={toggleSave}>
             <View style={styles.quickIcon}>
               <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
             </View>

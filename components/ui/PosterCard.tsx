@@ -17,6 +17,7 @@ interface Props {
   progress?: number;
   width?: number;
   onPress?: () => void;
+  onLongPress?: () => void;
 }
 
 export function PosterCard({
@@ -27,10 +28,11 @@ export function PosterCard({
   progress,
   width = 116,
   onPress,
+  onLongPress,
 }: Props) {
   const height = width * 1.5;
   return (
-    <Pressable onPress={onPress} style={{ width }}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} style={{ width }}>
       <View style={[styles.card, { width, height }]}>
         {poster ? (
           <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
