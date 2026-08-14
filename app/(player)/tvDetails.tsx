@@ -8,9 +8,11 @@ import {
   Reviews,
   Section,
 } from "@/components/details/sections";
+import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { colors, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
+import { genRoomCode } from "@/utils/roomCode";
 import {
   externalLinks,
   fetchDetails,
@@ -172,6 +174,8 @@ const TvDetails: React.FC = () => {
       pathname: "/party",
       params: {
         role: "host",
+        room: genRoomCode(),
+        provider: defaultHijackProvider()?.id,
         id: id!.toString(),
         type: "tv",
         season: String(season ?? 1),

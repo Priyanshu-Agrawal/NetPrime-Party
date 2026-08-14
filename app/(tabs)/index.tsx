@@ -44,7 +44,7 @@ export default React.memo(function HomePage() {
               </View>
               <Pressable
                 style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
-                onPress={() => router.push("/party")}
+                onPress={() => router.push("/joinParty")}
                 hitSlop={6}
               >
                 <Text style={styles.ctaBtnText}>Invite</Text>
@@ -93,7 +93,7 @@ export default React.memo(function HomePage() {
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.hostBtn, pressed && styles.pressed]}
-              onPress={() => router.push("/party")}
+              onPress={() => router.push("/joinParty")}
               hitSlop={6}
             >
               <Ionicons name="people" size={15} color={colors.onHoney} />

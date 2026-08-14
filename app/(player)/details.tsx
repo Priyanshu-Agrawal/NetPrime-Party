@@ -8,8 +8,10 @@ import {
   Reviews,
   Section,
 } from "@/components/details/sections";
+import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { colors, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
+import { genRoomCode } from "@/utils/roomCode";
 import {
   externalLinks,
   fetchDetails,
@@ -139,6 +141,8 @@ const Details: React.FC = () => {
       pathname: "/party",
       params: {
         role: "host",
+        room: genRoomCode(),
+        provider: defaultHijackProvider()?.id,
         id: id!.toString(),
         type: "movie",
         title: d.title,

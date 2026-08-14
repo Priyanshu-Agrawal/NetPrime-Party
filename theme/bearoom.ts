@@ -5,7 +5,26 @@
  * Stitch design system (project 9821378598804634936). Warm, premium, rounded,
  * frosted glass. Import from here everywhere — never hardcode brand colors.
  */
-import { TextStyle, ViewStyle } from "react-native";
+import { Dimensions, TextStyle, ViewStyle } from "react-native";
+
+/**
+ * Responsive sizing. We design against a 390dp baseline (iPhone 14 / a typical
+ * "medium" phone) and moderate-scale every hard pixel value so small phones
+ * (~360dp) and large phones (~430dp) keep the SAME visual proportions instead of
+ * looking cramped or oversized.
+ *
+ * - `scale(n)`  linear scale by width ratio (use for widths that must track the
+ *   screen, e.g. poster columns).
+ * - `ms(n, f)`  moderate scale — dampened (default 50%) so type + chrome nudge
+ *   with the screen without ballooning. Use this for font sizes, paddings, and
+ *   fixed control/avatar dimensions. This is the primary responsive primitive.
+ */
+const BASE_WIDTH = 390;
+const SCREEN_W = Dimensions.get("window").width;
+export const scale = (size: number): number =>
+  Math.round((SCREEN_W / BASE_WIDTH) * size);
+export const ms = (size: number, factor = 0.5): number =>
+  Math.round(size + (scale(size) - size) * factor);
 
 export const colors = {
   // warm charcoal backgrounds (never pure cold black)

@@ -4,6 +4,7 @@
  * and quick Play / Details / Watch-together actions. Bearoom cozy-cinema skin:
  * warm charcoal scrims, glass meta chips, honey primary action.
  */
+import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import {
   detailsRoute,
   fetchList,
@@ -13,6 +14,7 @@ import {
   type MediaItem,
 } from "@/utils/tmdbLists";
 import { colors, font, glow, radius } from "@/theme/bearoom";
+import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -164,7 +166,19 @@ export function HeroCarousel() {
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]}
-                    onPress={() => router.push("/party")}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/party",
+                        params: {
+                          role: "host",
+                          room: genRoomCode(),
+                          provider: defaultHijackProvider()?.id,
+                          id: String(item.id),
+                          type: itemType(item, "movie"),
+                          title: itemTitle(item),
+                        },
+                      })
+                    }
                     hitSlop={8}
                   >
                     <Ionicons name="paw" size={14} color={colors.honey} />

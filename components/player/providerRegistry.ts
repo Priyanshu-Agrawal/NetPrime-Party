@@ -40,6 +40,19 @@ export function isHijackable(p: Provider | undefined): boolean {
   return !!p?.hijack.supported;
 }
 
+/**
+ * A sensible default provider for launching a watch party directly from a title
+ * (e.g. Details → "Watch together"), where the user hasn't hand-picked one in
+ * the solo player. Prefers a stable hijackable provider, falling back to any
+ * hijackable one.
+ */
+export function defaultHijackProvider(): Provider | undefined {
+  return (
+    PROVIDERS.find((p) => p.hijack.supported && !p.hijack.unstable) ??
+    PROVIDERS.find((p) => p.hijack.supported)
+  );
+}
+
 /** Hijackable but flaky (has an internal server picker) — warn in the UI. */
 export function isUnstable(p: Provider | undefined): boolean {
   return !!p?.hijack.supported && !!p?.hijack.unstable;

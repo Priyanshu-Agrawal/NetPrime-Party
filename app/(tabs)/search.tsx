@@ -242,7 +242,7 @@ const Search: React.FC = () => {
           <Pressable
             key={m.label}
             style={styles.moodTile}
-            onPress={() => (m.party ? router.push("/party") : handleSearch(m.query))}
+            onPress={() => (m.party ? router.push("/joinParty") : handleSearch(m.query))}
           >
             <View style={styles.moodIcon}>
               <Ionicons name={m.icon} size={20} color={colors.honey} />
@@ -290,7 +290,7 @@ const Search: React.FC = () => {
             Bea<Text style={styles.brandAccent}>r</Text>oom
           </Text>
         </View>
-        <Pressable onPress={() => router.push("/party")} hitSlop={6}>
+        <Pressable onPress={() => router.push("/joinParty")} hitSlop={6}>
           <Text style={styles.hostLink}>Host Party</Text>
         </Pressable>
       </View>
