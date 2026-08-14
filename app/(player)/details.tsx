@@ -9,6 +9,7 @@ import {
   Section,
 } from "@/components/details/sections";
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
+import { GlassIconButton } from "@/components/ui/GlassIconButton";
 import { fadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
@@ -185,15 +186,15 @@ const Details: React.FC = () => {
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>
-          <Pressable style={styles.glassRound} onPress={() => router.back()} hitSlop={6}>
+          <GlassIconButton onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Pressable>
+          </GlassIconButton>
           <Animated.Text numberOfLines={1} style={[styles.headerTitle, headerTitleStyle]}>
             {d.title}
           </Animated.Text>
-          <Pressable style={styles.glassRound} onPress={() => setSaved((s) => !s)} hitSlop={6}>
+          <GlassIconButton onPress={() => setSaved((s) => !s)}>
             <Ionicons name={saved ? "bookmark" : "bookmark-outline"} size={20} color={saved ? colors.honey : colors.text} />
-          </Pressable>
+          </GlassIconButton>
         </View>
       </View>
 
@@ -423,18 +424,6 @@ const styles = StyleSheet.create({
     fontFamily: font.headlineSemi,
     fontSize: ms(16),
     textAlign: "center",
-  },
-  glassRound: {
-    width: ms(40),
-    height: ms(40),
-    borderRadius: radius.pill,
-    // Dark scrim bubble so the light icon stays visible over ANY backdrop
-    // (bright posters washed out the old faint-white bubble).
-    backgroundColor: colors.scrim,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    alignItems: "center",
-    justifyContent: "center",
   },
   heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
   title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(32), letterSpacing: -0.6, lineHeight: ms(36) },
