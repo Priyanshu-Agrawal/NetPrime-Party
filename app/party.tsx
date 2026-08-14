@@ -12,6 +12,7 @@ import HijackPlayer, {
   type PlayerEvent,
   type PlayerHandle,
 } from "@/components/player/HijackPlayer";
+import GifPicker from "@/components/party/GifPicker";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { getDisplayName } from "@/services/party/identity";
@@ -20,6 +21,7 @@ import { useParty } from "@/services/party/useParty";
 import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/services/party/usePartyChat";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -82,6 +84,7 @@ export default function Party() {
   const [pwPrompt, setPwPrompt] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [showGif, setShowGif] = useState(false);
 
   const party = useParty({
     code: room,
@@ -344,6 +347,11 @@ export default function Party() {
           ) : null}
           {canSendChat ? (
             <View style={styles.inputRow}>
+              {reactionsOn ? (
+                <Pressable style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6}>
+                  <Text style={styles.gifBtnText}>GIF</Text>
+                </Pressable>
+              ) : null}
               <View style={styles.inputBox}>
                 <TextInput
                   style={styles.input}
@@ -416,6 +424,9 @@ export default function Party() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* GIF picker (Giphy via our Cloudflare proxy) */}
+      <GifPicker visible={showGif} onClose={() => setShowGif(false)} onPick={(g) => chat.sendGif(g)} />
     </View>
   );
 }
@@ -462,13 +473,29 @@ function AvatarStack({
   );
 }
 
+function GifBubble({ msg }: { msg: ChatMessage }) {
+  const maxW = ms(180);
+  const w = msg.gifW && msg.gifH ? Math.min(maxW, msg.gifW) : maxW;
+  const h = msg.gifW && msg.gifH ? Math.round(w * (msg.gifH / msg.gifW)) : Math.round(w * 0.75);
+  return (
+    <View style={[styles.gifBubble, { width: w, height: h }]}>
+      <Image source={{ uri: msg.gifUrl }} style={styles.gifBubbleImg} contentFit="cover" transition={120} />
+    </View>
+  );
+}
+
 function Bubble({ msg }: { msg: ChatMessage }) {
+  const isGif = msg.kind === "gif" && !!msg.gifUrl;
   if (msg.mine) {
     return (
       <View style={[styles.bubbleRow, styles.bubbleRowMine]}>
-        <View style={[styles.bubble, styles.bubbleMine]}>
-          <Text style={styles.bubbleText}>{msg.text}</Text>
-        </View>
+        {isGif ? (
+          <GifBubble msg={msg} />
+        ) : (
+          <View style={[styles.bubble, styles.bubbleMine]}>
+            <Text style={styles.bubbleText}>{msg.text}</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -479,9 +506,13 @@ function Bubble({ msg }: { msg: ChatMessage }) {
       </View>
       <View style={styles.bubbleCol}>
         <Text style={styles.bubbleName}>{msg.name || "Guest"}</Text>
-        <View style={[styles.bubble, styles.bubbleOther]}>
-          <Text style={styles.bubbleText}>{msg.text}</Text>
-        </View>
+        {isGif ? (
+          <GifBubble msg={msg} />
+        ) : (
+          <View style={[styles.bubble, styles.bubbleOther]}>
+            <Text style={styles.bubbleText}>{msg.text}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -687,6 +718,19 @@ const styles = StyleSheet.create({
   },
   quickEmoji: { fontSize: ms(20) },
   inputRow: { flexDirection: "row", alignItems: "center", gap: ms(8), paddingHorizontal: ms(12), paddingTop: ms(8) },
+  gifBtn: {
+    height: ms(44),
+    paddingHorizontal: ms(12),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gifBtnText: { color: colors.honey, fontFamily: font.label, fontSize: ms(13), letterSpacing: 0.5 },
+  gifBubble: { borderRadius: radius.lg, overflow: "hidden", backgroundColor: colors.surfaceStrong },
+  gifBubbleImg: { width: "100%", height: "100%" },
   inputBox: {
     flex: 1,
     backgroundColor: colors.surfaceStrong,

@@ -17,6 +17,11 @@ export interface ChatMessage {
   text: string;
   ts: number;
   mine: boolean;
+  /** "gif" messages carry gifUrl + dimensions instead of text. */
+  kind?: "text" | "gif";
+  gifUrl?: string;
+  gifW?: number;
+  gifH?: number;
 }
 
 export interface FloatingReaction {
@@ -35,6 +40,7 @@ export function usePartyChat(opts: {
   messages: ChatMessage[];
   reactions: FloatingReaction[];
   sendChat: (text: string) => void;
+  sendGif: (gif: { url: string; width?: number; height?: number }) => void;
   sendReaction: (emoji: string) => void;
   ready: boolean;
 } {
@@ -61,7 +67,7 @@ export function usePartyChat(opts: {
         config: { broadcast: { self: false } },
       });
       channel.on("broadcast", { event: "chat" }, ({ payload }) => {
-        const p = payload as { id: string; userId: string; name: string; text: string; ts: number };
+        const p = payload as Omit<ChatMessage, "mine">;
         setMessages((m) =>
           m.some((x) => x.id === p.id)
             ? m
@@ -98,6 +104,26 @@ export function usePartyChat(opts: {
     [userId, name],
   );
 
+  const sendGif = useCallback(
+    (gif: { url: string; width?: number; height?: number }) => {
+      if (!gif?.url) return;
+      const msg = {
+        id: uid(),
+        userId,
+        name,
+        text: "",
+        ts: Date.now(),
+        kind: "gif" as const,
+        gifUrl: gif.url,
+        gifW: gif.width,
+        gifH: gif.height,
+      };
+      setMessages((m) => [...m, { ...msg, mine: true }].slice(-200));
+      void channelRef.current?.send({ type: "broadcast", event: "chat", payload: msg });
+    },
+    [userId, name],
+  );
+
   const sendReaction = useCallback(
     (emoji: string) => {
       popReaction(emoji); // show my own immediately
@@ -106,5 +132,5 @@ export function usePartyChat(opts: {
     [popReaction],
   );
 
-  return { messages, reactions, sendChat, sendReaction, ready };
+  return { messages, reactions, sendChat, sendGif, sendReaction, ready };
 }
