@@ -1,4 +1,5 @@
 import "@/utils/polyfills";
+import { AlertHost } from "@/components/ui/BearAlert";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -53,6 +54,7 @@ export default function RootLayout() {
             translucent
           />
           <Stack screenOptions={{ headerShown: false }} />
+          <AlertHost />
         </MovieContextProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>

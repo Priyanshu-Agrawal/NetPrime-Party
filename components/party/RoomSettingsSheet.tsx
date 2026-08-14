@@ -7,12 +7,12 @@
  * Member actions use a custom action sheet (not Alert.alert): Android alerts
  * only render three buttons, which would silently drop Remove/Cancel.
  */
+import { bearAlert } from "@/components/ui/BearAlert";
 import type { Member, RoomAccess, RoomConfig } from "@/services/party/protocol";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -85,7 +85,7 @@ export function RoomSettingsSheet({
 
   const savePassword = () => {
     if (pw.trim().length < 3) {
-      Alert.alert("Password too short", "Use at least 3 characters.");
+      bearAlert("Password too short", "Use at least 3 characters.");
       return;
     }
     onSetConfig({ access: "password" }, pw.trim());

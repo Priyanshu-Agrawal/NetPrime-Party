@@ -5,10 +5,11 @@ import AppHeader from "@/components/ui/AppHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
+import { hasOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useRouter } from "expo-router";
+import { Redirect, useNavigation, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -28,6 +29,9 @@ export default React.memo(function HomePage() {
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
+
+  // First launch → onboarding. Safe here (inside the navigator; all hooks ran).
+  if (!hasOnboarded()) return <Redirect href="/onboarding" />;
 
   return (
     <View style={styles.root}>

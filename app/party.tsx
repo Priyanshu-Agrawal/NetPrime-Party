@@ -13,6 +13,7 @@ import HijackPlayer, {
   type PlayerHandle,
 } from "@/components/player/HijackPlayer";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
+import { bearAlert } from "@/components/ui/BearAlert";
 import { getDisplayName } from "@/services/party/identity";
 import type { PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
@@ -22,7 +23,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Easing,
   FlatList,
@@ -113,7 +113,7 @@ export default function Party() {
   // Removed by the host → bounce out with a note.
   useEffect(() => {
     if (!party.kicked) return;
-    Alert.alert("Removed", "The host removed you from this room.", [
+    bearAlert("Removed", "The host removed you from this room.", [
       { text: "OK", onPress: () => router.back() },
     ]);
   }, [party.kicked, router]);
@@ -153,7 +153,7 @@ export default function Party() {
 
   const transferHost = () => {
     if (!guests.length) return;
-    Alert.alert("Transfer host", "Hand playback control to…", [
+    bearAlert("Transfer host", "Hand playback control to…", [
       ...guests.slice(0, 5).map((m) => ({
         text: m.displayName || "Guest",
         onPress: () => party.transferHost(m.userId),

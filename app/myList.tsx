@@ -8,10 +8,11 @@ import PosterCard from "@/components/ui/PosterCard";
 import { colors, font, ms } from "@/theme/bearoom";
 import { img } from "@/utils/tmdbDetails";
 import { getWatchlist, removeFromWatchlist, type WatchlistItem } from "@/utils/watchlist";
+import { bearAlert } from "@/components/ui/BearAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Alert, Dimensions, FlatList, StyleSheet, Text, View } from "react-native";
+import { Dimensions, FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
@@ -38,7 +39,7 @@ export default function MyList() {
     });
 
   const remove = (item: WatchlistItem) =>
-    Alert.alert(item.title, "Remove from My List?", [
+    bearAlert(item.title, "Remove from My List?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Remove",

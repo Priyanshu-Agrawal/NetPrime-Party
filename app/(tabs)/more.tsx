@@ -8,6 +8,7 @@
  */
 import appJson from "@/app.json";
 import AppHeader from "@/components/ui/AppHeader";
+import { bearAlert } from "@/components/ui/BearAlert";
 import { fadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { getDisplayName, setDisplayName } from "@/services/party/identity";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
@@ -18,7 +19,6 @@ import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  Alert,
   Linking,
   Modal,
   Platform,
@@ -92,10 +92,10 @@ export default function MoreScreen() {
     });
   };
 
-  const comingSoon = (label: string) => Alert.alert(label, "Coming soon.");
+  const comingSoon = (label: string) => bearAlert(label, "Coming soon.");
 
   const confirmClearHistory = () =>
-    Alert.alert("Clear watch history", "Remove all watch history?", [
+    bearAlert("Clear watch history", "Remove all watch history?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Clear",
@@ -108,7 +108,7 @@ export default function MoreScreen() {
     ]);
 
   const confirmClearCache = () =>
-    Alert.alert("Clear cache", "Clear cached data?", [
+    bearAlert("Clear cache", "Clear cached data?", [
       { text: "Cancel", style: "cancel" },
       { text: "Clear", style: "destructive", onPress: () => clearAppCache() },
     ]);
@@ -117,17 +117,17 @@ export default function MoreScreen() {
     const current = appJson.expo?.version || "0.0.0";
     const res = await checkGithubRelease("roshan669", "Uott", current);
     if (res.isNewer) {
-      Alert.alert("Update available", `Latest: ${res.latestVersion}`, [
+      bearAlert("Update available", `Latest: ${res.latestVersion}`, [
         { text: "Open", onPress: () => res.htmlUrl && Linking.openURL(res.htmlUrl) },
         { text: "OK", style: "cancel" },
       ]);
     } else {
-      Alert.alert("Up to date", `Current: ${current}`);
+      bearAlert("Up to date", `Current: ${current}`);
     }
   };
 
   const signOut = () =>
-    Alert.alert(
+    bearAlert(
       "Anonymous mode",
       "You're browsing anonymously — there's no account to sign out of yet. Accounts are coming soon.",
       [{ text: "OK" }],
