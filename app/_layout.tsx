@@ -1,3 +1,4 @@
+import "../devtools/execbro"; // dev-only ExecBro SDK capture — MUST stay first; no-op in prod
 import "@/utils/polyfills";
 import { AlertHost } from "@/components/ui/BearAlert";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
