@@ -42,6 +42,64 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 
+/** Media position (seconds) → "m:ss" (or "h:mm:ss" past an hour). */
+function fmtMedia(sec: number): string {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  return `${h > 0 ? `${h}:` : ""}${mm}:${String(ss).padStart(2, "0")}`;
+}
+
+/** Wall-clock send time → short local "h:mm AM/PM". */
+function fmtClock(ts: number): string {
+  try {
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+/** "m:ss" / "h:mm:ss" → seconds, or null if it isn't a valid clock. */
+function parseClock(s: string): number | null {
+  const parts = s.split(":").map((p) => Number(p));
+  if (parts.some((n) => !Number.isFinite(n))) return null;
+  if (parts.length === 3) {
+    const [h, m, sec] = parts;
+    return m > 59 || sec > 59 ? null : h * 3600 + m * 60 + sec;
+  }
+  if (parts.length === 2) {
+    const [m, sec] = parts;
+    return sec > 59 ? null : m * 60 + sec;
+  }
+  return null;
+}
+
+// Matches YouTube-style timestamps embedded in a message ("1:27", "12:04", "1:02:03").
+const TS_RE = /\b\d{1,2}:\d{2}(?::\d{2})?\b/g;
+
+/** Render message text, turning any timestamp token into a tappable seek link. */
+function MessageText({ text, onSeek }: { text: string; onSeek: (sec: number) => void }) {
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  TS_RE.lastIndex = 0;
+  while ((m = TS_RE.exec(text)) !== null) {
+    const sec = parseClock(m[0]);
+    if (sec == null) continue; // leave invalid tokens as plain text
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    nodes.push(
+      <Text key={m.index} style={styles.tsLink} onPress={() => onSeek(sec)}>
+        {m[0]}
+      </Text>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return <Text style={styles.bubbleText}>{nodes.length ? nodes : text}</Text>;
+}
+
 export default function Party() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -85,6 +143,11 @@ export default function Party() {
   const [pwInput, setPwInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showGif, setShowGif] = useState(false);
+  // Latest known playback position (seconds) from the player — read when inserting.
+  const posRef = useRef(0);
+  // Live mm:ss shown on the in-field timestamp button; ticks only while composing.
+  const [livePos, setLivePos] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
 
   const party = useParty({
     code: room,
@@ -116,6 +179,9 @@ export default function Party() {
     party.isHost ||
     (selfApproved && config?.chatEnabled !== false && selfMember?.permissions?.canChat !== false);
   const canGrabControl = !party.isHost && selfApproved && !!config?.guestControlDefault;
+  // Only those who can drive playback get a tappable "jump to this moment" chip.
+  const canSeek = party.isHost || selfMember?.permissions?.canControlPlayback === true;
+  const hasMedia = !!(providerId && media);
   const pendingCount = guests.filter((g) => g.approved === false).length;
 
   // Removed by the host → bounce out with a note.
@@ -159,7 +225,29 @@ export default function Party() {
     }
   }, [chat.messages.length]);
 
-  const onEvent = (e: PlayerEvent) => party.onPlayerEvent(e);
+  const onEvent = (e: PlayerEvent) => {
+    if (Number.isFinite(e.currentTime)) {
+      posRef.current = e.currentTime;
+      // Only re-render the live label while the user is actually composing (1/sec).
+      if (inputFocused) {
+        const s = Math.floor(e.currentTime);
+        setLivePos((prev) => (prev === s ? prev : s));
+      }
+    }
+    party.onPlayerEvent(e);
+  };
+
+  // YouTube-style: drop the current media time into the draft as clickable text.
+  const insertTimestamp = () => {
+    const stamp = fmtMedia(posRef.current);
+    setDraft((d) => (d && !/\s$/.test(d) ? `${d} ` : d) + `${stamp} `);
+  };
+
+  // Tap a timestamp in a message → jump there. Controllers move the room; others peek locally.
+  const seekToMoment = (sec: number) => {
+    if (canSeek) party.seekTo(sec);
+    else playerRef.current?.seek(sec);
+  };
 
   const share = () => {
     void Share.share({
@@ -324,7 +412,7 @@ export default function Party() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <Bubble msg={item} />}
+          renderItem={({ item }) => <Bubble msg={item} onSeek={seekToMoment} />}
           ListEmptyComponent={
             <View style={styles.chatEmpty}>
               <Ionicons name="chatbubbles-outline" size={26} color={colors.textFaint} />
@@ -359,11 +447,22 @@ export default function Party() {
                   placeholderTextColor={colors.textDim}
                   value={draft}
                   onChangeText={setDraft}
+                  onFocus={() => {
+                    setLivePos(Math.floor(posRef.current));
+                    setInputFocused(true);
+                  }}
+                  onBlur={() => setInputFocused(false)}
                   selectionColor={colors.honey}
                   returnKeyType="send"
                   onSubmitEditing={send}
                   blurOnSubmit={false}
                 />
+                {hasMedia ? (
+                  <Pressable style={styles.stampBtn} onPress={insertTimestamp} hitSlop={6}>
+                    <Ionicons name="time-outline" size={ms(13)} color={colors.honey} />
+                    <Text style={styles.stampBtnText}>{fmtMedia(livePos)}</Text>
+                  </Pressable>
+                ) : null}
               </View>
               <Pressable style={styles.sendBtn} onPress={send}>
                 <Ionicons name="send" size={16} color={colors.onHoney} />
@@ -495,18 +594,31 @@ function GifBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function Bubble({ msg }: { msg: ChatMessage }) {
+/** The little time row under a bubble — the message's send time. */
+function Meta({ msg, mine }: { msg: ChatMessage; mine?: boolean }) {
+  return (
+    <View style={[styles.metaRow, mine && styles.metaRowMine]}>
+      <Text style={styles.metaTime}>{fmtClock(msg.ts)}</Text>
+    </View>
+  );
+}
+
+function Bubble({ msg, onSeek }: { msg: ChatMessage; onSeek: (sec: number) => void }) {
   const isGif = msg.kind === "gif" && !!msg.gifUrl;
+  const content = isGif ? (
+    <GifBubble msg={msg} />
+  ) : (
+    <View style={[styles.bubble, msg.mine ? styles.bubbleMine : styles.bubbleOther]}>
+      <MessageText text={msg.text} onSeek={onSeek} />
+    </View>
+  );
   if (msg.mine) {
     return (
       <View style={[styles.bubbleRow, styles.bubbleRowMine]}>
-        {isGif ? (
-          <GifBubble msg={msg} />
-        ) : (
-          <View style={[styles.bubble, styles.bubbleMine]}>
-            <Text style={styles.bubbleText}>{msg.text}</Text>
-          </View>
-        )}
+        <View style={styles.bubbleColMine}>
+          {content}
+          <Meta msg={msg} mine />
+        </View>
       </View>
     );
   }
@@ -517,13 +629,8 @@ function Bubble({ msg }: { msg: ChatMessage }) {
       </View>
       <View style={styles.bubbleCol}>
         <Text style={styles.bubbleName}>{msg.name || "Guest"}</Text>
-        {isGif ? (
-          <GifBubble msg={msg} />
-        ) : (
-          <View style={[styles.bubble, styles.bubbleOther]}>
-            <Text style={styles.bubbleText}>{msg.text}</Text>
-          </View>
-        )}
+        {content}
+        <Meta msg={msg} />
       </View>
     </View>
   );
@@ -712,6 +819,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   bubbleText: { color: colors.text, fontFamily: font.body, fontSize: ms(13), lineHeight: ms(18) },
+  bubbleColMine: { alignItems: "flex-end", gap: 4, flexShrink: 1 },
+
+  metaRow: { flexDirection: "row", alignItems: "center", gap: ms(6), marginLeft: 4 },
+  metaRowMine: { justifyContent: "flex-end", marginLeft: 0, marginRight: 2 },
+  metaTime: { color: colors.textFaint, fontFamily: font.label, fontSize: ms(9), letterSpacing: 0.3 },
+  // A timestamp embedded in a message → tappable seek link (YouTube-style).
+  tsLink: { color: colors.honey, fontFamily: font.bodySemi },
 
   inputArea: {
     backgroundColor: colors.bgElevated,
@@ -745,15 +859,31 @@ const styles = StyleSheet.create({
   gifBubbleImg: { width: "100%", height: "100%" },
   inputBox: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(8),
     backgroundColor: colors.surfaceStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     borderRadius: radius.pill,
-    paddingHorizontal: ms(16),
+    paddingLeft: ms(16),
+    paddingRight: ms(6),
     height: ms(44),
-    justifyContent: "center",
   },
-  input: { color: colors.text, fontFamily: font.body, fontSize: ms(13), padding: 0 },
+  input: { flex: 1, color: colors.text, fontFamily: font.body, fontSize: ms(13), padding: 0 },
+  // "Add current time" button living inside the field, like YouTube's comment box.
+  stampBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(3),
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(240,169,60,0.35)",
+    paddingHorizontal: ms(9),
+    height: ms(30),
+    borderRadius: radius.pill,
+  },
+  stampBtnText: { color: colors.honey, fontFamily: font.label, fontSize: ms(10), letterSpacing: 0.3 },
   sendBtn: {
     width: ms(44),
     height: ms(44),

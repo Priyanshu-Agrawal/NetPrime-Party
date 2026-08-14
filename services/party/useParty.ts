@@ -26,6 +26,8 @@ export interface UseParty {
   play: () => void;
   pause: () => void;
   seekBy: (deltaSec: number) => void;
+  /** Seek the room to an absolute position (seconds). Server enforces control perms. */
+  seekTo: (sec: number) => void;
   transferHost: (userId: string) => Promise<void>;
   claimHost: () => void;
   // room administration (host-only server-side)
@@ -118,6 +120,7 @@ export function useParty(opts: {
         const curSec = effectivePositionMs(s.playback, client.now()) / 1000;
         void client.seek(Math.max(0, curSec + deltaSec) * 1000);
       },
+      seekTo: (sec) => void client.seek(Math.max(0, sec) * 1000),
       transferHost: (uid) => client.transferHost(uid),
       claimHost: () => void client.claimHost(),
       setConfig: (patch, pw) => client.setConfig(patch, pw),
