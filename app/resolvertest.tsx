@@ -11,13 +11,14 @@ import {
   getProvider,
   providerHosts,
 } from "@/components/player/providerRegistry";
-import { useVideoPlayer, VideoView } from "expo-video";
+import NativePlayer from "@/components/player/NativePlayer";
+import { type VideoPlayer } from "expo-video";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 const TEST_TMDB = "550"; // Fight Club (movie)
 
-/** Mounts AFTER capture: proves expo-video plays the sniffed HLS URL natively. */
+/** Uses the real NativePlayer; surfaces native track counts (Quality/Audio/Subs). */
 function NativePlayback({
   url,
   headers,
@@ -25,43 +26,36 @@ function NativePlayback({
   url: string;
   headers: Record<string, string>;
 }) {
-  const player = useVideoPlayer({ uri: url, headers, contentType: "hls" }, (p) => {
-    p.timeUpdateEventInterval = 1;
-    p.play();
-  });
-  const [t, setT] = useState(0);
-  const [pstatus, setPstatus] = useState("idle");
-  const [err, setErr] = useState("");
+  const [player, setPlayer] = useState<VideoPlayer | null>(null);
+  const [info, setInfo] = useState("loading…");
 
   useEffect(() => {
+    if (!player) return;
     const iv = setInterval(() => {
       try {
-        if (player.status === "readyToPlay" && !player.playing) player.play();
-        setT(player.currentTime);
-        setPstatus(player.status);
+        setInfo(
+          `status=${player.status} t=${(player.currentTime || 0).toFixed(1)}s play=${String(player.playing)} | ` +
+            `Quality=${player.availableVideoTracks?.length ?? 0} Audio=${player.availableAudioTracks?.length ?? 0} Subs=${player.availableSubtitleTracks?.length ?? 0}`,
+        );
       } catch (e) {
-        setErr(String(e));
+        setInfo("err " + String(e).slice(0, 40));
       }
-    }, 500);
+    }, 700);
     return () => clearInterval(iv);
   }, [player]);
 
   return (
     <View style={{ marginTop: 16 }}>
-      <Text style={styles.label}>expo-video (native playback)</Text>
-      <Text style={styles.status}>
-        {err
-          ? `❌ ${err}`
-          : `status: ${pstatus}   t=${t.toFixed(1)}s   playing=${String(
-              player.playing,
-            )}`}
-      </Text>
-      <VideoView
-        player={player}
-        style={{ width: "100%", height: 200, marginTop: 8, backgroundColor: "#000" }}
-        contentFit="contain"
-        nativeControls
-      />
+      <Text style={styles.label}>NativePlayer (native tracks)</Text>
+      <Text style={styles.status}>{info}</Text>
+      <View style={{ height: 220, marginTop: 8 }}>
+        <NativePlayer
+          source={{ uri: url, headers, contentType: "hls" }}
+          nativeControls
+          onReady={setPlayer}
+          onPlayerEvent={() => {}}
+        />
+      </View>
     </View>
   );
 }
