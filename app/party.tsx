@@ -13,7 +13,6 @@ import HijackPlayer, {
   type PlayerHandle,
 } from "@/components/player/HijackPlayer";
 import GifPicker from "@/components/party/GifPicker";
-import PlayerControls from "@/components/player/PlayerControls";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { getDisplayName } from "@/services/party/identity";
@@ -151,8 +150,6 @@ export default function Party() {
   // Live mm:ss shown on the in-field timestamp button; ticks only while composing.
   const [livePos, setLivePos] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
-  // Live playback state for the native controls overlay (controllers only).
-  const [pb, setPb] = useState({ t: 0, d: 0, paused: true });
 
   const party = useParty({
     code: room,
@@ -238,16 +235,6 @@ export default function Party() {
         const s = Math.floor(e.currentTime);
         setLivePos((prev) => (prev === s ? prev : s));
       }
-    }
-    // Feed the native controls overlay — only controllers mount it, so only they
-    // pay the ~1/sec re-render. Collapse to integer seconds + state flips.
-    if (canSeek) {
-      setPb((prev) => {
-        const t = Math.floor(e.currentTime || 0);
-        const d = Math.floor(e.duration || 0);
-        const paused = typeof e.paused === "boolean" ? e.paused : prev.paused;
-        return prev.t === t && prev.d === d && prev.paused === paused ? prev : { t, d, paused };
-      });
     }
     party.onPlayerEvent(e);
   };
@@ -349,22 +336,6 @@ export default function Party() {
               </Text>
             </View>
           )}
-
-          {/* Native controls overlay (replaces the provider's flaky inline
-              controls). Only controllers mount it; it drives the room authority. */}
-          {hasMedia && canSeek ? (
-            <PlayerControls
-              paused={pb.paused}
-              currentTime={pb.t}
-              duration={pb.d}
-              canControl={canSeek}
-              onPlay={() => party.play()}
-              onPause={() => party.pause()}
-              onSeekTo={(s) => party.seekTo(s)}
-              onSeekBy={(d) => party.seekBy(d)}
-              onToggleFullscreen={() => playerRef.current?.fullscreen()}
-            />
-          ) : null}
 
           {/* LIVE · In Sync pill */}
           {providerId && media ? (
