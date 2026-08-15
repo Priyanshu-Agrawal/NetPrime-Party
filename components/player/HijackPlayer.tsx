@@ -121,12 +121,16 @@ const BRIDGE_JS = `
   }, 1000);
   window.__vlCmd = function(cmd){
     if (!vid) return;
-    markApplying();
     try {
-      if (cmd.action === 'play') { var p = vid.play(); if (p && p.catch) p.catch(function(){}); }
-      else if (cmd.action === 'pause') vid.pause();
-      else if (cmd.action === 'seek') vid.currentTime = cmd.time;
-      else if (cmd.action === 'rate') vid.playbackRate = cmd.rate;
+      // Only echo-suppress commands that actually emit a listened event (play/pause/
+      // seeked). 'rate' emits 'ratechange' (which we don't observe), so suppressing
+      // after it is needless AND harmful: the drift engine nudges playbackRate on
+      // nearly every tick, and a blanket markApplying() there was swallowing the
+      // user's real play/pause/seek taps during playback.
+      if (cmd.action === 'play') { markApplying(); var p = vid.play(); if (p && p.catch) p.catch(function(){}); }
+      else if (cmd.action === 'pause') { markApplying(); vid.pause(); }
+      else if (cmd.action === 'seek') { markApplying(); vid.currentTime = cmd.time; }
+      else if (cmd.action === 'rate') { vid.playbackRate = cmd.rate; }
       else if (cmd.action === 'fullscreen') {
         var fs = vid.requestFullscreen || vid.webkitRequestFullscreen || vid.webkitEnterFullscreen || vid.mozRequestFullScreen;
         if (fs) fs.call(vid);

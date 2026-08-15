@@ -55,6 +55,7 @@ export class PartySyncEngine {
   private anchor: PlaybackAnchor | null = null;
   private appliedKey = ""; // epoch:seq of the last anchor we applied
   private detached = false;
+  private lastCt = 0; // last observed player position (s), for redundant-seek avoidance
 
   private driftEma = 0;
   private driftSamples: number[] = [];
@@ -90,6 +91,7 @@ export class PartySyncEngine {
   }
 
   onPlayerEvent(e: PlayerEvent): void {
+    if (Number.isFinite(e.currentTime)) this.lastCt = e.currentTime;
     // Anything reaching here is a USER action (bridge suppresses our own changes).
     if (e.event === "play" || e.event === "pause" || e.event === "seeked") {
       this.handleUserControl(e);
@@ -128,7 +130,11 @@ export class PartySyncEngine {
     this.correcting = false;
     this.persist = 0;
     this.setRate(this.anchor.rate);
-    this.player.seek(this.expectedSec());
+    const target = this.expectedSec();
+    // Only re-seek when actually off target. A seek re-buffers these streams; when
+    // the host acts, the video is already at the right spot, so a redundant seek
+    // froze playback and made the controls feel unresponsive.
+    if (Math.abs(this.lastCt - target) > 1.5) this.player.seek(target);
     if (this.anchor.status === "paused") this.player.pause();
     else this.player.play();
   }
