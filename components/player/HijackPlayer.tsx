@@ -87,6 +87,26 @@ const BRIDGE_JS = `
       if (a){ ev.preventDefault(); ev.stopPropagation(); }
     }, true);
   } catch(e){}
+  // Some embed players (videasy) use a FIXED-height bottom control bar
+  // (absolute bottom-0 h-44 = 176px). In the short inline/collapsed viewport that
+  // bar blankets the vertical-center play/pause/+-10s buttons and, being
+  // pointer-events:auto, swallows their taps (fullscreen is tall, so the bar is a
+  // thin strip and the same controls work — hence "collapsed broken, expanded
+  // fine"). Collapsing it to content height ONLY in short viewports removes the
+  // overlap; children keep their own pointer-events, so the scrubber / quality /
+  // subtitle controls are unaffected. Verified via CDP on player.videasy.to.
+  try {
+    var __addSt = function(){
+      try {
+        if (document.getElementById('__vlStyle')) return;
+        var st = document.createElement('style'); st.id = '__vlStyle';
+        st.textContent = '@media (max-height:480px){div.absolute.bottom-0.h-44{height:auto!important}}';
+        (document.head || document.documentElement).appendChild(st);
+      } catch(e){}
+    };
+    __addSt();
+    document.addEventListener('DOMContentLoaded', __addSt);
+  } catch(e){}
   var vid = null, applying = 0;
   function markApplying(){ applying = Date.now() + 500; }
   function isApplying(){ return Date.now() < applying; }
