@@ -20,7 +20,7 @@
  * stream, so switching dubs = re-run this resolver for that server.
  */
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
 import WebView from "react-native-webview";
 import {
   DEFAULT_SNIFF,
@@ -137,14 +137,17 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
   }
 
   // --- play kick: start playback, THEN hand off to dub selection --------------
+  // ⚠ videasy's play button ignores .click()/partial events (proven via CDP) — use
+  // the SAME full pointer sequence (pdispatch) that flips its tabs. And the WebView
+  // MUST have a real viewport (see component style) or videasy renders nothing.
   function kick(){
-    try { var v = document.querySelector('video'); if (v) { v.muted = true; var p = v.play && v.play(); if (p && p.catch) p.catch(function(){}); } } catch (e) {}
+    try { var b = document.querySelector('button'); if (b) pdispatch(b); } catch (e) {}
     try {
-      var cx = Math.floor((window.innerWidth||360)/2), cy = Math.floor((window.innerHeight||640)/2);
+      var cx = Math.floor((window.innerWidth||1280)/2), cy = Math.floor((window.innerHeight||720)/2);
       var el = document.elementFromPoint(cx, cy);
-      if (el) { ['pointerdown','mousedown','mouseup','click'].forEach(function (t){ try { el.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy})); } catch (e) {} }); }
+      if (el && el.tagName === 'BUTTON') pdispatch(el);
     } catch (e) {}
-    try { var b = document.querySelector('button.tabbable, [class*="mobileCenterControls"] button, button[aria-label*="lay"], .play-button'); if (b) b.click(); } catch (e) {}
+    try { var v = document.querySelector('video'); if (v) { v.muted = true; var p = v.play && v.play(); if (p && p.catch) p.catch(function(){}); } } catch (e) {}
   }
 
   var tries = 0;
@@ -265,14 +268,17 @@ export const StreamResolverWebView: React.FC<StreamResolverWebViewProps> = ({
   );
 };
 
+// videasy needs a REAL viewport to render its player + resolve the stream — a 1×1
+// WebView renders nothing (hasVideo stays false). Give it screen size but push it
+// fully off-screen so it renders + plays while staying invisible to the user.
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const styles = StyleSheet.create({
   hidden: {
     position: "absolute",
-    width: 1,
-    height: 1,
-    opacity: 0,
-    top: -10,
-    left: -10,
+    width: SCREEN_W,
+    height: SCREEN_H,
+    top: -(SCREEN_H + 200),
+    left: 0,
   },
 });
 
