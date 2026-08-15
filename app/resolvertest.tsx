@@ -6,7 +6,11 @@
 import StreamResolverWebView, {
   type ResolvedNativeStream,
 } from "@/components/player/StreamResolverWebView";
-import { buildEmbedUrl, getProvider } from "@/components/player/providerRegistry";
+import {
+  buildEmbedUrl,
+  getProvider,
+  providerHosts,
+} from "@/components/player/providerRegistry";
 import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -82,6 +86,10 @@ export default function ResolverTest() {
         : "",
     [provider],
   );
+  const navHosts = useMemo(
+    () => (provider ? providerHosts(provider) : []),
+    [provider],
+  );
 
   const run = (dubLabel: string | null) => {
     setDub(dubLabel);
@@ -141,6 +149,7 @@ export default function ResolverTest() {
           key={runId}
           embedUrl={embedUrl}
           dubLabel={dub}
+          navHosts={navHosts}
           config={{ mediaPattern: /\.m3u8|\.mp4/i, timeoutMs: 25000 }}
           onResolved={(r) => {
             setElapsed(Date.now() - startedAt);

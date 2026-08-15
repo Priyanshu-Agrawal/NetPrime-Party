@@ -19,7 +19,7 @@
  * "Fade"); on any failure we fall through to Original. Each dub is a SEPARATE
  * stream, so switching dubs = re-run this resolver for that server.
  */
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import WebView from "react-native-webview";
 import {
@@ -45,6 +45,13 @@ interface StreamResolverWebViewProps {
   embedUrl: string;
   /** Server/dub label to select (e.g. "Fade" = Hindi). Omit/null = Original. */
   dubLabel?: string | null;
+  /**
+   * Bare hostnames the TOP frame may navigate to (e.g. providerHosts(videasy)).
+   * ⚠ REQUIRED for reliability: videasy fires ad redirects that hijack the top
+   * frame (e.g. → naidunia.com) and kill the sniff. Anything else is blocked.
+   * Defaults to just the embed URL's own host.
+   */
+  navHosts?: string[];
   config?: SniffConfig;
   onResolved: (r: ResolvedNativeStream) => void;
   onFail: (reason: string) => void;
@@ -60,6 +67,12 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
   var re = ${pattern.toString()};
   var DUB = ${JSON.stringify(dubLabel)};
   window.__captured = false;
+
+  // Ad/popup defense (top-frame nav is also blocked RN-side via onShouldStart).
+  try { window.open = function(){ return null; }; } catch (e) {}
+  document.addEventListener('click', function(ev){
+    try { var a = ev.target && ev.target.closest && ev.target.closest('a[target="_blank"]'); if (a) ev.preventDefault(); } catch (e) {}
+  }, true); // capture-phase, preventDefault ONLY (never stopPropagation — it'd eat the play-kick)
 
   function post(obj){ try { window.ReactNativeWebView.postMessage(JSON.stringify(obj)); } catch (e) {} }
   function headerObj(h){
@@ -131,11 +144,38 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
 export const StreamResolverWebView: React.FC<StreamResolverWebViewProps> = ({
   embedUrl,
   dubLabel = null,
+  navHosts,
   config = DEFAULT_SNIFF,
   onResolved,
   onFail,
 }) => {
   const settled = useRef(false);
+
+  const allowedHosts = useMemo(() => {
+    if (navHosts && navHosts.length) return navHosts.map((h) => h.toLowerCase());
+    try {
+      return [new URL(embedUrl).hostname.toLowerCase()];
+    } catch {
+      return [];
+    }
+  }, [navHosts, embedUrl]);
+
+  // Block top-frame navigations away from the provider (ad redirects); always
+  // allow sub-resources / media / iframes (isTopFrame === false) so the stream loads.
+  const onShouldStart = useCallback(
+    (req: { url: string; isTopFrame?: boolean }) => {
+      if (req.isTopFrame === false) return true;
+      const url = req.url || "";
+      if (!url || /^(about:|data:|blob:)/.test(url)) return true;
+      try {
+        const host = new URL(url).hostname.toLowerCase();
+        return allowedHosts.some((d) => host === d || host.endsWith("." + d));
+      } catch {
+        return false;
+      }
+    },
+    [allowedHosts],
+  );
 
   useEffect(() => {
     settled.current = false;
@@ -193,6 +233,7 @@ export const StreamResolverWebView: React.FC<StreamResolverWebViewProps> = ({
         setSupportMultipleWindows={false}
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
+        onShouldStartLoadWithRequest={onShouldStart}
         injectedJavaScriptBeforeContentLoaded={buildInjectedJS(
           config.mediaPattern,
           dubLabel,
