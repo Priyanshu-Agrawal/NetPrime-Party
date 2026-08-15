@@ -113,7 +113,7 @@ export default function ResolverTest() {
         <Pressable style={styles.btn} onPress={() => run(null)}>
           <Text style={styles.btnText}>Resolve (Original)</Text>
         </Pressable>
-        <Pressable style={styles.btn} onPress={() => run("Fade")}>
+        <Pressable style={styles.btn} onPress={() => run("Hindi")}>
           <Text style={styles.btnText}>Resolve Hindi (Fade)</Text>
         </Pressable>
       </View>

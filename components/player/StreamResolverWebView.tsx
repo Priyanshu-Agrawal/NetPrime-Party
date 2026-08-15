@@ -67,6 +67,8 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
   var re = ${pattern.toString()};
   var DUB = ${JSON.stringify(dubLabel)};
   window.__captured = false;
+  var dubStage = DUB ? 0 : 2;   // 0=open Servers tab, 1=pick language, 2=ready to capture
+  var dubTries = 0;
 
   // Ad/popup defense (top-frame nav is also blocked RN-side via onShouldStart).
   try { window.open = function(){ return null; }; } catch (e) {}
@@ -84,17 +86,14 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
       return h;
     } catch (e) { return out; }
   }
-  // Prefer a MASTER playlist; accept any .m3u8/.mp4 after a short grace period.
-  var firstSeen = null;
+  // Capture the first .m3u8/.mp4. If a dub was requested, WAIT until the dub
+  // server is selected (dubStage>=2) so we grab the DUB's stream, not Original.
   function report(u, headers){
     try {
       if (!u || window.__captured || !re.test(u)) return;
-      var isMaster = /master\\.m3u8/i.test(u);
-      if (isMaster) { window.__captured = true; post({ type:'media', url:u, headers:headers||null, dub:'master' }); return; }
-      if (!firstSeen) { firstSeen = u;
-        // give master ~1.2s to appear; else fall back to whatever we saw first
-        setTimeout(function(){ if (!window.__captured && firstSeen) { window.__captured = true; post({ type:'media', url:firstSeen, headers:null, dub:'media' }); } }, 1200);
-      }
+      if (dubStage < 2) return;
+      window.__captured = true;
+      post({ type:'media', url:u, headers:headers||null, dub: DUB || 'Original' });
     } catch (e) {}
   }
 
@@ -106,19 +105,38 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
   var oo = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function (method, url){ try { report(url); } catch (e) {} return oo.apply(this, arguments); };
 
-  // --- dub selection (best-effort; provider-specific, videasy) ---------------
-  function selectDub(){
-    if (!DUB) return false;
+  // --- dub selection (videasy) ------------------------------------------------
+  // ⚠ videasy's React tabs/servers respond to a FULL synthetic pointer sequence,
+  // NOT element.click() (proven via CDP). Labels read e.g. "FadeHindi audio", so
+  // we match the language (DUB, e.g. "Hindi"). Staged: open Servers → click lang.
+  // If Servers/lang never appear, bail to Original so we still resolve something.
+  function pdispatch(b){
     try {
-      // open the gear if present, click "Servers" tab, then the matching label.
-      var texts = Array.prototype.slice.call(document.querySelectorAll('button, [role="button"], li, div'));
-      var hit = texts.find(function (el){ return el.textContent && el.textContent.trim() === DUB; });
-      if (hit) { hit.click(); return true; }
+      var r = b.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+      ['pointerover','pointerenter','pointerdown','pointerup','click','mousedown','mouseup'].forEach(function (t){
+        try { b.dispatchEvent(new (t.indexOf('pointer')===0?PointerEvent:MouseEvent)(t,{bubbles:true,cancelable:true,composed:true,clientX:cx,clientY:cy,button:0,isPrimary:true})); } catch (e) {}
+      });
     } catch (e) {}
-    return false;
+  }
+  function findBtn(pred){ try { return Array.prototype.slice.call(document.querySelectorAll('button')).find(pred); } catch (e) { return null; } }
+  function selectDub(){
+    if (dubStage >= 2) return;
+    if (dubStage === 0){
+      var srv = findBtn(function (x){ return (x.textContent||'').trim() === 'Servers'; });
+      if (srv){ pdispatch(srv); dubStage = 1; dubTries = 0; }
+      else if (++dubTries > 14){ dubStage = 2; }   // no Servers tab → give up → Original
+      return;
+    }
+    if (dubStage === 1){
+      var reD = new RegExp(DUB, 'i');
+      var lang = findBtn(function (x){ var t = x.textContent||''; return reD.test(t) && /audio/i.test(t); });
+      if (lang){ pdispatch(lang); dubStage = 2; }   // switched → next m3u8 is the dub stream
+      else if (++dubTries > 14){ dubStage = 2; }     // dub language absent → Original fallback
+      return;
+    }
   }
 
-  // --- play kick -------------------------------------------------------------
+  // --- play kick: start playback, THEN hand off to dub selection --------------
   function kick(){
     try { var v = document.querySelector('video'); if (v) { v.muted = true; var p = v.play && v.play(); if (p && p.catch) p.catch(function(){}); } } catch (e) {}
     try {
@@ -129,12 +147,13 @@ const buildInjectedJS = (pattern: RegExp, dubLabel: string | null) => `
     try { var b = document.querySelector('button.tabbable, [class*="mobileCenterControls"] button, button[aria-label*="lay"], .play-button'); if (b) b.click(); } catch (e) {}
   }
 
-  var tries = 0, dubDone = false;
+  var tries = 0;
   var iv = setInterval(function (){
-    if (window.__captured || tries > 30) { clearInterval(iv); return; }
+    if (window.__captured || tries > 40) { clearInterval(iv); return; }
     tries++;
-    if (!dubDone) dubDone = selectDub();   // try dub first few rounds
-    kick();
+    var v = document.querySelector('video');
+    if (!v || v.paused) { kick(); }   // not playing yet → keep kicking to start it
+    else { selectDub(); }             // playing → drive the dub switch; report() then captures
   }, 500);
   post({ type:'debug', msg:'resolver injected' });
   true;
