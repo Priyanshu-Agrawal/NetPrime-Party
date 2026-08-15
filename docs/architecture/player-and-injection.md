@@ -29,8 +29,10 @@ interface PlayerEvent {            // every event/heartbeat from the bridge
 }
 // Props: { providerId, tmdbId, type, season?, episode?, startAt?, onPlayerEvent, onBound?, onBindFailed? }
 ```
-`VidLinkPlayer.tsx` is an older single-provider twin with the same handle
-(used only by `app/sync-demo.tsx`).
+(An older single-provider twin, `VidLinkPlayer.tsx`, with the same handle — used only
+by a `sync-demo` route over the old `services/sync/*` engine — was **removed**. So
+`HijackPlayer` is the sole live implementation of this contract today, until the native
+player joins it.)
 
 ## BRIDGE_JS anatomy (`HijackPlayer.tsx`, the `BRIDGE_JS` template string)
 1. **Popup/ad blocking**: `window.open = () => null`; a capture-phase `click`

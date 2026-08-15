@@ -7,7 +7,7 @@
 ## What a provider is
 A provider is a third-party **embed page** we load in a WebView. The catalog +
 per-provider hijack tuning come from two places, merged at load:
-- **`providers.json`** — **bundled locally**, imported directly by `providerRegistry.ts` (`import providersData from "@/providers.json"`). Each entry: `{ id, name, urls:{movie,tv}, allowedDomain }`. (14 providers.) ⚠ `streamResolver.ts`'s remote `GITHUB_RAW_JSON_URL` fetch (`listProviders`) is **dead/unused** — the live catalog is the bundled file.
+- **`providers.json`** — **bundled locally**, imported directly by `providerRegistry.ts` (`import providersData from "@/providers.json"`). Each entry: `{ id, name, urls:{movie,tv}, allowedDomain }`. (14 providers.) ⚠ the old remote `GITHUB_RAW_JSON_URL`/`listProviders` fetch (in the now-renamed `streamResolver.old.ts`) was **removed** — the live catalog is this bundled file.
 - **`components/player/hijackCapabilities.ts`** — the `HIJACK_CAPS` overlay: `{ supported, videoLocation?: "top"|"same-origin-iframe", navHosts?, autoplayParam?, unstable?, notes? }`.
 - Merged into `PROVIDERS` by `components/player/providerRegistry.ts` (`getProvider`, `isHijackable`, `providerHosts`, `isAllowedTopNav`, `defaultHijackProvider`).
 
@@ -18,7 +18,7 @@ bridge can't reach it.
 
 ## Two `buildEmbedUrl`s — don't cross them
 - `providerRegistry.buildEmbedUrl(provider, mediaRef, {party?})` — used by the LIVE players (`HijackPlayer` with `{party:true}`, solo `player.tsx` with none). Appends `hijack.autoplayParam` in party mode + `startAt`.
-- `streamResolver.buildEmbedUrl({id,type,season,ep,provider})` — belongs to the (currently **unwired**) native-extractor path. Different signature.
+- `streamResolver.old.buildEmbedUrl({id,type,season,ep,provider})` — the renamed-old resolver-path variant (build-excluded reference scaffolding). Different signature.
 
 Both special-case **videasy TV** with `?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true`.
 

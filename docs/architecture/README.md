@@ -43,7 +43,7 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 > **Deep dive: [watch-party-sync.md](./watch-party-sync.md)** (anchor math, epoch/seq, the
 > full RPC surface, drift correction, host lease, security-fix history). Summary below.
 
-Fully **Supabase-only authority** (replaced an older Realtime relay in `services/sync/*`):
+Fully **Supabase-only authority** (replaced an older Realtime relay that lived in `services/sync/*`, now deleted):
 - **Postgres is the single writer.** `SECURITY DEFINER` RPCs serialize a room row with `SELECT … FOR UPDATE` (`supabase/migrations/0001_party_core.sql` + `0002–0006`).
 - **Playback = a timeline ANCHOR** (`protocol.ts` `PlaybackAnchor`: status/positionMs/rate/anchorServerTimeMs + `epoch`/`seq`). `effectivePositionMs(anchor, serverNow)` is the single source of truth. Server `now()` is the stable clock.
 - **Host is a leased role** (`HostLease`, 6s lease). Handoff = epoch bump + re-anchor; no clock/authority reshuffle.
@@ -53,10 +53,10 @@ Fully **Supabase-only authority** (replaced an older Realtime relay in `services
 
 ## Data / metadata
 - TMDB via a **Cloudflare Worker proxy** (`contexts/movieContext/movieContext.tsx` → `tmdb.spiderfan-no1.workers.dev`; token injected server-side). Helpers: `utils/tmdbDetails.ts`, `utils/tmdbLists.ts`.
-- Provider list: **bundled** `providers.json`, merged with hijack caps in `components/player/providerRegistry.ts` (`import … from "@/providers.json"`). ⚠ The remote `GITHUB_RAW_JSON_URL` fetch in `utils/streamResolver.ts` is **dead/unused**.
+- Provider list: **bundled** `providers.json`, merged with hijack caps in `components/player/providerRegistry.ts` (`import … from "@/providers.json"`). (The old remote `GITHUB_RAW_JSON_URL` fetch was removed; resolver scaffolding now lives at `utils/streamResolver.old.ts`.)
 - Local: MMKV — watch history (`utils/history.ts`), watchlist (`utils/watchlist.ts`), prefs (`utils/prefs.ts`).
 
 ## Gotchas (don't relitigate)
-- **`@movie-web/providers` native scrapers are DEAD** — resolve nothing (source sites rotted). `utils/streamResolver.resolveNativeStream` returns null for everything. Native playback must resolve via the **hidden-WebView sniff**, not this package. (p-stream's `@p-stream/providers` fork is the maintained alternative if we ever swap.)
+- **`@movie-web/providers` was REMOVED** (uninstalled) — its native scrapers resolved nothing (source sites rotted), so `resolveNativeStream` + `utils/polyfills.ts` are gone. Native playback resolves via the **hidden-WebView sniff** instead. (If we ever revisit on-device extraction, the maintained `@p-stream/providers` fork is the candidate — a fresh install, not this package.)
 - Emulator `screencap` returns **black once a provider `<video>` binds** (hardware surface) — verify via CDP/fiber, not pixels.
 - `bearoom://` scheme + PiP/background need a **native rebuild** (config in `app.json`, but the installed dev build may predate it).

@@ -18,7 +18,7 @@ import {
   DEFAULT_SNIFF,
   embedOrigin,
   type SniffConfig,
-} from "@/utils/streamResolver";
+} from "@/utils/streamResolver.old";
 
 const DESKTOP_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";

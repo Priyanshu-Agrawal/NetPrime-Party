@@ -68,7 +68,7 @@ Full list captured for one title:
 Because `videoLocation:"top"`, a **top-frame** `fetch`/`XHR.open` hook catches the
 `.m3u8`. Approach for the hidden resolver WebView:
 1. Load the embed URL. **Set `mediaPlaybackRequiresUserAction={false}`** (and
-   `allowsInlineMediaPlayback`) — `SnifferWebView` currently omits these, and
+   `allowsInlineMediaPlayback`) — `SnifferWebView.old` currently omits these, and
    videasy won't resolve without a "play" trigger.
 2. Inject JS that (optionally) opens Settings → clicks the target dub **server**
    (match the language label; Hindi→"Fade", else Original/first) → clicks the

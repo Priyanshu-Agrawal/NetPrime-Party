@@ -1,5 +1,6 @@
 import "../devtools/execbro"; // dev-only ExecBro SDK capture — MUST stay first; no-op in prod
-import "@/utils/polyfills";
+import "react-native-get-random-values"; // crypto.getRandomValues (uuid — party identity)
+import "react-native-url-polyfill/auto"; // global URL/URLSearchParams (supabase realtime)
 import { AlertHost } from "@/components/ui/BearAlert";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";

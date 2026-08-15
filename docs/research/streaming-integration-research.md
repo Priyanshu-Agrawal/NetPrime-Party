@@ -12,6 +12,14 @@
 > DMCA / app-store-rejection risk. **Reuse the architecture and techniques, not
 > the target list.** This doc is decision-support for our own player, not an
 > endorsement of any specific source.
+>
+> 🗒️ **STATUS UPDATE (post-cleanup).** This doc predates the decision to drop
+> on-device extraction. `@movie-web/providers` has since been **uninstalled** and
+> `resolveNativeStream` **removed** — its scrapers resolved nothing. The native
+> player now resolves streams by **sniffing the provider's own web player** in a
+> hidden WebView (see [../architecture/native-player.md](../architecture/native-player.md)).
+> Read the sections below as background/history, not the current plan. The
+> `@p-stream/providers` fork remains the reference if we ever revisit extraction.
 
 ---
 

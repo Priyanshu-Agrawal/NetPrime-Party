@@ -9,7 +9,7 @@
 ## Why
 Native playback unlocks what a WebView can't: **PiP, background/lock-screen audio,
 AirPlay/Chromecast, native scrubber/quality/speed**, and a first-class **dub picker
-(India-first)**. The `@movie-web/providers` scrapers are dead, but the web player
+(India-first)**. The `@movie-web/providers` scrapers were dead (now uninstalled), but the web player
 resolves the stream fine — so use it as a **headless resolver**, then play natively.
 
 ## Feasibility — PROVEN on-device (videasy, via CDP)
@@ -23,7 +23,7 @@ resolves the stream fine — so use it as a **headless resolver**, then play nat
 back to Original** when the title has no dub (common).
 
 ## Components to build
-1. **`StreamResolverWebView`** (adapt `components/player/SnifferWebView.tsx`) — hidden 1×1 WebView; **must add `mediaPlaybackRequiresUserAction={false}` + `allowsInlineMediaPlayback`** (SnifferWebView lacks them and videasy binds only after a play tap). Injected JS: (optional) open Settings → click the target **dub server** (Hindi→"Fade", else Original) → click play → the top-frame `fetch`/`XHR` hook captures `master.m3u8` → `onResolved({url, dub})`; `onFail` on ~8s.
+1. **`StreamResolverWebView`** (adapt `components/player/SnifferWebView.old.tsx`) — hidden 1×1 WebView; **must add `mediaPlaybackRequiresUserAction={false}` + `allowsInlineMediaPlayback`** (`SnifferWebView.old` lacks them and videasy binds only after a play tap). Injected JS: (optional) open Settings → click the target **dub server** (Hindi→"Fade", else Original) → click play → the top-frame `fetch`/`XHR` hook captures `master.m3u8` → `onResolved({url, dub})`; `onFail` on ~8s.
 2. **`NativePlayer`** (drop-in for `HijackPlayer`) — `forwardRef<PlayerHandle>` (`play/pause/seek/setRate/fullscreen`) emitting `PlayerEvent` (`ready/play/pause/seeked/tick` w/ currentTime,duration,paused). `expo-video` `useVideoPlayer({uri:master, contentType:'hls'})` + `VideoView`. **Dub switch** → resolve new server → `player.replaceAsync` → seek back.
 3. **`NativeControls`** (themed, the ONLY control set over the native surface): play/pause, ±10s, scrub, fullscreen, PiP; settings sheet = **Quality** (`availableVideoTracks`/`videoTrack`), **Speed** (`playbackRate`), **Dub picker** (server re-resolve+replaceAsync, Hindi→Original), Subtitles (v2). In party, route through room authority like today. (Start from the deleted `PlayerControls.tsx` in git history.)
 4. **Wire `app/party.tsx`**: `nativeUnavailable` → `nativeUnavailable ? <HijackPlayer/> : <NativePlayer onUnavailable={…}/>`. WebView stays as graceful fallback.

@@ -23,17 +23,16 @@ app/_layout.tsx            Root Stack (headerless). Mounts the provider stack + 
 ├─ onboarding.tsx          FIRST-LAUNCH — 3-slide, sets name + setOnboarded()
 ├─ myList.tsx              MY LIST — watchlist poster grid (MMKV), long-press remove
 ├─ watchHistory.tsx        re-export of components/watchHistory.tsx
-├─ trendingShows.tsx       TRENDING TV — paginated FlatList from movieContext
-└─ sync-demo.tsx           DEV DEMO — two VidLinkPlayers over in-memory mockTransport
+└─ trendingShows.tsx       TRENDING TV — paginated FlatList from movieContext
 ```
 - Root `_layout` sets `unstable_settings = { initialRouteName: "index" }` and renders
   a single headerless `<Stack>` — every group/screen auto-registers. `(tabs)` uses
   `<Tabs tabBar={FloatingTabBar} …>`; tabs are `index`/`search`/`more`.
 - **Home gates onboarding**: `index.tsx` `Redirect`s to `/onboarding` when
   `!hasOnboarded()`.
-- `sync-demo` is a **Phase-1 local demo** (in-memory `mockTransport`, two players,
-  hardcoded Fight Club `tmdbId:"550"`) — not the real party. The real party is
-  `party.tsx` on Supabase authority.
+- (A `sync-demo` route with two `VidLinkPlayer`s over an in-memory `mockTransport`,
+  which exercised the old `services/sync/*` engine, was **removed** — superseded by the
+  Supabase-authority party. See [watch-party-sync.md](./watch-party-sync.md).)
 
 ## Root provider stack (`app/_layout.tsx`)
 Wrap order (outer → inner):
@@ -48,7 +47,10 @@ GestureHandlerRootView            (flex:1)
 **Init side-effects (order matters):**
 - **`import "../devtools/execbro"` is line 1** — must stay first so dev capture starts
   before any module fetches (see [Dev tooling](#dev-tooling)).
-- `import "@/utils/polyfills"` — runtime polyfills for `@movie-web/providers`.
+- `import "react-native-get-random-values"` + `import "react-native-url-polyfill/auto"`
+  — the two early polyfills the app genuinely needs (crypto for uuid; global URL for
+  supabase realtime), inlined here. (The old `utils/polyfills.ts`, which existed only
+  for the now-removed `@movie-web/providers`, was deleted.)
 - `Appearance.setColorScheme("dark")` at module scope — **forces dark app-wide**,
   ignoring device setting. (The legacy `contexts/colorContext/*` + `constants/Colors`
   are unused relative to `theme/bearoom`.)
@@ -90,19 +92,20 @@ GestureHandlerRootView            (flex:1)
 > `components/player/providerRegistry.ts` does `import providersData from
 > "@/providers.json"` and builds `PROVIDERS` by merging each entry with the
 > `HIJACK_CAPS` overlay. The remote **`GITHUB_RAW_JSON_URL` fetch
-> (`streamResolver.listProviders`) has NO live caller — it is dead.** (Earlier docs
+> (`streamResolver.listProviders`) had no live caller and was **REMOVED**.** (Earlier docs
 > said "fetched from GitHub raw"; that was wrong.) See
 > [../providers/README.md](../providers/README.md).
 
 - `providers.json` = 14 entries (videasy, vidfast, vixsrc, vidlink, vidcore,
   111movies, vidnest, vidphantom, mycineby, + non-hijackable vidsrcTo, multiembed,
   vsembed.ru, vidsrccc2, vidsrcvip2). Each: `{ id, name, urls:{movie,tv}, allowedDomain }`.
-- **`utils/streamResolver.ts` is a DEAD/legacy module** — `resolveNativeStream` (the
-  `@movie-web/providers` NATIVE extractor, resolves nothing), its own `buildEmbedUrl`
-  variant, and `listProviders`/`GITHUB_RAW_JSON_URL` have no live callers. Only unused
-  scaffolding (`SnifferWebView`, `EmbedWebView`) references it. **Reusable for the
-  native-player POC, but not currently wired.** Two `buildEmbedUrl`s exist — the live
-  one is `providerRegistry.buildEmbedUrl(p, m, {party?})`; don't cross them.
+- **`utils/streamResolver.old.ts` is renamed-old reference scaffolding** — the dead
+  `resolveNativeStream` (`@movie-web/providers` NATIVE extractor) + `listProviders`/
+  `GITHUB_RAW_JSON_URL` were **REMOVED** (package uninstalled); the reusable pure helpers
+  (`buildEmbedUrl`/`embedOrigin`/`DEFAULT_SNIFF`) remain for the native-player POC,
+  consumed only by the also-renamed `SnifferWebView.old` / `EmbedWebView.old`. All
+  `*.old.*` files are **excluded from tsc + eslint**. Two `buildEmbedUrl`s exist — the
+  live one is `providerRegistry.buildEmbedUrl(p, m, {party?})`; don't cross them.
 
 ## Local storage (MMKV)
 > ⚠ **One shared instance.** Every module calls `createMMKV()` with **no id**, so
@@ -165,5 +168,7 @@ GestureHandlerRootView            (flex:1)
 - `SystemUI.setBackgroundColorAsync` in render bodies (root + player layout) — cosmetic,
   but not idiomatic.
 - No SafeAreaProvider / no splash management (fonts gate first paint).
-- `streamResolver` + `SnifferWebView` + `EmbedWebView` + `resolveNativeStream` are
-  **unwired scaffolding** — reusable for the native player, but nothing calls them today.
+- `streamResolver.old` + `SnifferWebView.old` + `EmbedWebView.old` are **renamed-old,
+  build-excluded** reference scaffolding — reusable for the native player, nothing calls
+  them today. `@movie-web/providers` (+ `resolveNativeStream`, `utils/polyfills.ts`) and
+  the whole `services/sync/*` cluster (+ `VidLinkPlayer`, `sync-demo`) were **deleted**.
