@@ -46,12 +46,24 @@ Full list captured for one title:
 | Omen | Spanish |
 | Raze | Portuguese |
 
-- **There is NO "Jade" server** — the Hindi one is **Fade**.
+- **There is NO "Jade" server** — the Hindi one is **Fade**. DOM button labels
+  concatenate agent+language: **`YoruOriginal audio`, `KilljoyGerman audio`,
+  `FadeHindi audio`, `OmenSpanish audio`, `RazePortuguese audio`** — so **match the
+  LANGUAGE** (`/hindi/i` + `/audio/i`), not the agent name.
 - **Product rule: default to Hindi (Fade); fall back to Original when the title has
   no dub** (dubs are frequently unavailable per title).
-- Because each dub is a distinct stream (own `m3u8`), a dub switch is **NOT** an
-  in-player audio-track change (`availableAudioTracks` shows only the 1 muxed
-  track). It is: **re-resolve that server → swap source** (native: `player.replaceAsync`, seek back to position).
+- Each dub is a distinct stream on a **different CDN**: Original = `moon.ironwallnet.net`
+  (fMP4, token-in-URL); **Hindi (Fade) = `rasta428jem.com`** (a real **master** `index.m3u8`
+  with `360/`,`720/` variants, **IP+time-locked** — the URL embeds the resolver's IP + an
+  expiry ts). ⚠ **IP-lock ⇒ resolve + play must be the SAME device/IP** (they are, on-device).
+  A dub switch = **re-resolve that server → swap source** (native `player.replaceAsync`, seek back).
+- **⚠ How to switch (injectable, PROVEN via CDP):** `element.click()` does NOT flip
+  videasy's React tabs. A **full synthetic pointer sequence** does — dispatch, in order,
+  `pointerover, pointerenter, pointerdown, pointerup, click, mousedown, mouseup` as
+  `PointerEvent`/`MouseEvent` with `composed:true` + `clientX/Y`. Sequence: pointer-dispatch
+  the **`Servers`** tab button → then the language button. (Desktop UA → the settings/Servers
+  panel is already in the DOM after play; no gear-open needed.) Implemented in
+  `StreamResolverWebView.selectDub`.
 
 ## The stream (what the player actually loads)
 - `video.src` is a **`blob:`** → hls.js + MSE. Real URLs are only visible by hooking `fetch`/`XHR`.
@@ -64,26 +76,41 @@ Full list captured for one title:
 - ⚠ **The token is almost certainly short-lived** (session/time-bound) → **resolve per play**; do not cache the m3u8.
 - **Subtitles are NOT in the manifest** — videasy loads external subs on demand (needs a separate sniff, or use the Wyzie subtitle API keyed by tmdbId, then a synthetic `EXT-X-MEDIA` wrapper manifest for native).
 
-## Sniffing videasy → a native-playable m3u8 (for the native player)
-Because `videoLocation:"top"`, a **top-frame** `fetch`/`XHR.open` hook catches the
-`.m3u8`. Approach for the hidden resolver WebView:
-1. Load the embed URL. **Set `mediaPlaybackRequiresUserAction={false}`** (and
-   `allowsInlineMediaPlayback`) — `SnifferWebView.old` currently omits these, and
-   videasy won't resolve without a "play" trigger.
-2. Inject JS that (optionally) opens Settings → clicks the target dub **server**
-   (match the language label; Hindi→"Fade", else Original/first) → clicks the
-   center play button (a real-ish gesture) → the page resolves + hls.js fetches
-   `master.m3u8` → the hook captures it.
-3. Return `{ masterUrl, dub }` to the native player (`expo-video`).
+## Backend API (speedracelight.com)
+Captured via headless-Chrome CDP. `player.videasy.to` only serves the shell; the real
+backend is **`speedracelight.com`**:
+- `db.speedracelight.com/3/<type>/<id>?append_to_response=…` — TMDB metadata proxy.
+- **`api.speedracelight.com/seed?mediaId=<id>`** → `{"seed":"…","ttlMs":30000}` — a
+  short-lived (30s) token.
+- **`api.speedracelight.com/cdn/sources-with-title?title=…&year=…&tmdbId=…&enc=2&se…`**
+  → the sources list, **ENCRYPTED** (`enc=2`; opaque blob, decrypted client-side using the
+  seed). A different server hits a sibling endpoint (e.g. **`/hdmovie/sources-with-title`**).
+- ⚠ Because the response is encrypted, there is **no clean API shortcut for dubs** — the
+  decrypted result becomes the m3u8, so the **sniff (not the API)** is the extraction method.
 
-CDP recipe that proved all of the above (dev builds only):
-```bash
-PID=$(adb shell pidof com.cody669.Uott); adb forward tcp:9222 localabstract:webview_devtools_remote_$PID
-curl -s localhost:9222/json/list        # get webSocketDebuggerUrl
-# connect via Node `ws`; Runtime.evaluate to hook fetch/XHR, read window.__caught, inspect DOM
-```
+## Sniffing videasy → a native-playable m3u8 (implemented)
+Because `videoLocation:"top"`, a **top-frame** `fetch`/`XHR.open` hook catches the `.m3u8`.
+Implemented in `components/player/StreamResolverWebView.tsx`:
+1. Load the embed. **Set `mediaPlaybackRequiresUserAction={false}` + `allowsInlineMediaPlayback`**,
+   and **block ad redirects** (`onShouldStartLoadWithRequest` → only provider `navHosts` for the
+   top frame; injected `window.open=null`). ⚠ **Without redirect blocking videasy hijacks the top
+   frame to ad sites (e.g. naidunia.com) and the sniff times out** — the main reliability bug.
+2. Injected JS: "play-kick" (`video.play()` + click center) until a `<video>` is playing → then
+   (if a dub is requested) the pointer-dispatch dub switch above → the hook captures the m3u8
+   (report() waits until *after* the dub switch when a dub is set, so it grabs the dub stream).
+3. Return `{ url, headers, dub }` to `expo-video`.
+
+**Two CDP surfaces for investigating this:**
+- **On-device WebView** (dev builds): `adb forward tcp:9222 localabstract:webview_devtools_remote_$(adb shell pidof com.cody669.Uott)` → `curl localhost:9222/json/list` → Node `ws`. ⚠ The socket is keyed to the **renderer** pid — find it in `/proc/net/unix` (`grep webview_devtools`); cold starts hit the **expo-dev-launcher** (tap the reachable `10.0.2.2:8081` server).
+- **Headless Chrome sandbox (BEST for reverse-engineering** — no emulator, popups blockable, real input, and Chrome actually *decodes* the fMP4 which the emulator can't): launch `--headless=new --remote-debugging-port=9333 --autoplay-policy=no-user-gesture-required --block-new-web-contents`; `Fetch.enable` → `failRequest` non-videasy `Document` requests (kills ad redirects); `Input.dispatchMouseEvent` for real clicks; `Network`+`Page`+`Runtime` for full capture. **This is how the dub switch + backend API were cracked** (scripts in the session scratchpad `cdp_chrome*.js`).
 
 ## Open items specific to videasy
-- Re-verify the hidden-WebView sniff actually triggers resolution offscreen (the
-  gesture requirement is the risk). Fallback: keep the `HijackPlayer` WebView.
-- Multi-dub resolution = one hidden-resolve per server (cost ~1–3s each).
+- **Re-confirm the offscreen resolve + dub switch ON-DEVICE** — proven in headless Chrome
+  (Original 6.3s; Hindi switch → different-CDN master, video playing); the emulator's
+  dev-launcher wedged during testing (dev-env, not code). Fallback stays the `HijackPlayer` WebView.
+- **Master for Original**: hls.js is handed the 1080p media playlist directly
+  (`index-s1080p…m3u8`); a master exists (Quality shows 2160p/1080p/720p/480p) but isn't
+  fetched. Hindi already yields a master. Could derive `.../master.m3u8` for adaptive quality.
+- Multi-dub resolution = one hidden-resolve per server (~few s each); Hindi CDN URL is
+  **IP+time-locked** → resolve per play, on-device.
+- Subtitles still external (v2).
