@@ -1,5 +1,14 @@
 # Native Player via Hidden Resolver + Dub Picker (design / plan)
 
+> # ⛔ REJECTED as primary playback — DO NOT BUILD THIS.
+> After investigation we rejected native-sniff **playback**: the provider's HLS stream uses a
+> **deterministic, ephemeral, WAF-gated token** (two fresh browser sessions resolve to the *same*
+> token; a URL that plays is dead hours later), so a native player **cannot self-heal on token
+> expiry** and can't reliably play a full movie. **The WebView stays the primary playback engine**;
+> native features (PiP/AirPlay/background/lock-screen) are added *around* it instead — see
+> **[../plans/webview-native-features.md](../plans/webview-native-features.md)**. Everything below
+> (the resolver, the dub reverse-engineering) remains as **research/reference**, not the plan.
+
 > Direction for replacing the party's WebView playback with a native `expo-video`
 > player, fed by an `.m3u8` **sniffed from a hidden resolver WebView**. Read with
 > [player-and-injection.md](./player-and-injection.md) and
