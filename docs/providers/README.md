@@ -7,7 +7,7 @@
 ## What a provider is
 A provider is a third-party **embed page** we load in a WebView. The catalog +
 per-provider hijack tuning come from two places, merged at load:
-- **`providers.json`** — fetched from GitHub raw (`utils/streamResolver.ts` `GITHUB_RAW_JSON_URL`). Each entry: `{ id, name, urls:{movie,tv}, allowedDomain }`. (14 providers.)
+- **`providers.json`** — **bundled locally**, imported directly by `providerRegistry.ts` (`import providersData from "@/providers.json"`). Each entry: `{ id, name, urls:{movie,tv}, allowedDomain }`. (14 providers.) ⚠ `streamResolver.ts`'s remote `GITHUB_RAW_JSON_URL` fetch (`listProviders`) is **dead/unused** — the live catalog is the bundled file.
 - **`components/player/hijackCapabilities.ts`** — the `HIJACK_CAPS` overlay: `{ supported, videoLocation?: "top"|"same-origin-iframe", navHosts?, autoplayParam?, unstable?, notes? }`.
 - Merged into `PROVIDERS` by `components/player/providerRegistry.ts` (`getProvider`, `isHijackable`, `providerHosts`, `isAllowedTopNav`, `defaultHijackProvider`).
 

@@ -2,7 +2,8 @@
  * GifPicker — a frosted bottom-sheet GIF + sticker browser for the watch-party
  * chat. Tabs for GIFs / Stickers, trending on open, debounced search, blur-up
  * loading (KLIPY blur_preview) + a shimmer skeleton on first load. Tap to send.
- * All calls go through our KLIPY Cloudflare proxy (services/gifs) — no key here.
+ * Media/API calls go DIRECTLY to KLIPY via services/gifs (KLIPY ToS forbids
+ * proxying/caching/reordering results); this component holds no key.
  */
 import {
   reportMedia,

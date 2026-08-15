@@ -28,9 +28,11 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 |---|---|---|
 | **Player + WebView injection** | `components/player/*` | [player-and-injection.md](./player-and-injection.md) |
 | **Providers (embeds + per-provider quirks)** | `components/player/providerRegistry.ts`, `hijackCapabilities.ts`, `providers.json` | [../providers/README.md](../providers/README.md) |
-| **Watch-party authority + sync** | `services/party/*` | this file, "Watch party" below |
-| **Chat / GIFs / reactions** | `services/party/usePartyChat.ts`, `services/gifs.ts`, `components/party/*` | — |
-| **Native player (planned)** | `.claude/plans/…` + [native-player.md](./native-player.md) | — |
+| **Watch-party authority + sync** | `services/party/*`, `supabase/migrations/*` | [watch-party-sync.md](./watch-party-sync.md) |
+| **Chat / GIFs / reactions / timestamps** | `services/party/usePartyChat.ts`, `services/gifs.ts`, `components/party/*` | [chat-and-reactions.md](./chat-and-reactions.md) |
+| **App shell / navigation / data / storage** | `app/*`, `contexts/*`, `utils/*`, `theme/*` | [app-shell-and-data.md](./app-shell-and-data.md) |
+| **Native player (planned)** | `components/player/*` (POC) | [native-player.md](./native-player.md) |
+| **Streaming-integration research** | notes (p-stream / providers landscape) | [../research/streaming-integration-research.md](../research/streaming-integration-research.md) |
 
 ## Playback model (two players today)
 - **Solo** (`app/(player)/player.tsx`): a plain `WebView` of the provider embed — the provider's own page + controls, no injection.
@@ -38,6 +40,9 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 - **Native (planned)**: `expo-video` fed by an `.m3u8` **sniffed from a hidden resolver WebView** — unlocks PiP/cast/background + a native dub picker. See [native-player.md](./native-player.md).
 
 ## Watch party (`services/party/*`)
+> **Deep dive: [watch-party-sync.md](./watch-party-sync.md)** (anchor math, epoch/seq, the
+> full RPC surface, drift correction, host lease, security-fix history). Summary below.
+
 Fully **Supabase-only authority** (replaced an older Realtime relay in `services/sync/*`):
 - **Postgres is the single writer.** `SECURITY DEFINER` RPCs serialize a room row with `SELECT … FOR UPDATE` (`supabase/migrations/0001_party_core.sql` + `0002–0006`).
 - **Playback = a timeline ANCHOR** (`protocol.ts` `PlaybackAnchor`: status/positionMs/rate/anchorServerTimeMs + `epoch`/`seq`). `effectivePositionMs(anchor, serverNow)` is the single source of truth. Server `now()` is the stable clock.
@@ -48,7 +53,7 @@ Fully **Supabase-only authority** (replaced an older Realtime relay in `services
 
 ## Data / metadata
 - TMDB via a **Cloudflare Worker proxy** (`contexts/movieContext/movieContext.tsx` → `tmdb.spiderfan-no1.workers.dev`; token injected server-side). Helpers: `utils/tmdbDetails.ts`, `utils/tmdbLists.ts`.
-- Provider list: `providers.json` fetched from GitHub raw (`utils/streamResolver.ts` `GITHUB_RAW_JSON_URL`).
+- Provider list: **bundled** `providers.json`, merged with hijack caps in `components/player/providerRegistry.ts` (`import … from "@/providers.json"`). ⚠ The remote `GITHUB_RAW_JSON_URL` fetch in `utils/streamResolver.ts` is **dead/unused**.
 - Local: MMKV — watch history (`utils/history.ts`), watchlist (`utils/watchlist.ts`), prefs (`utils/prefs.ts`).
 
 ## Gotchas (don't relitigate)

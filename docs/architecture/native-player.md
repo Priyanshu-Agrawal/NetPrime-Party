@@ -29,6 +29,8 @@ back to Original** when the title has no dub (common).
 4. **Wire `app/party.tsx`**: `nativeUnavailable` → `nativeUnavailable ? <HijackPlayer/> : <NativePlayer onUnavailable={…}/>`. WebView stays as graceful fallback.
 
 ## Contract the native player MUST satisfy (from the sync engine)
+> **Canonical definition:** [watch-party-sync.md](./watch-party-sync.md) → "The player
+> contract" (incl. the ⚠ **seconds vs. milliseconds** units boundary). Recap:
 - Ref handle `play/pause/seek(seconds)/setRate/fullscreen`; emit `PlayerEvent` with `tick` **~1/sec** (`player.timeUpdateEventInterval = 1` → map `timeUpdate`→`tick`).
 - **⚠ Echo-suppress programmatic play/pause/seek (~500ms guard), NOT `setRate`** — the engine drives constantly; un-suppressed echoes make guests detach every anchor and hosts echo RPCs. (Mirror `HijackPlayer` `markApplying`.)
 - **⚠ expo-video has no `seeked` event** — emit `seeked` from OUR scrub UI (engine's user-scrub detection needs a landed position, threshold 2s). System/PiP scrubs are hard to detect — known limitation.
