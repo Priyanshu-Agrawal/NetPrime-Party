@@ -38,6 +38,7 @@ internal object BearoomPlaybackHub {
   fun keepAliveSolo() {
     val ctx = reactContext ?: return
     BearoomWebViews.resume(ctx.currentActivity)
+    BearoomWebViews.setForceWindowVisible(ctx.currentActivity, true)
     BearoomWebViews.inject(
       ctx.currentActivity,
       "try{if(window.__soloKeepAlive)window.__soloKeepAlive();}catch(e){}",

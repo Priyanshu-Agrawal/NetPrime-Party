@@ -19,6 +19,7 @@ class BearoomPlaybackModule(reactContext: ReactApplicationContext) :
       putExtra(BearoomPlaybackService.EXTRA_ARTWORK, artworkUrl ?: "")
     }
     ContextCompat.startForegroundService(reactApplicationContext, intent)
+    BearoomWebViews.setForceWindowVisible(reactApplicationContext.currentActivity, true)
   }
 
   @ReactMethod
@@ -33,6 +34,7 @@ class BearoomPlaybackModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun stop() {
     val ctx = reactApplicationContext
+    BearoomWebViews.setForceWindowVisible(ctx.currentActivity, false)
     ctx.stopService(Intent(ctx, BearoomPlaybackService::class.java))
   }
 

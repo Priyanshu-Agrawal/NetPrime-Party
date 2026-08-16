@@ -4,6 +4,7 @@ import android.app.Activity
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
+import com.reactnativecommunity.webview.AlwaysVisibleRNCWebView
 
 internal object BearoomWebViews {
   fun forEach(activity: Activity?, block: (WebView) -> Unit) {
@@ -16,6 +17,17 @@ internal object BearoomWebViews {
     activity.runOnUiThread {
       forEach(activity) { wv ->
         wv.evaluateJavascript(js, null)
+      }
+    }
+  }
+
+  fun setForceWindowVisible(activity: Activity?, enabled: Boolean) {
+    if (activity == null) return
+    activity.runOnUiThread {
+      forEach(activity) { wv ->
+        if (wv is AlwaysVisibleRNCWebView) {
+          wv.forceWindowVisible = enabled
+        }
       }
     }
   }

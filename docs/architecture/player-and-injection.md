@@ -13,12 +13,17 @@ the keep-alive re-`play()`s **only if `wasPlaying`**. A Kotlin foreground
 `MediaSession` service (`BearoomPlaybackService`) holds audio focus so Android 16
 does not mute background media, and notification/lock-screen play/pause/seek map
 to `window.__soloCmd` (injected from **native** so they work if RN JS is paused).
-⚠ Empirically, Chromium still **stalls the media clock** when the Activity is not
-visible (`readyState` drops to HAVE_METADATA even if `video.paused === false`).
-The session/notification/FGS are real; continuous background *audio* through this
-WebView is not — Android PiP (visible surface) is the remaining attempt.
-Party background-audio is deferred — visibility pause/play would look like user
-controls and desync the room.
+⚠ Empirically, Chromium **keys the media pipeline off WebView window
+visibility**, not the FGS. Pre-spike: after Home, `document.visibilityState ===
+'hidden'` and the clock froze (`readyState` → 1). Post-spike: an
+`AlwaysVisibleRNCWebView` subclass (gated by `forceWindowVisible`, set only
+while the solo MediaSession is running) forces `onWindowVisibilityChanged(VISIBLE)`
+and keeps a non-zero layout. After Home, `visibilityState` stays `'visible'`,
+`readyState` stays 4, and `currentTime` advances in real time (emulator API 36).
+⚠ Not yet re-confirmed on a **physical device**. Screen-off / lock is a separate
+question from Home; Android PiP is a separate floating-window feature, not this.
+Party must **not** set `forceWindowVisible` (visibility pause would look like a
+user control).
 
 ## The hijack in one paragraph
 The party plays a provider's embed page inside `react-native-webview`
