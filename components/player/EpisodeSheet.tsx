@@ -1,17 +1,42 @@
 /**
  * EpisodeSheet — a frosted bottom sheet to switch episodes on a TV show, so shows
- * keep episode navigation now that we hide the provider's own chrome. Seasons +
- * episodes come from the app's TMDB proxy (same source as the details screen).
+ * keep episode navigation now that we hide the provider's own chrome.
+ *
+ * Uses @gorhom/bottom-sheet (like ProviderSheet) so it's DRAGGABLE between two snap
+ * points — a compact peek that extends to near-full when a season has many episodes.
+ * It renders a <BottomSheetModal>, so it MUST be mounted under a
+ * <BottomSheetModalProvider> (the app root provides one). Imperative, like
+ * ProviderSheet:
+ *
+ *   const ref = useRef<BottomSheetModal>(null);
+ *   <EpisodeSheet ref={ref} tmdbId={id} season={s} episode={e} onSelect={…} />
+ *   ref.current?.present();
+ *
+ * Seasons + episodes come from the app's TMDB proxy and are PRELOADED on mount (the
+ * parent mounts this only for shows), so the list is ready the instant it opens.
  */
-import GlassCard from "@/components/ui/GlassCard";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { fetchDetails, img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  BottomSheetBackdrop,
+  BottomSheetFlatList,
+  BottomSheetModal,
+  type BottomSheetBackdropProps,
+} from "@gorhom/bottom-sheet";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItem,
+} from "react-native";
 
 interface Season {
   season_number: number;
@@ -26,154 +51,217 @@ interface Episode {
 }
 
 export interface EpisodeSheetProps {
-  visible: boolean;
-  onClose: () => void;
   tmdbId: string;
   season?: number;
   episode?: number;
   onSelect: (season: number, episode: number) => void;
 }
 
-export default function EpisodeSheet({
-  visible,
-  onClose,
-  tmdbId,
-  season,
-  episode,
-  onSelect,
-}: EpisodeSheetProps) {
-  const insets = useSafeAreaInsets();
-  const [seasons, setSeasons] = useState<Season[]>([]);
-  const [sel, setSel] = useState<number | null>(season ?? null);
-  const [episodes, setEpisodes] = useState<Episode[] | null>(null);
+export const EpisodeSheet = forwardRef<BottomSheetModal, EpisodeSheetProps>(
+  ({ tmdbId, season, episode, onSelect }, ref) => {
+    const [seasons, setSeasons] = useState<Season[]>([]);
+    const [sel, setSel] = useState<number | null>(season ?? null);
+    const [episodes, setEpisodes] = useState<Episode[] | null>(null);
 
-  // Seasons (once, when opened).
-  useEffect(() => {
-    if (!visible || !tmdbId) return;
-    let aborted = false;
-    void fetchDetails("tv", tmdbId)
-      .then((d: { seasons?: Season[] }) => {
-        if (aborted) return;
-        const ss = (d?.seasons ?? []).filter((s) => s.season_number > 0 && s.episode_count > 0);
-        setSeasons(ss);
-        setSel((cur) => cur ?? season ?? ss[0]?.season_number ?? 1);
-      })
-      .catch(() => {});
-    return () => {
-      aborted = true;
-    };
-  }, [visible, tmdbId, season]);
+    // Two snap points → the sheet is draggable from a peek to near-full for long seasons.
+    const snapPoints = useMemo(() => ["58%", "92%"], []);
 
-  // Episodes for the selected season.
-  useEffect(() => {
-    if (!visible || !tmdbId || sel == null) return;
-    let aborted = false;
-    setEpisodes(null);
-    fetch(`${API_URL}tv/${tmdbId}/season/${sel}?language=en-US`, { headers: API_HEADERS })
-      .then((r) => r.json())
-      .then((d: { episodes?: Episode[] }) => !aborted && setEpisodes(d?.episodes ?? []))
-      .catch(() => !aborted && setEpisodes([]));
-    return () => {
-      aborted = true;
-    };
-  }, [visible, tmdbId, sel]);
+    // Preload seasons on mount (the parent mounts this only for shows).
+    useEffect(() => {
+      if (!tmdbId) return;
+      let aborted = false;
+      void fetchDetails("tv", tmdbId)
+        .then((d: { seasons?: Season[] }) => {
+          if (aborted) return;
+          const ss = (d?.seasons ?? []).filter((s) => s.season_number > 0 && s.episode_count > 0);
+          setSeasons(ss);
+          setSel((cur) => cur ?? season ?? ss[0]?.season_number ?? 1);
+        })
+        .catch(() => {});
+      return () => {
+        aborted = true;
+      };
+    }, [tmdbId, season]);
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.wrap} onPress={() => {}}>
-          <GlassCard blur rounded={radius.xxl} bordered>
-            <View style={[styles.inner, { paddingBottom: Math.max(insets.bottom, ms(16)) }]}>
-              <View style={styles.handle} />
-              <Text style={styles.title}>Episodes</Text>
+    // Preload episodes for the selected season.
+    useEffect(() => {
+      if (!tmdbId || sel == null) return;
+      let aborted = false;
+      setEpisodes(null);
+      fetch(`${API_URL}tv/${tmdbId}/season/${sel}?language=en-US`, { headers: API_HEADERS })
+        .then((r) => r.json())
+        .then((d: { episodes?: Episode[] }) => !aborted && setEpisodes(d?.episodes ?? []))
+        .catch(() => !aborted && setEpisodes([]));
+      return () => {
+        aborted = true;
+      };
+    }, [tmdbId, sel]);
 
-              <View style={styles.seasonRow}>
-                {seasons.map((s) => {
-                  const on = s.season_number === sel;
-                  return (
-                    <Pressable
-                      key={s.season_number}
-                      style={[styles.chip, on && styles.chipOn]}
-                      onPress={() => setSel(s.season_number)}
-                    >
-                      <Text style={[styles.chipText, on && styles.chipTextOn]}>S{s.season_number}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+    const dismiss = useCallback(() => {
+      if (ref && typeof ref !== "function") ref.current?.dismiss();
+    }, [ref]);
 
-              {episodes == null ? (
-                <ActivityIndicator color={colors.honey} style={{ marginVertical: ms(24) }} />
-              ) : (
-                <FlatList
-                  data={episodes}
-                  keyExtractor={(e) => String(e.episode_number)}
-                  style={styles.list}
-                  showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => {
-                    const on = sel === season && item.episode_number === episode;
-                    return (
-                      <Pressable
-                        style={[styles.epRow, on && styles.epRowOn]}
-                        onPress={() => {
-                          if (sel != null) onSelect(sel, item.episode_number);
-                          onClose();
-                        }}
-                      >
-                        <View style={styles.thumbWrap}>
-                          <Image
-                            source={img(item.still_path, "w300")}
-                            style={styles.thumb}
-                            contentFit="cover"
-                            transition={150}
-                          />
-                          {on ? (
-                            <View style={styles.thumbPlaying}>
-                              <Ionicons name="play" size={ms(16)} color={colors.onHoney} />
-                            </View>
-                          ) : null}
-                        </View>
-                        <View style={styles.epInfo}>
-                          <View style={styles.epTitleRow}>
-                            <Text style={[styles.epName, on && styles.epNameOn]} numberOfLines={1}>
-                              {item.episode_number}. {item.name || `Episode ${item.episode_number}`}
-                            </Text>
-                            {item.runtime ? <Text style={styles.epRuntime}>{item.runtime}m</Text> : null}
-                          </View>
-                          {item.overview ? (
-                            <Text style={styles.epOverview} numberOfLines={2}>
-                              {item.overview}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </Pressable>
-                    );
-                  }}
-                  ListEmptyComponent={<Text style={styles.dim}>No episodes found.</Text>}
-                />
-              )}
+    const renderBackdrop = useCallback(
+      (props: BottomSheetBackdropProps) => (
+        <BottomSheetBackdrop
+          {...props}
+          disappearsOnIndex={-1}
+          appearsOnIndex={0}
+          pressBehavior="close"
+          opacity={0.6}
+        />
+      ),
+      [],
+    );
+
+    const renderItem: ListRenderItem<Episode> = useCallback(
+      ({ item }) => {
+        const on = sel === season && item.episode_number === episode;
+        return (
+          <Pressable
+            style={[styles.epRow, on && styles.epRowOn]}
+            android_ripple={{ color: colors.border }}
+            onPress={() => {
+              if (sel != null) onSelect(sel, item.episode_number);
+              dismiss();
+            }}
+          >
+            <View style={styles.thumbWrap}>
+              <Image
+                source={img(item.still_path, "w300")}
+                style={styles.thumb}
+                contentFit="cover"
+                transition={150}
+              />
+              {on ? (
+                <View style={styles.thumbPlaying}>
+                  <Ionicons name="play" size={ms(16)} color={colors.onHoney} />
+                </View>
+              ) : null}
             </View>
-          </GlassCard>
-        </Pressable>
-      </Pressable>
-    </Modal>
+            <View style={styles.epInfo}>
+              <View style={styles.epTitleRow}>
+                <Text style={[styles.epName, on && styles.epNameOn]} numberOfLines={1}>
+                  {item.episode_number}. {item.name || `Episode ${item.episode_number}`}
+                </Text>
+                {item.runtime ? <Text style={styles.epRuntime}>{item.runtime}m</Text> : null}
+              </View>
+              {item.overview ? (
+                <Text style={styles.epOverview} numberOfLines={2}>
+                  {item.overview}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      },
+      [sel, season, episode, onSelect, dismiss],
+    );
+
+    return (
+      <BottomSheetModal
+        ref={ref}
+        snapPoints={snapPoints}
+        enableDynamicSizing={false}
+        enablePanDownToClose
+        backgroundStyle={styles.sheetBackground}
+        backgroundComponent={SheetBackground}
+        handleIndicatorStyle={styles.handleIndicator}
+        backdropComponent={renderBackdrop}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Episodes</Text>
+          <Pressable onPress={dismiss} hitSlop={10} style={styles.closeBtn} accessibilityLabel="Close">
+            <Ionicons name="close" size={22} color={colors.text} />
+          </Pressable>
+        </View>
+
+        <View style={styles.seasonRow}>
+          {seasons.map((s) => {
+            const on = s.season_number === sel;
+            return (
+              <Pressable
+                key={s.season_number}
+                style={[styles.chip, on && styles.chipOn]}
+                onPress={() => setSel(s.season_number)}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>S{s.season_number}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <BottomSheetFlatList
+          data={episodes ?? []}
+          keyExtractor={(e) => String(e.episode_number)}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            episodes == null ? (
+              <ActivityIndicator color={colors.honey} style={{ marginVertical: ms(24) }} />
+            ) : (
+              <Text style={styles.dim}>No episodes found.</Text>
+            )
+          }
+        />
+      </BottomSheetModal>
+    );
+  },
+);
+
+EpisodeSheet.displayName = "EpisodeSheet";
+
+/** Frosted-glass sheet background (blurs the player behind it). */
+function SheetBackground({ style }: any) {
+  return (
+    <View style={[style, styles.sheetBgClip]}>
+      <BlurView
+        intensity={48}
+        tint="dark"
+        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, styles.sheetBgTint]} />
+    </View>
   );
 }
 
+export default EpisodeSheet;
+
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(8,6,4,0.55)", justifyContent: "flex-end" },
-  wrap: { paddingHorizontal: ms(10), paddingBottom: ms(10) },
-  inner: { paddingHorizontal: ms(18), paddingTop: ms(10) },
-  handle: {
-    alignSelf: "center",
-    width: ms(38),
-    height: ms(4),
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    marginBottom: ms(12),
+  sheetBackground: { backgroundColor: "transparent" },
+  sheetBgClip: {
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    overflow: "hidden",
+    backgroundColor: "rgba(16,13,10,0.72)",
+  },
+  sheetBgTint: {
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  handleIndicator: { backgroundColor: colors.borderStrong, width: ms(40) },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: ms(18),
+    paddingTop: ms(2),
+    paddingBottom: ms(8),
   },
   title: { color: colors.text, fontFamily: font.headline, fontSize: ms(17) },
-  seasonRow: { flexDirection: "row", flexWrap: "wrap", gap: ms(8), marginTop: ms(14), marginBottom: ms(6) },
+  closeBtn: { padding: ms(4) },
+
+  seasonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: ms(8),
+    paddingHorizontal: ms(18),
+    paddingBottom: ms(8),
+  },
   chip: {
     paddingHorizontal: ms(14),
     paddingVertical: ms(8),
@@ -185,7 +273,8 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: colors.honeySoft, borderColor: colors.honey },
   chipText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
   chipTextOn: { color: colors.honey },
-  list: { maxHeight: ms(300), marginTop: ms(6) },
+
+  listContent: { paddingHorizontal: ms(18), paddingBottom: ms(32) },
   epRow: {
     flexDirection: "row",
     alignItems: "flex-start",

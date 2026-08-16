@@ -66,6 +66,7 @@ export const Player: React.FC = () => {
   });
 
   const sheetRef = useRef<BottomSheetModal>(null);
+  const episodeSheetRef = useRef<BottomSheetModal>(null);
   const playerRef = useRef<PlayerHandle>(null);
   const controlsRef = useRef<PlayerControlsHandle>(null);
   const posRef = useRef(0);
@@ -78,7 +79,6 @@ export const Player: React.FC = () => {
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [showEpisodes, setShowEpisodes] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
 
   const displayTitle = title || "Bearoom";
@@ -275,7 +275,7 @@ export const Player: React.FC = () => {
                     setTimeout(() => playerRef.current?.readAudio(), 750);
                     setShowSettings(true);
                   }}
-                  onEpisodes={media.type === "tv" ? () => setShowEpisodes(true) : undefined}
+                  onEpisodes={media.type === "tv" ? () => episodeSheetRef.current?.present() : undefined}
                 />
               ) : null}
             </>
@@ -335,14 +335,15 @@ export const Player: React.FC = () => {
         onSetAudio={(label) => playerRef.current?.setAudio(label)}
       />
 
-      <EpisodeSheet
-        visible={showEpisodes}
-        onClose={() => setShowEpisodes(false)}
-        tmdbId={media.tmdbId}
-        season={media.season}
-        episode={media.episode}
-        onSelect={(s, e) => router.setParams({ season: String(s), ep: String(e) })}
-      />
+      {media.type === "tv" ? (
+        <EpisodeSheet
+          ref={episodeSheetRef}
+          tmdbId={media.tmdbId}
+          season={media.season}
+          episode={media.episode}
+          onSelect={(s, e) => router.setParams({ season: String(s), ep: String(e) })}
+        />
+      ) : null}
 
       <ProviderSheet ref={sheetRef} selectedId={selected.id} onSelect={onSelectProvider} />
     </>
