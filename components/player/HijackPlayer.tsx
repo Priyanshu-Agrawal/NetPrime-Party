@@ -38,7 +38,9 @@ export type PlayerEventType =
   | "waiting"
   | "playing"
   | "canplay"
-  | "tick";
+  | "tick"
+  | "enterfullscreen"
+  | "exitfullscreen";
 
 export interface PlayerEvent {
   event: PlayerEventType;
@@ -68,6 +70,9 @@ interface Props extends MediaRef {
   /** Non-controlling guest → hide the provider's seek bar / ±10s / play-pause
    *  (the host drives the timeline). Reactively toggled. */
   hideTransportControls?: boolean;
+  /** Take over the control surface: hide ALL videasy chrome (we render our own
+   *  overlay). Restored automatically in HTML5 fullscreen. */
+  nativeControls?: boolean;
 }
 
 /** If no <video> binds within this window, show a soft "still trying" banner
@@ -225,6 +230,30 @@ const BRIDGE_JS = `
     window.__vlGuest = !!on;
     try { __vlGuestStyleEl().textContent = on ? __vlGuestCss : ''; } catch(e){}
   };
+  // Full chrome-off: hide ALL of videasy's controls so our native overlay is the
+  // ONLY control surface. In HTML5 fullscreen we RESTORE them — our RN overlay
+  // sits behind the native fullscreen view, so quality/subs/server stay reachable
+  // there until we build native settings sheets.
+  var __vlChromeCss = '[class*="mobileCenterControls"]{display:none!important}'
+    + 'div.absolute.bottom-0.h-44{display:none!important}';
+  var __vlChromeActive = false;
+  function __vlChromeStyleEl(){
+    var el = document.getElementById('__vlChromeStyle');
+    if (!el){ el = document.createElement('style'); el.id = '__vlChromeStyle'; (document.head||document.documentElement).appendChild(el); }
+    return el;
+  }
+  function __vlApplyChrome(){
+    try { __vlChromeStyleEl().textContent = (__vlChromeActive && !document.fullscreenElement) ? __vlChromeCss : ''; } catch(e){}
+  }
+  window.__vlChromeOff = function(on){ __vlChromeActive = !!on; __vlApplyChrome(); };
+  document.addEventListener('fullscreenchange', function(){
+    __vlApplyChrome();
+    try {
+      post({ event: document.fullscreenElement ? 'enterfullscreen' : 'exitfullscreen',
+        currentTime: (vid && vid.currentTime) || 0, duration: (vid && vid.duration) || 0,
+        paused: vid ? !!vid.paused : true });
+    } catch(e){}
+  });
   true;
 })();
 `;
@@ -242,6 +271,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       onBound,
       onBindFailed,
       hideTransportControls,
+      nativeControls,
     },
     ref,
   ) => {
@@ -291,6 +321,13 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         `window.__vlSetGuest && window.__vlSetGuest(${hideTransportControls ? "true" : "false"}); true;`,
       );
     }, [hideTransportControls, bound]);
+
+    // Native-controls takeover: hide ALL videasy chrome (we render our own overlay).
+    useEffect(() => {
+      webRef.current?.injectJavaScript(
+        `window.__vlChromeOff && window.__vlChromeOff(${nativeControls ? "true" : "false"}); true;`,
+      );
+    }, [nativeControls, bound]);
 
     useEffect(() => {
       boundRef.current = false;
