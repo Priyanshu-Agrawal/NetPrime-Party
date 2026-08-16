@@ -3,20 +3,21 @@
  *
  * videasy's own chrome is hidden (HijackPlayer `__vlChromeOff`), so THIS is the
  * only control surface. Presentational + stateless about transport: the callbacks
- * route through the room authority in a party (host), so a press stays in sync for
- * everyone.
+ * route through the room authority in a party (host), so a press stays in sync.
  *
- * Host / controller: full transport — play/pause, ±10s, draggable scrub, time,
- * fullscreen. Guest: a read-only progress bar + time, a non-interactive play/pause
- * indicator, and — when their video is paused while the room is PLAYING (detached
- * or autoplay-stalled) — a "Tap to sync" that jumps them back to live (the tap is
- * also the browser gesture). A guest can never drive the room's timeline.
+ * Skin = the cozy cinema-lounge system (theme/bearoom + GlassCard): a warm
+ * gradient scrim, frosted-glass bottom bar, translucent honey-accented chips, and
+ * a honey CTA with glow. Host gets full transport; a guest gets a read-only bar +
+ * a non-interactive indicator, plus a "Tap to sync" when paused while the room
+ * plays.
  *
  * Playback state is pushed imperatively via the ref (`setPlayback`) so the parent
  * (party.tsx) doesn't re-render its chat list on every 1 s tick.
  */
-import { colors, font, ms, radius } from "@/theme/bearoom";
+import GlassCard from "@/components/ui/GlassCard";
+import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, {
   forwardRef,
   useCallback,
@@ -118,7 +119,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     }, [paused, scrubbing, clearHide]);
 
     useEffect(() => {
-      Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 180, useNativeDriver: true }).start();
+      Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 190, useNativeDriver: true }).start();
       if (visible) armHide();
       return clearHide;
     }, [visible, armHide, clearHide, fade]);
@@ -178,65 +179,78 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     return (
       <Pressable style={StyleSheet.absoluteFill} onPress={toggle}>
         <Animated.View
-          style={[StyleSheet.absoluteFill, styles.scrim, { opacity: fade }]}
+          style={[StyleSheet.absoluteFill, { opacity: fade }]}
           pointerEvents={visible ? "auto" : "none"}
         >
-          {/* Center */}
-          {canControl ? (
-            <View style={styles.centerRow} pointerEvents="box-none">
-              <Pressable style={styles.roundBtn} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
-                <MaterialIcons name="replay-10" size={ms(30)} color={colors.text} />
-              </Pressable>
-              <Pressable
-                style={styles.playBtn}
-                onPress={() => {
-                  if (paused) onPlay();
-                  else onPause();
-                  show();
-                }}
-                hitSlop={10}
-              >
-                <Ionicons name={paused ? "play" : "pause"} size={ms(34)} color={colors.onHoney} />
-              </Pressable>
-              <Pressable style={styles.roundBtn} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
-                <MaterialIcons name="forward-10" size={ms(30)} color={colors.text} />
-              </Pressable>
-            </View>
-          ) : outOfSync ? (
-            <View style={styles.centerRow} pointerEvents="box-none">
+          {/* Warm cinema scrim — subtle top vignette, stronger under the bar. */}
+          <LinearGradient
+            colors={["rgba(16,13,10,0.28)", "rgba(16,13,10,0.05)", "rgba(16,13,10,0.30)", "rgba(16,13,10,0.72)"]}
+            locations={[0, 0.4, 0.72, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+
+          {/* Center transport / indicator */}
+          <View style={styles.center} pointerEvents="box-none">
+            {canControl ? (
+              <View style={styles.centerRow} pointerEvents="box-none">
+                <Pressable style={styles.chip} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
+                  <MaterialIcons name="replay-10" size={ms(29)} color={colors.text} />
+                </Pressable>
+                <Pressable
+                  style={styles.playBtn}
+                  onPress={() => {
+                    if (paused) onPlay();
+                    else onPause();
+                    show();
+                  }}
+                  hitSlop={10}
+                >
+                  <Ionicons
+                    name={paused ? "play" : "pause"}
+                    size={ms(32)}
+                    color={colors.onHoney}
+                    style={paused ? { marginLeft: ms(3) } : undefined}
+                  />
+                </Pressable>
+                <Pressable style={styles.chip} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
+                  <MaterialIcons name="forward-10" size={ms(29)} color={colors.text} />
+                </Pressable>
+              </View>
+            ) : outOfSync ? (
               <Pressable style={styles.syncBtn} onPress={() => { onTapSync?.(); show(); }} hitSlop={10}>
-                <Ionicons name="flash" size={ms(17)} color={colors.onHoney} />
+                <Ionicons name="flash" size={ms(16)} color={colors.onHoney} />
                 <Text style={styles.syncText}>Tap to sync</Text>
               </Pressable>
-            </View>
-          ) : paused ? (
-            <View style={styles.centerRow} pointerEvents="none">
-              <View style={styles.indicator}>
-                <Ionicons name="play" size={ms(30)} color={colors.text} />
+            ) : paused ? (
+              <View style={styles.indicator} pointerEvents="none">
+                <Ionicons name="play" size={ms(28)} color={colors.honeyBright} style={{ marginLeft: ms(3) }} />
               </View>
-            </View>
-          ) : null}
-
-          {/* Bottom scrubber + time (read-only for guests) */}
-          <View style={styles.bottomBar} pointerEvents="box-none">
-            <Text style={styles.time}>{fmt(scrubbing ? scrubSec : currentTime)}</Text>
-            <View
-              style={styles.trackHit}
-              onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width)}
-              {...(canControl ? pan.panHandlers : {})}
-            >
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${progress * 100}%` }]} />
-                {canControl ? <View style={[styles.thumb, { left: `${progress * 100}%` }]} /> : null}
-              </View>
-            </View>
-            <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
-            {onToggleFullscreen ? (
-              <Pressable style={styles.fsBtn} onPress={onToggleFullscreen} hitSlop={8}>
-                <Ionicons name="expand" size={ms(18)} color={colors.text} />
-              </Pressable>
             ) : null}
           </View>
+
+          {/* Frosted-glass bottom bar: time · scrub · time · fullscreen */}
+          <GlassCard blur rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
+            <View style={styles.bottomRow} pointerEvents="box-none">
+              <Text style={styles.time}>{fmt(scrubbing ? scrubSec : currentTime)}</Text>
+              <View
+                style={styles.trackHit}
+                onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width)}
+                {...(canControl ? pan.panHandlers : {})}
+              >
+                <View style={styles.track}>
+                  <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+                  {canControl ? <View style={[styles.thumb, { left: `${progress * 100}%` }]} /> : null}
+                </View>
+              </View>
+              <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
+              {onToggleFullscreen ? (
+                <Pressable style={styles.fsBtn} onPress={onToggleFullscreen} hitSlop={8}>
+                  <Ionicons name="expand" size={ms(17)} color={colors.text} />
+                </Pressable>
+              ) : null}
+            </View>
+          </GlassCard>
         </Animated.View>
       </Pressable>
     );
@@ -246,31 +260,37 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
 PlayerControls.displayName = "PlayerControls";
 
 const styles = StyleSheet.create({
-  scrim: { backgroundColor: "rgba(6,4,3,0.32)", justifyContent: "center" },
-  centerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(28) },
-  roundBtn: {
+  center: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  centerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(26) },
+  // Translucent honey-accented glass chip (blur-free for perf — matches the party pills).
+  chip: {
     width: ms(52),
     height: ms(52),
-    borderRadius: ms(26),
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(20,15,11,0.45)",
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   playBtn: {
-    width: ms(64),
-    height: ms(64),
-    borderRadius: ms(32),
+    width: ms(66),
+    height: ms(66),
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honey,
+    ...glow.honey,
   },
   indicator: {
     width: ms(60),
     height: ms(60),
-    borderRadius: ms(30),
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(20,15,11,0.42)",
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honey,
   },
   syncBtn: {
     flexDirection: "row",
@@ -278,28 +298,39 @@ const styles = StyleSheet.create({
     gap: ms(8),
     backgroundColor: colors.honey,
     paddingHorizontal: ms(18),
-    paddingVertical: ms(10),
+    paddingVertical: ms(11),
     borderRadius: radius.pill,
+    ...glow.honey,
   },
   syncText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
   bottomBar: {
     position: "absolute",
     left: ms(10),
     right: ms(10),
-    bottom: ms(8),
+    bottom: ms(10),
+    ...glow.soft,
+  },
+  bottomRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(8),
+    gap: ms(9),
+    paddingHorizontal: ms(13),
+    paddingVertical: ms(8),
   },
   time: {
-    color: colors.text,
+    color: colors.textDim,
     fontFamily: font.label,
     fontSize: ms(11),
-    minWidth: ms(38),
+    minWidth: ms(40),
     textAlign: "center",
   },
-  trackHit: { flex: 1, height: ms(28), justifyContent: "center" },
-  track: { height: ms(4), borderRadius: ms(2), backgroundColor: "rgba(255,255,255,0.25)", overflow: "visible" },
+  trackHit: { flex: 1, height: ms(30), justifyContent: "center" },
+  track: {
+    height: ms(4),
+    borderRadius: ms(2),
+    backgroundColor: colors.surfaceStrong,
+    overflow: "visible",
+  },
   fill: { height: "100%", borderRadius: ms(2), backgroundColor: colors.honey },
   thumb: {
     position: "absolute",
@@ -309,9 +340,12 @@ const styles = StyleSheet.create({
     borderRadius: ms(7),
     marginLeft: -ms(7),
     marginTop: -ms(7),
-    backgroundColor: colors.honey,
+    backgroundColor: colors.honeyBright,
+    borderWidth: ms(2),
+    borderColor: colors.onHoney,
+    ...glow.honey,
   },
-  fsBtn: { width: ms(30), height: ms(30), alignItems: "center", justifyContent: "center" },
+  fsBtn: { width: ms(32), height: ms(32), alignItems: "center", justifyContent: "center" },
 });
 
 export default PlayerControls;
