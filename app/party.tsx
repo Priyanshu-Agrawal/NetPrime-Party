@@ -33,6 +33,8 @@ import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -162,6 +164,7 @@ export default function Party() {
   const [showGif, setShowGif] = useState(false);
   const [showPlayerSettings, setShowPlayerSettings] = useState(false);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [fullscreen, setFullscreen] = useState(false);
   // Latest known playback position (seconds) from the player — read when inserting.
   const posRef = useRef(0);
   // Live mm:ss shown on the in-field timestamp button; ticks only while composing.
@@ -235,6 +238,27 @@ export default function Party() {
   useEffect(() => {
     setPlayerBound(false);
   }, [providerId, media?.tmdbId, media?.season, media?.episode]);
+
+  // Native fullscreen: rotate + expand our player. (HTML5 requestFullscreen needs a
+  // gesture INSIDE the WebView that an RN tap can't supply, so we do it RN-side; our
+  // overlay stays on top.)
+  const toggleFullscreen = () => {
+    const next = !fullscreen;
+    setFullscreen(next);
+    (async () => {
+      try {
+        if (next) await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        else await ScreenOrientation.unlockAsync();
+      } catch {
+        /* orientation lock is best-effort */
+      }
+    })();
+  };
+  useEffect(() => {
+    return () => {
+      ScreenOrientation.unlockAsync().catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasMedia || !isBackgroundPlaybackAvailable()) {
@@ -372,6 +396,7 @@ export default function Party() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar hidden={fullscreen} style="light" />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -393,7 +418,7 @@ export default function Party() {
         </View>
 
         {/* Player */}
-        <View style={styles.player}>
+        <View style={fullscreen ? styles.playerFs : styles.player}>
           {party.error && /password/i.test(party.error) ? (
             <View style={styles.waiting}>
               <Ionicons name="lock-closed-outline" size={30} color={colors.honey} />
@@ -438,7 +463,7 @@ export default function Party() {
                   onPause={party.pause}
                   onSeekTo={party.seekTo}
                   onSeekBy={party.seekBy}
-                  onToggleFullscreen={() => playerRef.current?.fullscreen()}
+                  onToggleFullscreen={toggleFullscreen}
                   onTapSync={party.jumpToLive}
                   onOpenSettings={() => {
                     playerRef.current?.readQuality();
@@ -847,6 +872,16 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(12) },
 
   player: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black },
+  playerFs: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.black,
+    zIndex: 50,
+    elevation: 50,
+  },
   waiting: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 24 },
   waitingText: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14), textAlign: "center" },
 
