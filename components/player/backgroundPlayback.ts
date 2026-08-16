@@ -29,16 +29,16 @@ export async function startBackgroundPlaybackSession(
   artworkUrl: string | null,
 ): Promise<void> {
   if (!isBackgroundPlaybackAvailable() || !Native) return;
+  Native.start(title, artworkUrl ?? "");
   if (Platform.OS === "android" && Platform.Version >= 33) {
     try {
       await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
       );
     } catch {
-      /* session still starts; notification may be hidden */
+      /* session already started; notification may stay hidden if denied */
     }
   }
-  Native.start(title, artworkUrl ?? "");
 }
 
 export function updateBackgroundPlaybackState(

@@ -116,7 +116,10 @@ export function useParty(opts: {
       detached,
       kicked,
       error,
-      onPlayerEvent: (e) => engine.onPlayerEvent(e),
+      onPlayerEvent: (e) => {
+        engine.onPlayerEvent(e);
+        if (e.event === "tick") client.renewLeaseIfDue();
+      },
       play: () => void client.play(),
       pause: () => void client.pause(),
       seekBy: (deltaSec) => {

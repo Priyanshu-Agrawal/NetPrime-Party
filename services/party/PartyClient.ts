@@ -11,9 +11,11 @@
  *     broadcasts the returned snapshot for low-latency fan-out; the host also
  *     re-broadcasts on each lease heartbeat so guests re-anchor + detect liveness.
  *     Snapshots are applied newest-wins by (epoch, seq).
- *   - HOST is a leased role. The host renews its lease every ~2s. If the lease
- *     lapses (or the heartbeat goes silent), guests trigger party_claim_host with
- *     a joinedAt-ranked backoff; Postgres' row lock picks exactly one winner.
+ *   - HOST is a leased role. The host renews its lease every ~2s (RN interval
+ *     in the foreground, and again from HijackPlayer ticks so Android Home
+ *     does not drop the lease while the media pipeline is still alive). If the
+ *     lease lapses, guests trigger party_claim_host with a joinedAt-ranked
+ *     backoff; Postgres' row lock picks exactly one winner.
  *
  * PartyClient knows nothing about the video player — the sync engine sits on top
  * and drives the player from onSnapshot(playback) + now().
@@ -67,6 +69,8 @@ export class PartyClient {
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private claiming = false;
   private destroyed = false;
+  private lastLeaseRenewAt = 0;
+  private leaseRenewInFlight = false;
 
   private snapCb: ((s: RoomSnapshot) => void) | null = null;
   private connCb: ((n: number) => void) | null = null;
@@ -293,14 +297,29 @@ export class PartyClient {
   private reconcileRole(): void {
     if (this.destroyed) return;
     if (this.isHost && !this.leaseTimer) {
-      this.leaseTimer = setInterval(() => void this.renewLease(), LEASE_RENEW_INTERVAL_MS);
+      this.leaseTimer = setInterval(() => this.renewLeaseIfDue(), LEASE_RENEW_INTERVAL_MS);
     } else if (!this.isHost && this.leaseTimer) {
       clearInterval(this.leaseTimer);
       this.leaseTimer = null;
     }
   }
 
+  /**
+   * Host heartbeat. Safe to call from the player tick: RN's setInterval is
+   * paused on Android HostPause (Home), but Chromium ticks keep crossing the
+   * bridge while the FGS + AlwaysVisible WebView are up.
+   */
+  renewLeaseIfDue(): void {
+    if (this.destroyed || !this.isHost || this.leaseRenewInFlight) return;
+    const now = Date.now();
+    if (now - this.lastLeaseRenewAt < LEASE_RENEW_INTERVAL_MS) return;
+    this.lastLeaseRenewAt = now;
+    void this.renewLease();
+  }
+
   private async renewLease(): Promise<void> {
+    if (this.destroyed || !this.isHost) return;
+    this.leaseRenewInFlight = true;
     try {
       const { data, error } = await supabase.rpc("party_renew_lease", { p_code: this.code });
       if (error) throw error;
@@ -319,6 +338,8 @@ export class PartyClient {
       }
     } catch {
       // We're no longer host (taken over). Role reconciles on the next snapshot.
+    } finally {
+      this.leaseRenewInFlight = false;
     }
   }
 
