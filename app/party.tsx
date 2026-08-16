@@ -453,7 +453,9 @@ export default function Party() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // Android edge-to-edge (Expo SDK 53) stops `adjustResize` from lifting the RN
+        // layout, so the KAV must do it — behavior must NOT be undefined on Android.
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
