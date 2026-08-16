@@ -65,6 +65,8 @@ export interface PlayerControlsProps {
   onTapSync?: () => void;
   /** Open the player settings sheet (speed / quality). */
   onOpenSettings?: () => void;
+  /** Open the episode picker — provided only for TV shows. */
+  onEpisodes?: () => void;
 }
 
 const AUTO_HIDE_MS = 3800;
@@ -90,6 +92,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       onToggleFullscreen,
       onTapSync,
       onOpenSettings,
+      onEpisodes,
     },
     ref,
   ) => {
@@ -302,6 +305,18 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                 </View>
               </View>
               <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
+              {onEpisodes ? (
+                <Pressable
+                  style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]}
+                  onPress={() => {
+                    onEpisodes();
+                    show();
+                  }}
+                  hitSlop={8}
+                >
+                  <Ionicons name="list" size={ms(18)} color={colors.text} />
+                </Pressable>
+              ) : null}
               {onOpenSettings ? (
                 <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
                   <Ionicons name="settings-outline" size={ms(16)} color={colors.text} />

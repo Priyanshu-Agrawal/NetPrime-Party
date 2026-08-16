@@ -4,6 +4,7 @@ import HijackPlayer, {
   type PlayerHandle,
   type QualityLevel,
 } from "@/components/player/HijackPlayer";
+import EpisodeSheet from "@/components/player/EpisodeSheet";
 import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import ProviderSheet from "@/components/player/ProviderSheet";
@@ -77,6 +78,7 @@ export const Player: React.FC = () => {
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [showEpisodes, setShowEpisodes] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
 
   const displayTitle = title || "Bearoom";
@@ -87,7 +89,7 @@ export const Player: React.FC = () => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
   }, [navigation]);
 
-  // Provider changed → back to the pre-play gate; drop stale settings + session.
+  // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {
     setPlayerBound(false);
     setRate(1);
@@ -95,7 +97,7 @@ export const Player: React.FC = () => {
     setAudios([]);
     sessionStarted.current = false;
     stopBackgroundPlaybackSession();
-  }, [selected.id]);
+  }, [selected.id, season, ep]);
 
   // Leaving the screen (e.g. tapping "Watch Party", which PUSHES the party on top so
   // this screen stays mounted) must not leave the video playing behind it — pause it.
@@ -256,36 +258,35 @@ export const Player: React.FC = () => {
                     setTimeout(() => playerRef.current?.readAudio(), 750);
                     setShowSettings(true);
                   }}
+                  onEpisodes={media.type === "tv" ? () => setShowEpisodes(true) : undefined}
                 />
               ) : null}
             </>
           ) : null}
         </View>
 
-        {!fullscreen ? (
-          <>
-            <View style={styles.controlBar}>
-              <TouchableOpacity style={styles.serverBtn} onPress={() => sheetRef.current?.present()}>
-                <Ionicons name="server-outline" size={15} color={colors.textDim} />
-                <Text style={styles.serverBtnText} numberOfLines={1}>
-                  {selected.name}
-                </Text>
-                {canParty && <Ionicons name="paw" size={12} color={colors.honey} />}
-                <Ionicons name="chevron-up" size={15} color={colors.textDim} />
-              </TouchableOpacity>
+        {/* Kept mounted in fullscreen (the absolute player covers it) to avoid an
+            extra layout reflow during the rotation. */}
+        <View style={styles.controlBar}>
+          <TouchableOpacity style={styles.serverBtn} onPress={() => sheetRef.current?.present()}>
+            <Ionicons name="server-outline" size={15} color={colors.textDim} />
+            <Text style={styles.serverBtnText} numberOfLines={1}>
+              {selected.name}
+            </Text>
+            {canParty && <Ionicons name="paw" size={12} color={colors.honey} />}
+            <Ionicons name="chevron-up" size={15} color={colors.textDim} />
+          </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={startWatchParty}
-                disabled={!canParty}
-                style={[styles.partyBtn, !canParty && styles.partyBtnDisabled]}
-              >
-                <Ionicons name="people" size={15} color={canParty ? colors.onHoney : colors.textFaint} />
-                <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>Watch Party</Text>
-              </TouchableOpacity>
-            </View>
-            <HijackHint provider={selected} />
-          </>
-        ) : null}
+          <TouchableOpacity
+            onPress={startWatchParty}
+            disabled={!canParty}
+            style={[styles.partyBtn, !canParty && styles.partyBtnDisabled]}
+          >
+            <Ionicons name="people" size={15} color={canParty ? colors.onHoney : colors.textFaint} />
+            <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>Watch Party</Text>
+          </TouchableOpacity>
+        </View>
+        <HijackHint provider={selected} />
       </SafeAreaView>
 
       <PlayerSettingsSheet
@@ -301,6 +302,15 @@ export const Player: React.FC = () => {
         onSetQuality={(label) => playerRef.current?.setQuality(label)}
         audios={audios}
         onSetAudio={(label) => playerRef.current?.setAudio(label)}
+      />
+
+      <EpisodeSheet
+        visible={showEpisodes}
+        onClose={() => setShowEpisodes(false)}
+        tmdbId={media.tmdbId}
+        season={media.season}
+        episode={media.episode}
+        onSelect={(s, e) => router.setParams({ season: String(s), ep: String(e) })}
       />
 
       <ProviderSheet ref={sheetRef} selectedId={selected.id} onSelect={onSelectProvider} />
