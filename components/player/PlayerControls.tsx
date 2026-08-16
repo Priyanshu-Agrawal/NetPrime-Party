@@ -29,7 +29,6 @@ import React, {
 } from "react";
 import {
   Animated,
-  Easing,
   LayoutChangeEvent,
   PanResponder,
   Pressable,
@@ -97,7 +96,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     ref,
   ) => {
     const [paused, setPaused] = useState(true);
-    // Time shown on the LABEL (a 1/sec step is fine); the THUMB glides via progressAnim.
+    // Progress is stepwise (one setState per tick), NOT a 60 fps animation. A JS-driven
+    // width/left glide restarts every tick and congests the UI thread the WebView video
+    // renders on → the video hitches once a second. A per-tick step plays smoothly and
+    // is plenty for a scrubber.
     const [displayTime, setDisplayTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [visible, setVisible] = useState(true);
@@ -108,12 +110,8 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     // Commit-hold: after release, keep the thumb at the dropped spot until the video
     // actually reaches it — no snap-back to the stale live position, no jump.
     const seekTargetRef = useRef<number | null>(null);
-    // 0..1 track progress, animated so the thumb glides between 1 s ticks (JS-driven:
-    // width/left aren't native-drivable, but it's one cheap value).
-    const progressAnim = useRef(new Animated.Value(0)).current;
     const fade = useRef(new Animated.Value(1)).current;
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const fillPct = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
 
     // Parent pushes playback here every event — no parent re-render.
     useImperativeHandle(
@@ -125,7 +123,6 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             setDuration(s.duration);
             durationRef.current = s.duration;
           }
-          const dur = Number.isFinite(s.duration) ? s.duration : durationRef.current;
           // Committed seek reached its target → resume following live.
           if (seekTargetRef.current != null && Math.abs(s.currentTime - seekTargetRef.current) < 1.5) {
             seekTargetRef.current = null;
@@ -133,23 +130,9 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           // While dragging, or holding a committed seek, freeze the thumb + label.
           if (scrubbingRef.current || seekTargetRef.current != null || !Number.isFinite(s.currentTime)) return;
           setDisplayTime(s.currentTime);
-          if (dur > 0) {
-            const cur = Math.min(1, Math.max(0, s.currentTime / dur));
-            progressAnim.stopAnimation();
-            progressAnim.setValue(cur);
-            if (!s.paused) {
-              // Glide toward where the next tick will land so the thumb moves smoothly.
-              Animated.timing(progressAnim, {
-                toValue: Math.min(1, (s.currentTime + 1) / dur),
-                duration: 1000,
-                easing: Easing.linear,
-                useNativeDriver: false,
-              }).start();
-            }
-          }
         },
       }),
-      [progressAnim],
+      [],
     );
 
     const clearHide = useCallback(() => {
@@ -191,16 +174,9 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     );
 
     // Move the thumb + label to a position immediately (while dragging / on commit).
-    const showAt = useCallback(
-      (sec: number) => {
-        setDisplayTime(sec);
-        if (duration > 0) {
-          progressAnim.stopAnimation();
-          progressAnim.setValue(Math.min(1, Math.max(0, sec / duration)));
-        }
-      },
-      [duration, progressAnim],
-    );
+    const showAt = useCallback((sec: number) => {
+      setDisplayTime(sec);
+    }, []);
 
     const pan = useMemo(
       () =>
@@ -236,6 +212,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
 
     // Guest is stuck (video paused while the room plays) → offer a rejoin.
     const outOfSync = !canControl && paused && roomPlaying;
+
+    // Stepwise 0..1 progress for fill + thumb. displayTime already holds the drag/commit
+    // position while scrubbing and the live time otherwise, so this covers every state.
+    const progress = duration > 0 ? Math.min(1, Math.max(0, displayTime / duration)) : 0;
 
     return (
       <Pressable style={StyleSheet.absoluteFill} onPress={toggle}>
@@ -300,8 +280,8 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                 {...(canControl ? pan.panHandlers : {})}
               >
                 <View style={styles.track}>
-                  <Animated.View style={[styles.fill, { width: fillPct }]} />
-                  {canControl ? <Animated.View style={[styles.thumb, { left: fillPct }]} /> : null}
+                  <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+                  {canControl ? <View style={[styles.thumb, { left: `${progress * 100}%` }]} /> : null}
                 </View>
               </View>
               <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
