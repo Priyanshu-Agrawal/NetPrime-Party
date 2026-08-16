@@ -54,8 +54,13 @@ Have today: `__vlCmd(play|pause|seek|rate|fullscreen)`, `__soloCmd` (un-suppress
 - **P1 — Overlay + transport.** `__vlChromeOff`; Bearoom overlay: play/pause, ±10s, draggable seek
   (host → `party.seekTo`; guest read-only), time labels, fullscreen, auto-hide on idle + tap-to-show.
   Host/guest modes + guest **"Tap to sync."** Wire into `party.tsx`.
-- **P2 — Speed + Quality** sheets (Bearoom). Speed = `__vlCmd rate` (host; engine already syncs rate).
-  Quality = new bridge read/set.
+- **P2 — Speed + Quality** ✅ **DONE (`975a6fd`)** — `PlayerSettingsSheet` (frosted GlassCard) opened
+  from a gear button. **Speed** routes through the authority (`party.setRate` → `party_set_playback`
+  RPC → the anchor), **host-only, synced**. ⚠ The engine's drift correction was hard-coded to base-rate
+  1.0 (it did NOT sync non-1× rooms — the plan's old note was wrong); fixed to nudge around
+  `anchor.rate` (no-op for 1× rooms). **Quality** = bridge `__vlCmd({readQuality|setQuality})` driving
+  videasy's DOM via pointer-dispatch (hls.js isn't reachable); per-device. Device-verified: setQuality
+  '480p' → `videoHeight` 1080→480.
 - **P3 — Subtitles + Server/dub** sheets. Pointer-dispatch + read-back. Flag dub-not-synced.
 - **P4 — Close-guard.** ✅ **DONE this session** — `hooks/useMediaCloseGuard.ts`: Android hardware
   back + in-app back → themed confirm (throttled, resists accidental exit). Wired in `party.tsx`
