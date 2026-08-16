@@ -90,6 +90,12 @@ export class PartySyncEngine {
     this.applyAnchorNow();
   }
 
+  /** Foreground: snap followers to live. Detached guests stay detached. */
+  resync(): void {
+    if (this.detached) return;
+    this.applyAnchorNow();
+  }
+
   onPlayerEvent(e: PlayerEvent): void {
     if (Number.isFinite(e.currentTime)) this.lastCt = e.currentTime;
     // Anything reaching here is a USER action (bridge suppresses our own changes).

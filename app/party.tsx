@@ -8,6 +8,12 @@
  *
  * Cozy cinema-lounge skin (Stitch "Bearoom Watch Party").
  */
+import {
+  isBackgroundPlaybackAvailable,
+  startBackgroundPlaybackSession,
+  stopBackgroundPlaybackSession,
+  updateBackgroundPlaybackState,
+} from "@/components/player/backgroundPlayback";
 import HijackPlayer, {
   type PlayerEvent,
   type PlayerHandle,
@@ -26,6 +32,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
   Easing,
   FlatList,
   KeyboardAvoidingView,
@@ -185,6 +192,9 @@ export default function Party() {
   const canSeek = party.isHost || selfMember?.permissions?.canControlPlayback === true;
   const hasMedia = !!(providerId && media);
   const pendingCount = guests.filter((g) => g.approved === false).length;
+  const sessionStarted = useRef(false);
+  const sessionTitleRef = useRef("Bearoom party");
+  sessionTitleRef.current = media?.title || params.title || "Bearoom party";
 
   // Removed by the host → bounce out with a note.
   useEffect(() => {
@@ -193,6 +203,26 @@ export default function Party() {
       { text: "OK", onPress: () => router.back() },
     ]);
   }, [party.kicked, router]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") party.resync();
+    });
+    return () => sub.remove();
+  }, [party]);
+
+  useEffect(() => {
+    return () => {
+      sessionStarted.current = false;
+      stopBackgroundPlaybackSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hasMedia) return;
+    sessionStarted.current = false;
+    stopBackgroundPlaybackSession();
+  }, [hasMedia]);
 
   // Password-gated room → surface a password prompt (retry with the entered pw).
   useEffect(() => {
@@ -237,6 +267,32 @@ export default function Party() {
       }
     }
     party.onPlayerEvent(e);
+    if (!isBackgroundPlaybackAvailable()) return;
+    if (e.event === "ended") {
+      sessionStarted.current = false;
+      stopBackgroundPlaybackSession();
+      return;
+    }
+    if (
+      e.event !== "play" &&
+      e.event !== "pause" &&
+      e.event !== "seeked" &&
+      e.event !== "tick" &&
+      e.event !== "playing" &&
+      e.event !== "ready"
+    ) {
+      return;
+    }
+    if (!sessionStarted.current) {
+      if (e.paused) return;
+      sessionStarted.current = true;
+      void startBackgroundPlaybackSession(sessionTitleRef.current, null);
+    }
+    updateBackgroundPlaybackState(
+      e.paused,
+      Number(e.currentTime) || 0,
+      Number(e.duration) || 0,
+    );
   };
 
   // YouTube-style: drop the current media time into the draft as clickable text.

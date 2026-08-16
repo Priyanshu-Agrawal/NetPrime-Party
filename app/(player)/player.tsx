@@ -12,12 +12,12 @@ import {
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import {
   SOLO_BG_JS,
-  isSoloPlaybackNativeAvailable,
-  startSoloPlaybackSession,
-  stopSoloPlaybackSession,
-  subscribeSoloRemoteCommands,
-  updateSoloPlaybackState,
-} from "@/components/player/soloBackgroundBridge";
+  isBackgroundPlaybackAvailable,
+  startBackgroundPlaybackSession,
+  stopBackgroundPlaybackSession,
+  subscribeRemoteCommands,
+  updateBackgroundPlaybackState,
+} from "@/components/player/backgroundPlayback";
 import { addToWatchHistory } from "@/utils/history";
 import { img } from "@/utils/tmdbDetails";
 import { genRoomCode } from "@/utils/roomCode";
@@ -94,8 +94,8 @@ export const Player: React.FC = () => {
   }, [navigation]);
 
   useEffect(() => {
-    if (!isSoloPlaybackNativeAvailable()) return;
-    const unsub = subscribeSoloRemoteCommands((cmd) => {
+    if (!isBackgroundPlaybackAvailable()) return;
+    const unsub = subscribeRemoteCommands((cmd) => {
       const payload =
         cmd.action === "seek"
           ? { action: "seek", time: (cmd.positionMs ?? 0) / 1000 }
@@ -107,13 +107,13 @@ export const Player: React.FC = () => {
     return () => {
       unsub();
       sessionStarted.current = false;
-      stopSoloPlaybackSession();
+      stopBackgroundPlaybackSession();
     };
   }, []);
 
   useEffect(() => {
     sessionStarted.current = false;
-    stopSoloPlaybackSession();
+    stopBackgroundPlaybackSession();
   }, [selected.id]);
 
   useEffect(() => {
@@ -175,10 +175,10 @@ export const Player: React.FC = () => {
           data?.type === "tick" ||
           data?.type === "ended"
         ) {
-          if (!isSoloPlaybackNativeAvailable()) return;
+          if (!isBackgroundPlaybackAvailable()) return;
           if (data.type === "ended") {
             sessionStarted.current = false;
-            stopSoloPlaybackSession();
+            stopBackgroundPlaybackSession();
             return;
           }
           // Chromium pauses on hide — ignore unless this is a user/lock-screen command.
@@ -186,9 +186,9 @@ export const Player: React.FC = () => {
           if (!sessionStarted.current) {
             if (data.type !== "play" && data.paused) return;
             sessionStarted.current = true;
-            void startSoloPlaybackSession(displayTitle, artworkUrl);
+            void startBackgroundPlaybackSession(displayTitle, artworkUrl);
           }
-          updateSoloPlaybackState(
+          updateBackgroundPlaybackState(
             !!data.paused,
             Number(data.currentTime) || 0,
             Number(data.duration) || 0,

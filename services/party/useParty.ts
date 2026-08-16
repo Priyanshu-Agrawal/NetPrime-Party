@@ -38,6 +38,8 @@ export interface UseParty {
   // guest
   grabControl: () => Promise<void>;
   jumpToLive: () => void;
+  /** AppState active: snap to live unless detached. */
+  resync: () => void;
 }
 
 export function useParty(opts: {
@@ -132,6 +134,7 @@ export function useParty(opts: {
       kick: (uid) => client.kick(uid),
       grabControl: () => client.grabControl(),
       jumpToLive: () => engine.jumpToLive(),
+      resync: () => engine.resync(),
     }),
     [snapshot, connectedCount, detached, kicked, error, client, engine],
   );

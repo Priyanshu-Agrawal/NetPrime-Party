@@ -1,14 +1,9 @@
 /**
- * Solo-player Android background audio.
+ * Android background audio — native session wrapper + solo keep-alive JS.
  *
- * Chromium pauses <video> when document.hidden; Android 16 also mutes
- * background media without a MediaSession. This file is the JS half:
- * keep-alive (re-play only if wasPlaying) + a thin wrapper around the
- * BearoomPlayback native module (FGS + MediaSession).
- *
- * ⚠ Party must NOT import this — visibility-induced pause/play would
- * look like user controls and desync the room. ASK CLAUDE before any
- * party wiring.
+ * BearoomPlayback (FGS + MediaSession + AlwaysVisible) is shared. Party must
+ * NOT import SOLO_BG_JS (wrong message shape). Party keep-alive lives in
+ * HijackPlayer BRIDGE_JS. Party MAY import start/update/stop/subscribe.
  */
 import {
   DeviceEventEmitter,
@@ -25,15 +20,15 @@ type NativePlayback = {
 
 const Native = NativeModules.BearoomPlayback as NativePlayback | undefined;
 
-export function isSoloPlaybackNativeAvailable(): boolean {
+export function isBackgroundPlaybackAvailable(): boolean {
   return Platform.OS === "android" && Native != null;
 }
 
-export async function startSoloPlaybackSession(
+export async function startBackgroundPlaybackSession(
   title: string,
   artworkUrl: string | null,
 ): Promise<void> {
-  if (!isSoloPlaybackNativeAvailable() || !Native) return;
+  if (!isBackgroundPlaybackAvailable() || !Native) return;
   if (Platform.OS === "android" && Platform.Version >= 33) {
     try {
       await PermissionsAndroid.request(
@@ -46,7 +41,7 @@ export async function startSoloPlaybackSession(
   Native.start(title, artworkUrl ?? "");
 }
 
-export function updateSoloPlaybackState(
+export function updateBackgroundPlaybackState(
   paused: boolean,
   positionSec: number,
   durationSec: number,
@@ -54,19 +49,19 @@ export function updateSoloPlaybackState(
   Native?.updateState(paused, positionSec, durationSec);
 }
 
-export function stopSoloPlaybackSession(): void {
+export function stopBackgroundPlaybackSession(): void {
   Native?.stop();
 }
 
-export type SoloRemoteCommand = {
+export type RemoteCommand = {
   action: "play" | "pause" | "seek";
   positionMs?: number;
 };
 
-export function subscribeSoloRemoteCommands(
-  onCommand: (cmd: SoloRemoteCommand) => void,
+export function subscribeRemoteCommands(
+  onCommand: (cmd: RemoteCommand) => void,
 ): () => void {
-  if (!isSoloPlaybackNativeAvailable()) return () => {};
+  if (!isBackgroundPlaybackAvailable()) return () => {};
   const sub = DeviceEventEmitter.addListener("BearoomRemoteCommand", (raw: unknown) => {
     const data = raw as { action?: string; positionMs?: number } | null;
     if (!data || (data.action !== "play" && data.action !== "pause" && data.action !== "seek")) {

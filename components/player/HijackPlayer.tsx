@@ -17,8 +17,9 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
 import WebView from "react-native-webview";
+import { subscribeRemoteCommands } from "./backgroundPlayback";
 import {
   buildEmbedUrl,
   getProvider,
@@ -75,6 +76,10 @@ const BIND_TIMEOUT_MS = 30000;
  * document AND any same-origin iframes, relays its events to RN, and exposes
  * window.__vlCmd(cmd) so RN can drive it. An `applying` guard suppresses events
  * caused by our own programmatic changes (echo suppression).
+ *
+ * Background keep-alive lives HERE (do not import SOLO_BG_JS): wasPlaying is the
+ * INTENDED play-state, including engine __vlCmd. Chromium's hidden-pause is
+ * swallowed; lock-screen __soloCmd is un-suppressed so handleUserControl sees it.
  */
 const BRIDGE_JS = `
 (function(){
@@ -107,7 +112,7 @@ const BRIDGE_JS = `
     __addSt();
     document.addEventListener('DOMContentLoaded', __addSt);
   } catch(e){}
-  var vid = null, applying = 0;
+  var vid = null, applying = 0, wasPlaying = false;
   function markApplying(){ applying = Date.now() + 500; }
   function isApplying(){ return Date.now() < applying; }
   function findVideo(doc){
@@ -122,11 +127,24 @@ const BRIDGE_JS = `
     } catch(e){}
     return null;
   }
+  function keepAlive(){
+    if (!vid) vid = findVideo(document);
+    if (!vid) return;
+    if (document.hidden && wasPlaying && vid.paused) {
+      markApplying();
+      var kp = vid.play();
+      if (kp && kp.catch) kp.catch(function(){});
+    }
+  }
   function bind(v){
     if (!v || v.__vlBound) return; v.__vlBound = true; vid = v;
+    wasPlaying = !v.paused;
     ['play','pause','seeking','seeked','ended','waiting','playing','canplay'].forEach(function(ev){
       v.addEventListener(ev, function(){
+        if (ev === 'pause' && document.hidden && wasPlaying) { keepAlive(); return; }
         if (isApplying()) return;
+        if (ev === 'play' || ev === 'playing') wasPlaying = true;
+        if (ev === 'pause' || ev === 'ended') wasPlaying = false;
         post({ event:ev, currentTime:v.currentTime||0, duration:v.duration||0, paused:!!v.paused });
       });
     });
@@ -136,9 +154,18 @@ const BRIDGE_JS = `
     var v = findVideo(document);
     if (v){ clearInterval(finder); bind(v); }
   }, 700);
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) return;
+    keepAlive();
+    setTimeout(keepAlive, 50);
+    setTimeout(keepAlive, 250);
+    setTimeout(keepAlive, 1000);
+  });
   setInterval(function(){
+    keepAlive();
     if (vid) post({ event:'tick', currentTime:vid.currentTime||0, duration:vid.duration||0, paused:!!vid.paused });
   }, 1000);
+  window.__soloKeepAlive = keepAlive;
   window.__vlCmd = function(cmd){
     if (!vid) return;
     try {
@@ -147,13 +174,30 @@ const BRIDGE_JS = `
       // after it is needless AND harmful: the drift engine nudges playbackRate on
       // nearly every tick, and a blanket markApplying() there was swallowing the
       // user's real play/pause/seek taps during playback.
-      if (cmd.action === 'play') { markApplying(); var p = vid.play(); if (p && p.catch) p.catch(function(){}); }
-      else if (cmd.action === 'pause') { markApplying(); vid.pause(); }
+      if (cmd.action === 'play') { wasPlaying = true; markApplying(); var p = vid.play(); if (p && p.catch) p.catch(function(){}); }
+      else if (cmd.action === 'pause') { wasPlaying = false; markApplying(); vid.pause(); }
       else if (cmd.action === 'seek') { markApplying(); vid.currentTime = cmd.time; }
       else if (cmd.action === 'rate') { vid.playbackRate = cmd.rate; }
       else if (cmd.action === 'fullscreen') {
         var fs = vid.requestFullscreen || vid.webkitRequestFullscreen || vid.webkitEnterFullscreen || vid.mozRequestFullScreen;
         if (fs) fs.call(vid);
+      }
+    } catch(e){}
+  };
+  // Lock-screen / notification: drive video WITHOUT markApplying so genuine
+  // play/pause/seeked reach handleUserControl (host pauses room, guest detaches).
+  window.__soloCmd = function(cmd){
+    if (!vid || !cmd) return;
+    try {
+      if (cmd.action === 'play') {
+        wasPlaying = true;
+        var up = vid.play();
+        if (up && up.catch) up.catch(function(){});
+      } else if (cmd.action === 'pause') {
+        wasPlaying = false;
+        vid.pause();
+      } else if (cmd.action === 'seek' && typeof cmd.time === 'number') {
+        vid.currentTime = cmd.time;
       }
     } catch(e){}
   };
@@ -189,6 +233,20 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       }),
       [cmd],
     );
+
+    // Native Hub also injects __soloCmd; this JS path matches solo player.tsx.
+    useEffect(() => {
+      if (Platform.OS !== "android") return;
+      return subscribeRemoteCommands((remote) => {
+        const payload =
+          remote.action === "seek"
+            ? { action: "seek", time: (remote.positionMs ?? 0) / 1000 }
+            : { action: remote.action };
+        webRef.current?.injectJavaScript(
+          `try{window.__soloCmd(${JSON.stringify(payload)});}catch(e){} true;`,
+        );
+      });
+    }, []);
 
     useEffect(() => {
       boundRef.current = false;
