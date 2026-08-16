@@ -93,6 +93,8 @@ interface Props extends MediaRef {
   /** Take over the control surface: hide ALL videasy chrome (we render our own
    *  overlay). Restored automatically in HTML5 fullscreen. */
   nativeControls?: boolean;
+  /** Party embed (autoplay-off so members sync) vs. plain solo embed. Default true. */
+  party?: boolean;
 }
 
 /** If no <video> binds within this window, show a soft "still trying" banner
@@ -350,6 +352,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       onBindFailed,
       hideTransportControls,
       nativeControls,
+      party = true,
     },
     ref,
   ) => {
@@ -456,7 +459,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const uri = buildEmbedUrl(
       provider,
       { tmdbId, type, season, episode, startAt },
-      { party: true },
+      { party },
     );
 
     return (

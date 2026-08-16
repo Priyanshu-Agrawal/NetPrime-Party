@@ -1,27 +1,29 @@
 import HijackHint from "@/components/player/HijackHint";
+import HijackPlayer, {
+  type PlayerEvent,
+  type PlayerHandle,
+  type QualityLevel,
+} from "@/components/player/HijackPlayer";
+import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
+import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import ProviderSheet from "@/components/player/ProviderSheet";
 import {
-  buildEmbedUrl,
   getProvider,
-  isAllowedTopNav,
   isHijackable,
   PROVIDERS,
-  providerHosts,
   type Provider,
 } from "@/components/player/providerRegistry";
-import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import {
-  SOLO_BG_JS,
   isBackgroundPlaybackAvailable,
   startBackgroundPlaybackSession,
   stopBackgroundPlaybackSession,
-  subscribeRemoteCommands,
   updateBackgroundPlaybackState,
 } from "@/components/player/backgroundPlayback";
+import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
+import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
-import { img } from "@/utils/tmdbDetails";
 import { genRoomCode } from "@/utils/roomCode";
+import { img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useKeepAwake } from "expo-keep-awake";
@@ -29,45 +31,16 @@ import { useFocusEffect, useGlobalSearchParams, useNavigation, useRouter } from 
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import WebView from "react-native-webview";
 
 /**
- * SOLO playback = the multi-aggregator embed with a provider selector (full
- * catalog; solo watching only needs the embed to PLAY, no injection). Providers
- * we've verified are HIJACKABLE additionally expose a "Watch Party" button, which
- * launches the synchronized party on that provider (see providerRegistry /
- * hijackCapabilities). The server list lives in a bottom sheet (search + filter).
+ * SOLO playback = the SAME native player as the watch party (HijackPlayer + our
+ * PlayerControls overlay + settings sheet), just driven LOCALLY (no room authority).
+ * A provider selector switches the source; hijackable providers get the overlay,
+ * others fall back to the provider's own web controls. Background audio, fullscreen,
+ * and the close-guard carry over. The "Watch Party" button launches the synced party.
  */
-const ALL_HOSTS = Array.from(new Set(PROVIDERS.flatMap(providerHosts)));
-
-/** Popup / ad-redirect blocking + fullscreen relay. */
-const BLOCK_POPUPS_JS = `
-(function(){
-  try { window.open = function(){ return null; }; } catch(e){}
-  try {
-    document.addEventListener('click', function(ev){
-      var a = ev.target && ev.target.closest && ev.target.closest('a[target=_blank]');
-      if (a){ ev.preventDefault(); ev.stopPropagation(); }
-    }, true);
-  } catch(e){}
-  try {
-    document.addEventListener('fullscreenchange', function(){
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type:'fullscreenchange', isFullscreen: !!document.fullscreenElement }));
-    });
-  } catch(e){}
-  true;
-})();
-`;
-
 export const Player: React.FC = () => {
   useKeepAwake();
 
@@ -92,55 +65,60 @@ export const Player: React.FC = () => {
   });
 
   const sheetRef = useRef<BottomSheetModal>(null);
-  const webRef = useRef<WebView>(null);
+  const playerRef = useRef<PlayerHandle>(null);
+  const controlsRef = useRef<PlayerControlsHandle>(null);
+  const posRef = useRef(0);
   const sessionStarted = useRef(false);
+  const focusedRef = useRef(true);
   const [selected, setSelected] = useState<Provider>(PROVIDERS[0]);
+  // Our overlay mounts once the bridge binds a <video> (past the pre-play gate).
+  const [playerBound, setPlayerBound] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [audios, setAudios] = useState<QualityLevel[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const displayTitle = title || "Bearoom";
   const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
+  const canParty = isHijackable(selected);
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
   }, [navigation]);
 
-  // Leaving the solo screen (e.g. tapping "Watch Party", which PUSHES the party
-  // on top so this screen stays mounted) must not leave our <video> playing
-  // behind it: AlwaysVisibleRNCWebView + the foreground service keep the WebView
-  // decoding while it's off-top. Pause on blur. We do NOT stop the background
-  // session here — it's activity-wide and the party may have just started its own.
-  // (Blur does NOT fire on Home, so background audio for solo still works.)
+  // Provider changed → back to the pre-play gate; drop stale settings + session.
+  useEffect(() => {
+    setPlayerBound(false);
+    setRate(1);
+    setQualities([]);
+    setAudios([]);
+    sessionStarted.current = false;
+    stopBackgroundPlaybackSession();
+  }, [selected.id]);
+
+  // Leaving the screen (e.g. tapping "Watch Party", which PUSHES the party on top so
+  // this screen stays mounted) must not leave the video playing behind it — pause it.
+  // (Blur does NOT fire on Home, so background audio still works.)
   useFocusEffect(
     useCallback(() => {
+      focusedRef.current = true;
       return () => {
-        webRef.current?.injectJavaScript(
-          "try{var v=document.querySelector('video');if(v)v.pause();if(window.__soloCmd)window.__soloCmd({action:'pause'});}catch(e){} true;",
-        );
+        focusedRef.current = false;
+        playerRef.current?.pause();
       };
     }, []),
   );
 
-  useEffect(() => {
-    if (!isBackgroundPlaybackAvailable()) return;
-    const unsub = subscribeRemoteCommands((cmd) => {
-      const payload =
-        cmd.action === "seek"
-          ? { action: "seek", time: (cmd.positionMs ?? 0) / 1000 }
-          : { action: cmd.action };
-      webRef.current?.injectJavaScript(
-        `try{window.__soloCmd(${JSON.stringify(payload)});}catch(e){} true;`,
-      );
-    });
-    return () => {
-      unsub();
+  // Teardown: stop the background session + release orientation.
+  useEffect(
+    () => () => {
       sessionStarted.current = false;
       stopBackgroundPlaybackSession();
-    };
-  }, []);
-
-  useEffect(() => {
-    sessionStarted.current = false;
-    stopBackgroundPlaybackSession();
-  }, [selected.id]);
+      ScreenOrientation.unlockAsync().catch(() => {});
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -164,68 +142,62 @@ export const Player: React.FC = () => {
     [id, type, season, ep],
   );
 
-  const uri = useMemo(
-    () => (id ? buildEmbedUrl(selected, media) : "about:blank"),
-    [selected, media, id],
-  );
-
-  const onShouldStartLoad = useCallback(
-    (req: { url: string; isTopFrame?: boolean }) => isAllowedTopNav(ALL_HOSTS, req),
-    [],
-  );
-
-  const onMessage = useCallback(
-    (e: { nativeEvent: { data: string } }) => {
-      try {
-        const data = JSON.parse(e.nativeEvent.data) as {
-          type?: string;
-          isFullscreen?: boolean;
-          currentTime?: number;
-          duration?: number;
-          paused?: boolean;
-          hidden?: boolean;
-          user?: boolean;
-        };
-        if (data?.type === "fullscreenchange") {
-          if (data.isFullscreen) {
-            void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-          } else {
-            void ScreenOrientation.unlockAsync();
-          }
-          return;
-        }
-        if (
-          data?.type === "play" ||
-          data?.type === "pause" ||
-          data?.type === "seeked" ||
-          data?.type === "tick" ||
-          data?.type === "ended"
-        ) {
-          if (!isBackgroundPlaybackAvailable()) return;
-          if (data.type === "ended") {
-            sessionStarted.current = false;
-            stopBackgroundPlaybackSession();
-            return;
-          }
-          // Chromium pauses on hide — ignore unless this is a user/lock-screen command.
-          if (data.hidden && data.paused && !data.user) return;
-          if (!sessionStarted.current) {
-            if (data.type !== "play" && data.paused) return;
-            sessionStarted.current = true;
-            void startBackgroundPlaybackSession(displayTitle, artworkUrl);
-          }
-          updateBackgroundPlaybackState(
-            !!data.paused,
-            Number(data.currentTime) || 0,
-            Number(data.duration) || 0,
-          );
-        }
-      } catch {
-        /* ignore non-JSON page noise */
+  const onEvent = (e: PlayerEvent) => {
+    if (e.event === "quality") {
+      setQualities(e.qualities ?? []);
+      return;
+    }
+    if (e.event === "audio") {
+      setAudios(e.audios ?? []);
+      return;
+    }
+    if (Number.isFinite(e.currentTime)) posRef.current = e.currentTime;
+    controlsRef.current?.setPlayback({
+      currentTime: e.currentTime || 0,
+      duration: e.duration || 0,
+      paused: !!e.paused,
+    });
+    // Background audio (Android): start the FGS on real playback, keep it fed. Skip
+    // while blurred (e.g. behind the party) so we don't fight it for the shared session.
+    if (!focusedRef.current || !isBackgroundPlaybackAvailable()) return;
+    if (e.event === "ended") {
+      const dur = Number(e.duration) || 0;
+      const t = Number(e.currentTime) || 0;
+      if (dur > 5 && t >= dur - 1.5) {
+        sessionStarted.current = false;
+        stopBackgroundPlaybackSession();
       }
-    },
-    [artworkUrl, displayTitle],
-  );
+      return;
+    }
+    if (
+      e.event !== "play" &&
+      e.event !== "pause" &&
+      e.event !== "seeked" &&
+      e.event !== "tick" &&
+      e.event !== "playing" &&
+      e.event !== "ready"
+    ) {
+      return;
+    }
+    if (!sessionStarted.current) {
+      sessionStarted.current = true;
+      void startBackgroundPlaybackSession(displayTitle, artworkUrl);
+    }
+    updateBackgroundPlaybackState(e.paused, Number(e.currentTime) || 0, Number(e.duration) || 0);
+  };
+
+  const toggleFullscreen = () => {
+    const next = !fullscreen;
+    setFullscreen(next);
+    (async () => {
+      try {
+        if (next) await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        else await ScreenOrientation.unlockAsync();
+      } catch {
+        /* best-effort */
+      }
+    })();
+  };
 
   const startWatchParty = useCallback(() => {
     if (!isHijackable(selected) || !id) return;
@@ -249,73 +221,89 @@ export const Player: React.FC = () => {
     if (p) setSelected(p);
   }, []);
 
-  const canParty = isHijackable(selected);
-
   return (
     <>
-      <StatusBar style="light" translucent />
+      <StatusBar style="light" translucent hidden={fullscreen} />
       <SafeAreaView style={styles.container}>
-        <View style={styles.playerArea}>
-          <WebView
-            ref={webRef}
-            key={selected.id}
-            style={styles.webview}
-            source={{ uri }}
-            javaScriptEnabled
-            allowsFullscreenVideo
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            overScrollMode="never"
-            startInLoadingState
-            renderLoading={() => (
-              <View style={[StyleSheet.absoluteFill, styles.center]}>
-                <ActivityIndicator size="large" color={colors.honey} />
-              </View>
-            )}
-            setSupportMultipleWindows={false}
-            onOpenWindow={() => {
-              /* swallow popups */
-            }}
-            onShouldStartLoadWithRequest={onShouldStartLoad}
-            injectedJavaScriptBeforeContentLoaded={
-              BLOCK_POPUPS_JS + (Platform.OS === "android" ? SOLO_BG_JS : "")
-            }
-            onMessage={onMessage}
-          />
+        <View style={fullscreen ? styles.playerFs : styles.playerArea}>
+          {id ? (
+            <>
+              <HijackPlayer
+                ref={playerRef}
+                key={selected.id}
+                providerId={selected.id}
+                tmdbId={media.tmdbId}
+                type={media.type}
+                season={media.season}
+                episode={media.episode}
+                onPlayerEvent={onEvent}
+                onBound={() => setPlayerBound(true)}
+                nativeControls={playerBound}
+                party={false}
+              />
+              {playerBound ? (
+                <PlayerControls
+                  ref={controlsRef}
+                  canControl
+                  roomPlaying={false}
+                  onPlay={() => playerRef.current?.play()}
+                  onPause={() => playerRef.current?.pause()}
+                  onSeekTo={(sec) => playerRef.current?.seek(sec)}
+                  onSeekBy={(d) => playerRef.current?.seek(Math.max(0, posRef.current + d))}
+                  onToggleFullscreen={toggleFullscreen}
+                  onOpenSettings={() => {
+                    playerRef.current?.readQuality();
+                    setTimeout(() => playerRef.current?.readAudio(), 750);
+                    setShowSettings(true);
+                  }}
+                />
+              ) : null}
+            </>
+          ) : null}
         </View>
 
-        <View style={styles.controlBar}>
-          <TouchableOpacity
-            style={styles.serverBtn}
-            onPress={() => sheetRef.current?.present()}
-          >
-            <Ionicons name="server-outline" size={15} color={colors.textDim} />
-            <Text style={styles.serverBtnText} numberOfLines={1}>
-              {selected.name}
-            </Text>
-            {canParty && <Ionicons name="paw" size={12} color={colors.honey} />}
-            <Ionicons name="chevron-up" size={15} color={colors.textDim} />
-          </TouchableOpacity>
+        {!fullscreen ? (
+          <>
+            <View style={styles.controlBar}>
+              <TouchableOpacity style={styles.serverBtn} onPress={() => sheetRef.current?.present()}>
+                <Ionicons name="server-outline" size={15} color={colors.textDim} />
+                <Text style={styles.serverBtnText} numberOfLines={1}>
+                  {selected.name}
+                </Text>
+                {canParty && <Ionicons name="paw" size={12} color={colors.honey} />}
+                <Ionicons name="chevron-up" size={15} color={colors.textDim} />
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={startWatchParty}
-            disabled={!canParty}
-            style={[styles.partyBtn, !canParty && styles.partyBtnDisabled]}
-          >
-            <Ionicons name="people" size={15} color={canParty ? colors.onHoney : colors.textFaint} />
-            <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>
-              Watch Party
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <HijackHint provider={selected} />
+              <TouchableOpacity
+                onPress={startWatchParty}
+                disabled={!canParty}
+                style={[styles.partyBtn, !canParty && styles.partyBtnDisabled]}
+              >
+                <Ionicons name="people" size={15} color={canParty ? colors.onHoney : colors.textFaint} />
+                <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>Watch Party</Text>
+              </TouchableOpacity>
+            </View>
+            <HijackHint provider={selected} />
+          </>
+        ) : null}
       </SafeAreaView>
 
-      <ProviderSheet
-        ref={sheetRef}
-        selectedId={selected.id}
-        onSelect={onSelectProvider}
+      <PlayerSettingsSheet
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        canControl
+        rate={rate}
+        onSetRate={(r) => {
+          setRate(r);
+          playerRef.current?.setRate(r);
+        }}
+        qualities={qualities}
+        onSetQuality={(label) => playerRef.current?.setQuality(label)}
+        audios={audios}
+        onSetAudio={(label) => playerRef.current?.setAudio(label)}
       />
+
+      <ProviderSheet ref={sheetRef} selectedId={selected.id} onSelect={onSelectProvider} />
     </>
   );
 };
@@ -323,8 +311,16 @@ export const Player: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.black },
   playerArea: { flex: 1, backgroundColor: colors.black },
-  webview: { flex: 1, backgroundColor: colors.black },
-  center: { justifyContent: "center", alignItems: "center" },
+  playerFs: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.black,
+    zIndex: 50,
+    elevation: 50,
+  },
   controlBar: {
     flexDirection: "row",
     alignItems: "center",
