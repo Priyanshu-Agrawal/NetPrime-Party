@@ -24,6 +24,9 @@ export interface PlayerSettingsSheetProps {
   onSetRate: (rate: number) => void;
   qualities: QualityLevel[];
   onSetQuality: (label: string) => void;
+  /** Audio / dub tracks (per-device — NOT synced across the room). */
+  audios: QualityLevel[];
+  onSetAudio: (label: string) => void;
 }
 
 export default function PlayerSettingsSheet({
@@ -34,6 +37,8 @@ export default function PlayerSettingsSheet({
   onSetRate,
   qualities,
   onSetQuality,
+  audios,
+  onSetAudio,
 }: PlayerSettingsSheetProps) {
   const insets = useSafeAreaInsets();
   return (
@@ -60,6 +65,23 @@ export default function PlayerSettingsSheet({
                   </View>
                 </>
               ) : null}
+
+              <Text style={styles.section}>AUDIO</Text>
+              <View style={styles.row}>
+                {audios.length ? (
+                  audios.map((a) => (
+                    <Pressable
+                      key={a.label}
+                      style={[styles.chip, a.active && styles.chipOn]}
+                      onPress={() => onSetAudio(a.label)}
+                    >
+                      <Text style={[styles.chipText, a.active && styles.chipTextOn]}>{a.label}</Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.dim}>Loading…</Text>
+                )}
+              </View>
 
               <Text style={styles.section}>QUALITY</Text>
               <View style={styles.row}>

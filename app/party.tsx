@@ -164,6 +164,7 @@ export default function Party() {
   const [showGif, setShowGif] = useState(false);
   const [showPlayerSettings, setShowPlayerSettings] = useState(false);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   // Latest known playback position (seconds) from the player — read when inserting.
   const posRef = useRef(0);
@@ -310,6 +311,10 @@ export default function Party() {
   const onEvent = (e: PlayerEvent) => {
     if (e.event === "quality") {
       setQualities(e.qualities ?? []);
+      return;
+    }
+    if (e.event === "audio") {
+      setAudios(e.audios ?? []);
       return;
     }
     if (Number.isFinite(e.currentTime)) {
@@ -467,6 +472,7 @@ export default function Party() {
                   onTapSync={party.jumpToLive}
                   onOpenSettings={() => {
                     playerRef.current?.readQuality();
+                    playerRef.current?.readAudio();
                     setShowPlayerSettings(true);
                   }}
                 />
@@ -645,6 +651,8 @@ export default function Party() {
         onSetRate={(r) => party.setRate(r)}
         qualities={qualities}
         onSetQuality={(label) => playerRef.current?.setQuality(label)}
+        audios={audios}
+        onSetAudio={(label) => playerRef.current?.setAudio(label)}
       />
 
       {/* Guest: password prompt for a protected room */}

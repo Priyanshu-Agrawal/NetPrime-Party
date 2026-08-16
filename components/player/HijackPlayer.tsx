@@ -41,10 +41,11 @@ export type PlayerEventType =
   | "tick"
   | "enterfullscreen"
   | "exitfullscreen"
-  | "quality";
+  | "quality"
+  | "audio";
 
 export interface QualityLevel {
-  /** Clean resolution label, e.g. "1080p" / "720p" / "Auto". */
+  /** Clean label — "1080p"/"Auto" for quality, "Hindi"/"Original" for audio/dub. */
   label: string;
   active: boolean;
 }
@@ -56,6 +57,8 @@ export interface PlayerEvent {
   paused: boolean;
   /** Only on a "quality" event — the provider's available quality levels. */
   qualities?: QualityLevel[];
+  /** Only on an "audio" event — the provider's available audio/dub tracks. */
+  audios?: QualityLevel[];
 }
 
 export interface PlayerHandle {
@@ -69,6 +72,10 @@ export interface PlayerHandle {
   readQuality(): void;
   /** Switch quality by label (drives videasy's DOM via pointer-dispatch). */
   setQuality(label: string): void;
+  /** Read audio/dub tracks → emits an "audio" PlayerEvent. */
+  readAudio(): void;
+  /** Switch audio/dub by language label (per-device, not synced across the room). */
+  setAudio(label: string): void;
 }
 
 interface Props extends MediaRef {
@@ -190,20 +197,6 @@ const BRIDGE_JS = `
   // --- Quality (videasy's settings tab; hls.js isn't reachable, so drive the DOM
   // with the SAME pointer-dispatch recipe the dub switch needs — verified: it
   // flips the active option AND the <video> resolution actually changes). ---
-  function __vlQualityLabel(t){ t=(t||'').trim(); if(t.indexOf('Auto')===0) return 'Auto'; var i=0; while(i<t.length&&t[i]>='0'&&t[i]<='9')i++; return (i>0&&t[i]==='p')?t.slice(0,i+1):t.slice(0,8); }
-  function __vlIsQuality(t){ t=(t||'').trim(); if(t.indexOf('Auto')===0) return true; var i=0; while(i<t.length&&t[i]>='0'&&t[i]<='9')i++; return i>0&&t[i]==='p'; }
-  function __vlQualityButtons(){ return Array.prototype.slice.call(document.querySelectorAll('button')).filter(function(b){ return __vlIsQuality(b.textContent); }); }
-  function __vlReadQuality(){
-    try {
-      var seen={}, qs=[];
-      __vlQualityButtons().forEach(function(b){
-        var label=__vlQualityLabel(b.textContent);
-        if(seen[label]) return; seen[label]=1;
-        qs.push({ label:label, active:(b.className||'').indexOf('primary')>=0 });
-      });
-      post({ event:'quality', currentTime:(vid&&vid.currentTime)||0, duration:(vid&&vid.duration)||0, paused:vid?!!vid.paused:true, qualities:qs });
-    } catch(e){}
-  }
   function __vlPointerHit(el){
     if(!el) return;
     try {
@@ -213,11 +206,47 @@ const BRIDGE_JS = `
       });
     } catch(e){}
   }
+  // Radix only renders the ACTIVE settings tab's options → activate before read/set.
+  function __vlActivateTab(tab){ __vlPointerHit(document.querySelector('[id*="trigger-'+tab+'"]')); }
+  function __vlCamelLast(s){ var m=(s||'').match(/[A-Z][a-z]+/g); return m?m[m.length-1]:''; }
+  function __vlOn(b){ return (b.className||'').indexOf('primary')>=0; }
+  function __vlQualityLabel(t){ t=(t||'').trim(); if(t.indexOf('Auto')===0) return 'Auto'; var i=0; while(i<t.length&&t[i]>='0'&&t[i]<='9')i++; return (i>0&&t[i]==='p')?t.slice(0,i+1):t.slice(0,8); }
+  function __vlIsQuality(t){ t=(t||'').trim(); if(t.indexOf('Auto')===0) return true; var i=0; while(i<t.length&&t[i]>='0'&&t[i]<='9')i++; return i>0&&t[i]==='p'; }
+  function __vlQualityButtons(){ return Array.prototype.slice.call(document.querySelectorAll('button')).filter(function(b){ return __vlIsQuality(b.textContent); }); }
+  function __vlReadQuality(){
+    __vlActivateTab('Quality');
+    setTimeout(function(){
+      try {
+        var seen={}, qs=[];
+        __vlQualityButtons().forEach(function(b){ var label=__vlQualityLabel(b.textContent); if(seen[label])return; seen[label]=1; qs.push({label:label, active:__vlOn(b)}); });
+        post({ event:'quality', currentTime:(vid&&vid.currentTime)||0, duration:(vid&&vid.duration)||0, paused:vid?!!vid.paused:true, qualities:qs });
+      } catch(e){}
+    }, 340);
+  }
   function __vlSetQuality(label){
-    try {
-      var b=__vlQualityButtons().filter(function(x){ return __vlQualityLabel(x.textContent)===label; })[0];
-      if(b){ __vlPointerHit(b); setTimeout(__vlReadQuality,500); }
-    } catch(e){}
+    __vlActivateTab('Quality');
+    setTimeout(function(){
+      try { var b=__vlQualityButtons().filter(function(x){ return __vlQualityLabel(x.textContent)===label; })[0]; if(b){ __vlPointerHit(b); setTimeout(__vlReadQuality,600); } } catch(e){}
+    }, 300);
+  }
+  // Audio / dub = videasy's "Servers" tab: buttons like "FadeHindi audio" → language.
+  function __vlAudioButtons(){ return Array.prototype.slice.call(document.querySelectorAll('button')).filter(function(b){ var t=(b.textContent||'').trim(); return t.toLowerCase().indexOf('audio')>=0 && t.length<44 && !(b.id&&b.id.indexOf('trigger-')>=0); }); }
+  function __vlAudioLang(b){ var t=(b.textContent||'').trim(); return __vlCamelLast(t.split('audio')[0]) || t.slice(0,10); }
+  function __vlReadAudio(){
+    __vlActivateTab('Servers');
+    setTimeout(function(){
+      try {
+        var seen={}, as=[];
+        __vlAudioButtons().forEach(function(b){ var lang=__vlAudioLang(b); if(!lang)return; if(seen[lang]){ if(__vlOn(b)) as.forEach(function(o){if(o.label===lang)o.active=true;}); return; } seen[lang]=1; as.push({label:lang, active:__vlOn(b)}); });
+        post({ event:'audio', currentTime:(vid&&vid.currentTime)||0, duration:(vid&&vid.duration)||0, paused:vid?!!vid.paused:true, audios:as });
+      } catch(e){}
+    }, 360);
+  }
+  function __vlSetAudio(label){
+    __vlActivateTab('Servers');
+    setTimeout(function(){
+      try { var b=__vlAudioButtons().filter(function(x){ return __vlAudioLang(x)===label; })[0]; if(b){ __vlPointerHit(b); setTimeout(__vlReadAudio,900); } } catch(e){}
+    }, 300);
   }
   window.__vlCmd = function(cmd){
     if (!vid) return;
@@ -237,6 +266,8 @@ const BRIDGE_JS = `
       }
       else if (cmd.action === 'readQuality') { __vlReadQuality(); }
       else if (cmd.action === 'setQuality') { __vlSetQuality(cmd.label); }
+      else if (cmd.action === 'readAudio') { __vlReadAudio(); }
+      else if (cmd.action === 'setAudio') { __vlSetAudio(cmd.label); }
     } catch(e){}
   };
   // Lock-screen / notification: drive video WITHOUT markApplying so genuine
@@ -344,6 +375,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         fullscreen: () => cmd({ action: "fullscreen" }),
         readQuality: () => cmd({ action: "readQuality" }),
         setQuality: (label: string) => cmd({ action: "setQuality", label }),
+        readAudio: () => cmd({ action: "readAudio" }),
+        setAudio: (label: string) => cmd({ action: "setAudio", label }),
       }),
       [cmd],
     );
