@@ -19,8 +19,8 @@ visibility**, not the FGS. Pre-spike: after Home, `document.visibilityState ===
 `AlwaysVisibleRNCWebView` subclass (gated by `forceWindowVisible`, set only
 while the solo MediaSession is running) forces `onWindowVisibilityChanged(VISIBLE)`
 and keeps a non-zero layout. After Home, `visibilityState` stays `'visible'`,
-`readyState` stays 4, and `currentTime` advances in real time (emulator API 36).
-⚠ Not yet re-confirmed on a **physical device**. Screen-off / lock is a separate
+`readyState` stays 4, and `currentTime` advances in real time — verified on emulator API 36 **and** a
+physical Nothing Phone 1 (A063, API 35). Screen-off / lock is a separate
 question from Home; Android PiP is a separate floating-window feature, not this.
 Party must **not** set `forceWindowVisible` (visibility pause would look like a
 user control).
