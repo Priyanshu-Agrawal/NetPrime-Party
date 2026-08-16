@@ -65,6 +65,9 @@ interface Props extends MediaRef {
   onBound?: () => void;
   /** Fires if the bridge never bound a <video> (provider not controllable here). */
   onBindFailed?: () => void;
+  /** Non-controlling guest → hide the provider's seek bar / ±10s / play-pause
+   *  (the host drives the timeline). Reactively toggled. */
+  hideTransportControls?: boolean;
 }
 
 /** If no <video> binds within this window, show a soft "still trying" banner
@@ -201,13 +204,45 @@ const BRIDGE_JS = `
       }
     } catch(e){}
   };
+  // Guest transport-hide: hide the seek bar + play/pause + ±10s for a
+  // non-controlling guest (the host owns the timeline). Toggled from RN via
+  // window.__vlSetGuest(on). Selectors verified via CDP on player.videasy.to
+  // (mobile): [class*=mobileCenterControls] wraps rewind-10 / play-pause /
+  // forward-10; the seek bar is a .cursor-pointer container holding a
+  // [class*=videoSeekBar] fill. Fullscreen (#ButtonFullscreen) + settings tabs
+  // are left alone. A <style> survives React re-renders (selectors re-match).
+  var __vlGuestCss = '[class*="mobileCenterControls"]{display:none!important}'
+    + '#ButtonPlay{display:none!important}'
+    + '[class*="videoSeekBar"]{display:none!important}'
+    + 'div.cursor-pointer:has([class*="videoSeekBar"]){display:none!important}';
+  function __vlGuestStyleEl(){
+    var el = document.getElementById('__vlGuestStyle');
+    if (!el){ el = document.createElement('style'); el.id = '__vlGuestStyle'; (document.head||document.documentElement).appendChild(el); }
+    return el;
+  }
+  window.__vlGuest = false;
+  window.__vlSetGuest = function(on){
+    window.__vlGuest = !!on;
+    try { __vlGuestStyleEl().textContent = on ? __vlGuestCss : ''; } catch(e){}
+  };
   true;
 })();
 `;
 
 export const HijackPlayer = forwardRef<PlayerHandle, Props>(
   (
-    { providerId, tmdbId, type, season, episode, startAt, onPlayerEvent, onBound, onBindFailed },
+    {
+      providerId,
+      tmdbId,
+      type,
+      season,
+      episode,
+      startAt,
+      onPlayerEvent,
+      onBound,
+      onBindFailed,
+      hideTransportControls,
+    },
     ref,
   ) => {
     const webRef = useRef<WebView>(null);
@@ -247,6 +282,15 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         );
       });
     }, []);
+
+    // Non-controlling guest → hide the provider's transport controls. Re-applied
+    // when `bound` flips so it lands even if the prop was set before the bridge
+    // loaded (an injectJavaScript before __vlSetGuest exists is a harmless no-op).
+    useEffect(() => {
+      webRef.current?.injectJavaScript(
+        `window.__vlSetGuest && window.__vlSetGuest(${hideTransportControls ? "true" : "false"}); true;`,
+      );
+    }, [hideTransportControls, bound]);
 
     useEffect(() => {
       boundRef.current = false;

@@ -212,17 +212,18 @@ export default function Party() {
   }, [party]);
 
   useEffect(() => {
+    if (!hasMedia || !isBackgroundPlaybackAvailable()) {
+      sessionStarted.current = false;
+      stopBackgroundPlaybackSession();
+      return;
+    }
+    sessionStarted.current = true;
+    void startBackgroundPlaybackSession(sessionTitleRef.current, null);
     return () => {
       sessionStarted.current = false;
       stopBackgroundPlaybackSession();
     };
-  }, []);
-
-  useEffect(() => {
-    if (hasMedia) return;
-    sessionStarted.current = false;
-    stopBackgroundPlaybackSession();
-  }, [hasMedia]);
+  }, [hasMedia, providerId, media?.tmdbId]);
 
   // Password-gated room → surface a password prompt (retry with the entered pw).
   useEffect(() => {
@@ -269,8 +270,12 @@ export default function Party() {
     party.onPlayerEvent(e);
     if (!isBackgroundPlaybackAvailable()) return;
     if (e.event === "ended") {
-      sessionStarted.current = false;
-      stopBackgroundPlaybackSession();
+      const dur = Number(e.duration) || 0;
+      const t = Number(e.currentTime) || 0;
+      if (dur > 5 && t >= dur - 1.5) {
+        sessionStarted.current = false;
+        stopBackgroundPlaybackSession();
+      }
       return;
     }
     if (
@@ -284,7 +289,6 @@ export default function Party() {
       return;
     }
     if (!sessionStarted.current) {
-      if (e.paused) return;
       sessionStarted.current = true;
       void startBackgroundPlaybackSession(sessionTitleRef.current, null);
     }
@@ -383,6 +387,7 @@ export default function Party() {
               season={media.season}
               episode={media.episode}
               onPlayerEvent={onEvent}
+              hideTransportControls={!canSeek}
             />
           ) : (
             <View style={styles.waiting}>
