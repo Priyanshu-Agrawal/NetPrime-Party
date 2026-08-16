@@ -57,6 +57,17 @@ const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 // Stable empty reference so `members` doesn't churn memo deps before the snapshot lands.
 const EMPTY_MEMBERS: Member[] = [];
 
+// Group a sender's consecutive messages sent within this window (WhatsApp/IG-style):
+// avatar + name shown once per group, bubbles tight-stacked, one timestamp at the end.
+const CHAT_GROUP_MS = 4 * 60 * 1000;
+// A stable, readable accent per sender (name + avatar) so a group chat is easy to scan.
+const SENDER_COLORS = ["#F0A93C", "#E8759B", "#63B3E8", "#7FD6A6", "#C79BF0", "#E8B24B", "#5FD2C6", "#F0906A"];
+function senderColor(userId: string): string {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) | 0;
+  return SENDER_COLORS[Math.abs(h) % SENDER_COLORS.length];
+}
+
 /** Media position (seconds) → "m:ss" (or "h:mm:ss" past an hour). */
 function fmtMedia(sec: number): string {
   const s = Math.max(0, Math.floor(sec || 0));
@@ -584,7 +595,20 @@ export default function Party() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <Bubble msg={item} onSeek={seekToMoment} />}
+          renderItem={({ item, index }) => {
+            const prev = chat.messages[index - 1];
+            const next = chat.messages[index + 1];
+            const groupedPrev = !!prev && prev.userId === item.userId && item.ts - prev.ts < CHAT_GROUP_MS;
+            const groupedNext = !!next && next.userId === item.userId && next.ts - item.ts < CHAT_GROUP_MS;
+            return (
+              <Bubble
+                msg={item}
+                onSeek={seekToMoment}
+                firstOfGroup={!groupedPrev}
+                lastOfGroup={!groupedNext}
+              />
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.chatEmpty}>
               <Ionicons name="chatbubbles-outline" size={26} color={colors.textFaint} />
@@ -802,34 +826,64 @@ function Meta({ msg, mine }: { msg: ChatMessage; mine?: boolean }) {
   );
 }
 
-function Bubble({ msg, onSeek }: { msg: ChatMessage; onSeek: (sec: number) => void }) {
+function Bubble({
+  msg,
+  onSeek,
+  firstOfGroup,
+  lastOfGroup,
+}: {
+  msg: ChatMessage;
+  onSeek: (sec: number) => void;
+  firstOfGroup: boolean;
+  lastOfGroup: boolean;
+}) {
   const isGif = msg.kind === "gif" && !!msg.gifUrl;
-  const content = isGif ? (
-    <GifBubble msg={msg} />
-  ) : (
-    <View style={[styles.bubble, msg.mine ? styles.bubbleMine : styles.bubbleOther]}>
-      <MessageText text={msg.text} onSeek={onSeek} />
-    </View>
-  );
+  const gap = firstOfGroup ? styles.groupGap : styles.groupTight;
+
   if (msg.mine) {
     return (
-      <View style={[styles.bubbleRow, styles.bubbleRowMine]}>
+      <View style={[styles.bubbleRow, styles.bubbleRowMine, gap]}>
         <View style={styles.bubbleColMine}>
-          {content}
-          <Meta msg={msg} mine />
+          {isGif ? (
+            <GifBubble msg={msg} />
+          ) : (
+            <View style={[styles.bubble, styles.bubbleMine]}>
+              <MessageText text={msg.text} onSeek={onSeek} />
+            </View>
+          )}
+          {lastOfGroup ? <Meta msg={msg} mine /> : null}
         </View>
       </View>
     );
   }
+
+  // Incoming: per-sender colored name (top of group) + avatar (bottom of group).
+  const color = senderColor(msg.userId);
   return (
-    <View style={styles.bubbleRow}>
-      <View style={styles.bubbleAvatar}>
-        <Text style={styles.bubbleAvatarText}>{(msg.name || "G").charAt(0).toUpperCase()}</Text>
+    <View style={[styles.bubbleRow, gap]}>
+      <View style={styles.avatarCol}>
+        {lastOfGroup ? (
+          <View style={[styles.bubbleAvatar, { backgroundColor: color + "2E", borderColor: color + "66" }]}>
+            <Text style={[styles.bubbleAvatarText, { color }]}>
+              {(msg.name || "G").charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        ) : null}
       </View>
       <View style={styles.bubbleCol}>
-        <Text style={styles.bubbleName}>{msg.name || "Guest"}</Text>
-        {content}
-        <Meta msg={msg} />
+        {firstOfGroup ? (
+          <Text style={[styles.bubbleName, { color }]} numberOfLines={1}>
+            {msg.name || "Guest"}
+          </Text>
+        ) : null}
+        {isGif ? (
+          <GifBubble msg={msg} />
+        ) : (
+          <View style={[styles.bubble, styles.bubbleOther]}>
+            <MessageText text={msg.text} onSeek={onSeek} />
+          </View>
+        )}
+        {lastOfGroup ? <Meta msg={msg} /> : null}
       </View>
     </View>
   );
@@ -1001,34 +1055,35 @@ const styles = StyleSheet.create({
 
   bubbleRow: { flexDirection: "row", alignItems: "flex-end", gap: ms(8), maxWidth: "86%" },
   bubbleRowMine: { alignSelf: "flex-end" },
+  // Group spacing: a clear break before a new sender, tight stacking within a run.
+  groupGap: { marginTop: ms(10) },
+  groupTight: { marginTop: ms(2) },
+  // Fixed-width left column so grouped bubbles indent under the (bottom) avatar.
+  avatarCol: { width: ms(28) },
   bubbleAvatar: {
     width: ms(28),
     height: ms(28),
     borderRadius: radius.pill,
-    backgroundColor: colors.bgElevated,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  bubbleAvatarText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(11) },
-  bubbleCol: { gap: 4, flexShrink: 1 },
-  bubbleName: { color: colors.textDim, fontFamily: font.label, fontSize: ms(10), marginLeft: 4 },
-  bubble: { paddingHorizontal: ms(14), paddingVertical: ms(10), borderRadius: radius.lg },
+  bubbleAvatarText: { fontFamily: font.bodySemi, fontSize: ms(12) },
+  bubbleCol: { gap: ms(3), flexShrink: 1 },
+  bubbleName: { fontFamily: font.bodySemi, fontSize: ms(11.5), marginLeft: ms(6), marginBottom: ms(1) },
+  bubble: { paddingHorizontal: ms(14), paddingVertical: ms(9), borderRadius: ms(18) },
   bubbleOther: {
     backgroundColor: colors.surfaceStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    borderBottomLeftRadius: 4,
   },
   bubbleMine: {
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(240,169,60,0.3)",
-    borderBottomRightRadius: 4,
   },
   bubbleText: { color: colors.text, fontFamily: font.body, fontSize: ms(13), lineHeight: ms(18) },
-  bubbleColMine: { alignItems: "flex-end", gap: 4, flexShrink: 1 },
+  bubbleColMine: { alignItems: "flex-end", gap: ms(3), flexShrink: 1 },
 
   metaRow: { flexDirection: "row", alignItems: "center", gap: ms(6), marginLeft: 4 },
   metaRowMine: { justifyContent: "flex-end", marginLeft: 0, marginRight: 2 },
