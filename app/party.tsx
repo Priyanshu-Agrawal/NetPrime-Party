@@ -24,6 +24,7 @@ import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import GifPicker from "@/components/party/GifPicker";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
+import GlassButton from "@/components/ui/GlassButton";
 import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
 import { getDisplayName } from "@/services/party/identity";
 import type { Member, PartyMedia } from "@/services/party/protocol";
@@ -66,6 +67,20 @@ function senderColor(userId: string): string {
   let h = 0;
   for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) | 0;
   return SENDER_COLORS[Math.abs(h) % SENDER_COLORS.length];
+}
+
+// Instagram-style corners: the tail side (right for mine, left for incoming) keeps
+// its OUTER corners round (top of first bubble, bottom of last) and FLATTENS where
+// consecutive bubbles meet, so a sender's run reads as one connected stack.
+const BUBBLE_ROUND = 19;
+const BUBBLE_FLAT = 6;
+function bubbleCorners(mine: boolean, firstOfGroup: boolean, lastOfGroup: boolean) {
+  const R = ms(BUBBLE_ROUND);
+  const top = firstOfGroup ? R : ms(BUBBLE_FLAT);
+  const bot = lastOfGroup ? R : ms(BUBBLE_FLAT);
+  return mine
+    ? { borderTopLeftRadius: R, borderBottomLeftRadius: R, borderTopRightRadius: top, borderBottomRightRadius: bot }
+    : { borderTopRightRadius: R, borderBottomRightRadius: R, borderTopLeftRadius: top, borderBottomLeftRadius: bot };
 }
 
 /** Media position (seconds) → "m:ss" (or "h:mm:ss" past an hour). */
@@ -442,16 +457,16 @@ export default function Party() {
       >
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-          <Pressable style={styles.glassRound} onPress={requestClose} hitSlop={8}>
+          <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </Pressable>
-          <Pressable style={styles.codePill} onPress={share}>
+          </GlassButton>
+          <GlassButton style={styles.codePill} onPress={share}>
             <Text style={styles.codeLabel}>ROOM · </Text>
             <Text style={styles.code}>{roomCode || "—"}</Text>
             <View style={styles.shareBtn}>
               <Ionicons name="share-social" size={13} color={colors.text} />
             </View>
-          </Pressable>
+          </GlassButton>
           <AvatarStack members={members} hostId={hostId} selfId={party.userId} />
         </View>
 
@@ -573,10 +588,10 @@ export default function Party() {
               </Text>
             </View>
             <View style={styles.hostActions}>
-              <Pressable style={styles.settingsBtn} onPress={() => setShowSettings(true)}>
+              <GlassButton style={styles.settingsBtn} onPress={() => setShowSettings(true)}>
                 <Ionicons name="settings-outline" size={16} color={colors.text} />
                 {pendingCount > 0 ? <View style={styles.settingsDot} /> : null}
-              </Pressable>
+              </GlassButton>
               {guests.length > 0 ? (
                 <Pressable style={styles.transferBtn} onPress={transferHost}>
                   <Ionicons name="swap-horizontal" size={14} color={colors.honey} />
@@ -632,9 +647,9 @@ export default function Party() {
           {canSendChat ? (
             <View style={styles.inputRow}>
               {reactionsOn ? (
-                <Pressable style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6}>
+                <GlassButton style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6}>
                   <Text style={styles.gifBtnText}>GIF</Text>
-                </Pressable>
+                </GlassButton>
               ) : null}
               <View style={styles.inputBox}>
                 <TextInput
@@ -847,7 +862,7 @@ function Bubble({
           {isGif ? (
             <GifBubble msg={msg} />
           ) : (
-            <View style={[styles.bubble, styles.bubbleMine]}>
+            <View style={[styles.bubble, styles.bubbleMine, bubbleCorners(true, firstOfGroup, lastOfGroup)]}>
               <MessageText text={msg.text} onSeek={onSeek} />
             </View>
           )}
@@ -879,7 +894,7 @@ function Bubble({
         {isGif ? (
           <GifBubble msg={msg} />
         ) : (
-          <View style={[styles.bubble, styles.bubbleOther]}>
+          <View style={[styles.bubble, styles.bubbleOther, bubbleCorners(false, firstOfGroup, lastOfGroup)]}>
             <MessageText text={msg.text} onSeek={onSeek} />
           </View>
         )}
@@ -1049,7 +1064,9 @@ const styles = StyleSheet.create({
   },
   transferText: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12) },
 
-  chatContent: { padding: ms(14), gap: ms(14), flexGrow: 1 },
+  // No flat gap here — per-message spacing comes from groupTight/groupGap so a
+  // sender's consecutive bubbles sit tight and only a new sender gets a real break.
+  chatContent: { padding: ms(14), flexGrow: 1 },
   chatEmpty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 40 },
   chatEmptyText: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13) },
 
@@ -1071,7 +1088,7 @@ const styles = StyleSheet.create({
   bubbleAvatarText: { fontFamily: font.bodySemi, fontSize: ms(12) },
   bubbleCol: { gap: ms(3), flexShrink: 1 },
   bubbleName: { fontFamily: font.bodySemi, fontSize: ms(11.5), marginLeft: ms(6), marginBottom: ms(1) },
-  bubble: { paddingHorizontal: ms(14), paddingVertical: ms(9), borderRadius: ms(18) },
+  bubble: { paddingHorizontal: ms(14), paddingVertical: ms(9) },
   bubbleOther: {
     backgroundColor: colors.surfaceStrong,
     borderWidth: StyleSheet.hairlineWidth,
