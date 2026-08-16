@@ -18,7 +18,6 @@ import HijackPlayer, {
   type PlayerEvent,
   type PlayerHandle,
 } from "@/components/player/HijackPlayer";
-import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import GifPicker from "@/components/party/GifPicker";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
@@ -148,7 +147,6 @@ export default function Party() {
   );
 
   const playerRef = useRef<PlayerHandle>(null);
-  const controlsRef = useRef<PlayerControlsHandle>(null);
   const [password, setPassword] = useState<string | undefined>(undefined);
   const [pwAttempt, setPwAttempt] = useState(0);
   const [pwPrompt, setPwPrompt] = useState(false);
@@ -280,11 +278,6 @@ export default function Party() {
       }
     }
     party.onPlayerEvent(e);
-    controlsRef.current?.setPlayback({
-      currentTime: e.currentTime || 0,
-      duration: e.duration || 0,
-      paused: !!e.paused,
-    });
     if (!isBackgroundPlaybackAvailable()) return;
     if (e.event === "ended") {
       const dur = Number(e.duration) || 0;
@@ -396,29 +389,16 @@ export default function Party() {
               <Text style={styles.waitingText}>Waiting for the host to let you in…</Text>
             </View>
           ) : providerId && media ? (
-            <>
-              <HijackPlayer
-                ref={playerRef}
-                providerId={providerId}
-                tmdbId={media.tmdbId}
-                type={media.type}
-                season={media.season}
-                episode={media.episode}
-                onPlayerEvent={onEvent}
-                nativeControls
-              />
-              <PlayerControls
-                ref={controlsRef}
-                canControl={canSeek}
-                roomPlaying={snap?.playback?.status === "playing"}
-                onPlay={party.play}
-                onPause={party.pause}
-                onSeekTo={party.seekTo}
-                onSeekBy={party.seekBy}
-                onToggleFullscreen={() => playerRef.current?.fullscreen()}
-                onTapSync={party.jumpToLive}
-              />
-            </>
+            <HijackPlayer
+              ref={playerRef}
+              providerId={providerId}
+              tmdbId={media.tmdbId}
+              type={media.type}
+              season={media.season}
+              episode={media.episode}
+              onPlayerEvent={onEvent}
+              hideTransportControls={!canSeek}
+            />
           ) : (
             <View style={styles.waiting}>
               <Ionicons name="hourglass-outline" size={30} color={colors.textFaint} />
@@ -438,7 +418,13 @@ export default function Party() {
             </View>
           ) : null}
 
-          {/* guest paused → the PlayerControls overlay shows "Tap to sync" */}
+          {/* guest paused → jump back to live */}
+          {!party.isHost && party.detached ? (
+            <Pressable style={styles.floatBtn} onPress={party.jumpToLive}>
+              <Ionicons name="flash" size={16} color={colors.onHoney} />
+              <Text style={styles.floatText}>Jump to Live</Text>
+            </Pressable>
+          ) : null}
 
           {/* no host → take over */}
           {!party.isHost && !hostPresent && !!snap ? (
