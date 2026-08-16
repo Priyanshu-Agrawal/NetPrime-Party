@@ -242,14 +242,23 @@ export default function Party() {
 
   // Native fullscreen: rotate + expand our player. (HTML5 requestFullscreen needs a
   // gesture INSIDE the WebView that an RN tap can't supply, so we do it RN-side; our
-  // overlay stays on top.) A black mask covers the WebView reflow + OS rotation, then
-  // fades out once it settles — otherwise videasy's chrome / a white flash / an
-  // overscaled poster show for a frame or two mid-transition.
-  const maskAnim = useRef(new Animated.Value(0)).current;
+  // overlay stays on top.) A black cover hides the WebView reflow + OS rotation, then
+  // fades once it settles — otherwise videasy's chrome / a white flash / an overscaled
+  // poster leak through for a frame or two mid-transition.
+  //
+  // Driven by STATE (not a lone Animated.setValue): the cover mounts opaque in the SAME
+  // commit as the layout change, so there's no one-frame leak on expand. It renders as a
+  // sibling of the whole app content (below), not nested in the player, so it also
+  // covers the party UI that re-appears on collapse — no "half-screen white".
+  const [masking, setMasking] = useState(false);
+  const maskFade = useRef(new Animated.Value(1)).current;
+  const maskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleFullscreen = () => {
     const next = !fullscreen;
-    maskAnim.setValue(1);
-    Animated.timing(maskAnim, { toValue: 0, duration: 320, delay: 520, useNativeDriver: true }).start();
+    if (maskTimer.current) clearTimeout(maskTimer.current);
+    maskFade.stopAnimation();
+    maskFade.setValue(1);
+    setMasking(true);
     setFullscreen(next);
     (async () => {
       try {
@@ -259,10 +268,17 @@ export default function Party() {
         /* orientation lock is best-effort */
       }
     })();
+    // Hold opaque through the rotation + reflow, then fade the cover away.
+    maskTimer.current = setTimeout(() => {
+      Animated.timing(maskFade, { toValue: 0, duration: 300, useNativeDriver: true }).start(
+        ({ finished }) => finished && setMasking(false),
+      );
+    }, 560);
   };
   useEffect(() => {
     return () => {
       ScreenOrientation.unlockAsync().catch(() => {});
+      if (maskTimer.current) clearTimeout(maskTimer.current);
     };
   }, []);
 
@@ -530,14 +546,6 @@ export default function Party() {
             ))}
           </View>
 
-          {/* Fullscreen-rotation mask — hides the WebView reflow + OS rotation. */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: colors.black, opacity: maskAnim, zIndex: 100, elevation: 100 },
-            ]}
-          />
         </View>
 
         {/* Host status bar — playback is driven by the web player's own controls
@@ -641,6 +649,20 @@ export default function Party() {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Fullscreen-rotation cover — a sibling of the whole app content so it hides the
+          WebView reflow, the OS rotation, AND the party UI that re-appears on collapse.
+          Mounted only during a toggle; opaque on mount (same commit as the layout
+          change → no leak), then fades out once the rotation settles. */}
+      {masking ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: colors.black, opacity: maskFade, zIndex: 1000, elevation: 1000 },
+          ]}
+        />
+      ) : null}
 
       {/* Host: room administration sheet */}
       {party.isHost && config ? (

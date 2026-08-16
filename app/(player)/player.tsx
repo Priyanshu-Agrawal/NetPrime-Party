@@ -118,6 +118,7 @@ export const Player: React.FC = () => {
       sessionStarted.current = false;
       stopBackgroundPlaybackSession();
       ScreenOrientation.unlockAsync().catch(() => {});
+      if (maskTimer.current) clearTimeout(maskTimer.current);
     },
     [],
   );
@@ -188,12 +189,19 @@ export const Player: React.FC = () => {
     updateBackgroundPlaybackState(e.paused, Number(e.currentTime) || 0, Number(e.duration) || 0);
   };
 
-  const maskAnim = useRef(new Animated.Value(0)).current;
+  // Black cover over the WebView reflow + OS rotation, faded out once it settles. State-
+  // driven so it mounts opaque in the SAME commit as the layout change (no one-frame leak
+  // on expand); rendered as a sibling of the whole screen (below), not nested in the
+  // player, so it also covers the UI that re-appears on collapse.
+  const [masking, setMasking] = useState(false);
+  const maskFade = useRef(new Animated.Value(1)).current;
+  const maskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleFullscreen = () => {
     const next = !fullscreen;
-    // Black mask over the WebView reflow + OS rotation, faded out once it settles.
-    maskAnim.setValue(1);
-    Animated.timing(maskAnim, { toValue: 0, duration: 320, delay: 520, useNativeDriver: true }).start();
+    if (maskTimer.current) clearTimeout(maskTimer.current);
+    maskFade.stopAnimation();
+    maskFade.setValue(1);
+    setMasking(true);
     setFullscreen(next);
     (async () => {
       try {
@@ -203,6 +211,11 @@ export const Player: React.FC = () => {
         /* best-effort */
       }
     })();
+    maskTimer.current = setTimeout(() => {
+      Animated.timing(maskFade, { toValue: 0, duration: 300, useNativeDriver: true }).start(
+        ({ finished }) => finished && setMasking(false),
+      );
+    }, 560);
   };
 
   const startWatchParty = useCallback(() => {
@@ -267,14 +280,6 @@ export const Player: React.FC = () => {
               ) : null}
             </>
           ) : null}
-          {/* Fullscreen-rotation mask — hides the WebView reflow + OS rotation. */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: colors.black, opacity: maskAnim, zIndex: 100, elevation: 100 },
-            ]}
-          />
         </View>
 
         {/* Kept mounted in fullscreen (the absolute player covers it) to avoid an
@@ -300,6 +305,20 @@ export const Player: React.FC = () => {
         </View>
         <HijackHint provider={selected} />
       </SafeAreaView>
+
+      {/* Fullscreen-rotation cover — a sibling of the whole screen so it hides the WebView
+          reflow, the OS rotation, AND the UI that re-appears on collapse. Mounted only
+          during a toggle; opaque on mount (same commit as the layout change → no leak),
+          then fades out once the rotation settles. */}
+      {masking ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: colors.black, opacity: maskFade, zIndex: 1000, elevation: 1000 },
+          ]}
+        />
+      ) : null}
 
       <PlayerSettingsSheet
         visible={showSettings}
