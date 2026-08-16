@@ -25,7 +25,7 @@ import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useKeepAwake } from "expo-keep-awake";
-import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -102,6 +102,22 @@ export const Player: React.FC = () => {
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
   }, [navigation]);
+
+  // Leaving the solo screen (e.g. tapping "Watch Party", which PUSHES the party
+  // on top so this screen stays mounted) must not leave our <video> playing
+  // behind it: AlwaysVisibleRNCWebView + the foreground service keep the WebView
+  // decoding while it's off-top. Pause on blur. We do NOT stop the background
+  // session here — it's activity-wide and the party may have just started its own.
+  // (Blur does NOT fire on Home, so background audio for solo still works.)
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        webRef.current?.injectJavaScript(
+          "try{var v=document.querySelector('video');if(v)v.pause();if(window.__soloCmd)window.__soloCmd({action:'pause'});}catch(e){} true;",
+        );
+      };
+    }, []),
+  );
 
   useEffect(() => {
     if (!isBackgroundPlaybackAvailable()) return;
