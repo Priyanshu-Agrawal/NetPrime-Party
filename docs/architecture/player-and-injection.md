@@ -5,6 +5,21 @@
 > WebView live with Chrome DevTools over CDP. Read alongside
 > [../providers/videasy.md](../providers/videasy.md) for a concrete example.
 
+## Solo Android background (not the party bridge)
+Solo (`app/(player)/player.tsx`) injects `SOLO_BG_JS` (`components/player/soloBackgroundBridge.ts`)
+**in addition to** popup blocking. It is **not** `BRIDGE_JS` / `__vlCmd` and must
+**not** be used in `HijackPlayer`. Chromium pauses `<video>` when `document.hidden`;
+the keep-alive re-`play()`s **only if `wasPlaying`**. A Kotlin foreground
+`MediaSession` service (`BearoomPlaybackService`) holds audio focus so Android 16
+does not mute background media, and notification/lock-screen play/pause/seek map
+to `window.__soloCmd` (injected from **native** so they work if RN JS is paused).
+⚠ Empirically, Chromium still **stalls the media clock** when the Activity is not
+visible (`readyState` drops to HAVE_METADATA even if `video.paused === false`).
+The session/notification/FGS are real; continuous background *audio* through this
+WebView is not — Android PiP (visible surface) is the remaining attempt.
+Party background-audio is deferred — visibility pause/play would look like user
+controls and desync the room.
+
 ## The hijack in one paragraph
 The party plays a provider's embed page inside `react-native-webview`
 (`components/player/HijackPlayer.tsx`). Before the page loads we inject

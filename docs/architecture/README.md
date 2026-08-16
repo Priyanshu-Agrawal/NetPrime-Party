@@ -18,7 +18,7 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 ## Screens (`app/`)
 - `(tabs)/index.tsx` Home · `(tabs)/search.tsx` · `(tabs)/more.tsx` Profile
 - `(player)/details.tsx`, `(player)/tvDetails.tsx` — title detail
-- `(player)/player.tsx` — **solo** playback (plain WebView, no bridge)
+- `(player)/player.tsx` — **solo** playback (plain WebView; Android MediaSession FGS wraps it — party not wired)
 - `party.tsx` — **watch party** (hijacked WebView + sync) · `joinParty.tsx`
 - `onboarding.tsx`, `myList.tsx`, `watchHistory.tsx`
 
@@ -34,7 +34,7 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 | **Streaming-integration research** | notes (p-stream / providers landscape) | [../research/streaming-integration-research.md](../research/streaming-integration-research.md) |
 
 ## Playback model (two players today)
-- **Solo** (`app/(player)/player.tsx`): a plain `WebView` of the provider embed — the provider's own page + controls, no injection.
+- **Solo** (`app/(player)/player.tsx`): a plain `WebView` of the provider embed. On **Android**, `BearoomPlaybackService` (foreground MediaSession + notification) wraps solo playback. Chromium still **stalls the media clock** once the Activity is not visible (`readyState` drops); lock-screen/notification commands inject `__soloCmd` natively. **Party is not wired.** See [player-and-injection.md](./player-and-injection.md).
 - **Party** (`app/party.tsx`): `components/player/HijackPlayer.tsx` — a WebView with an **injected JS bridge** so the app can BOTH observe (play/pause/seek/time) AND drive the `<video>`. This powers sync. See [player-and-injection.md](./player-and-injection.md).
 - **Native playback (REJECTED):** sniffing the provider `.m3u8` into `expo-video` cannot self-heal ephemeral WAF tokens. WebView stays primary; native **features** (PiP/AirPlay/background) wrap the WebView — [webview-native-features.md](../plans/webview-native-features.md). Resolver/dub notes remain in [native-player.md](./native-player.md).
 

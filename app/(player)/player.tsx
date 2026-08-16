@@ -10,7 +10,16 @@ import {
   type Provider,
 } from "@/components/player/providerRegistry";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import {
+  SOLO_BG_JS,
+  isSoloPlaybackNativeAvailable,
+  startSoloPlaybackSession,
+  stopSoloPlaybackSession,
+  subscribeSoloRemoteCommands,
+  updateSoloPlaybackState,
+} from "@/components/player/soloBackgroundBridge";
 import { addToWatchHistory } from "@/utils/history";
+import { img } from "@/utils/tmdbDetails";
 import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
@@ -21,6 +30,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -72,11 +82,39 @@ export const Player: React.FC = () => {
   const navigation = useNavigation();
   const router = useRouter();
   const sheetRef = useRef<BottomSheetModal>(null);
+  const webRef = useRef<WebView>(null);
+  const sessionStarted = useRef(false);
   const [selected, setSelected] = useState<Provider>(PROVIDERS[0]);
+
+  const displayTitle = title || "Bearoom";
+  const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
 
   useEffect(() => {
     navigation.setOptions({ headerShown: false, animation: "fade" });
   }, [navigation]);
+
+  useEffect(() => {
+    if (!isSoloPlaybackNativeAvailable()) return;
+    const unsub = subscribeSoloRemoteCommands((cmd) => {
+      const payload =
+        cmd.action === "seek"
+          ? { action: "seek", time: (cmd.positionMs ?? 0) / 1000 }
+          : { action: cmd.action };
+      webRef.current?.injectJavaScript(
+        `try{window.__soloCmd(${JSON.stringify(payload)});}catch(e){} true;`,
+      );
+    });
+    return () => {
+      unsub();
+      sessionStarted.current = false;
+      stopSoloPlaybackSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    sessionStarted.current = false;
+    stopSoloPlaybackSession();
+  }, [selected.id]);
 
   useEffect(() => {
     if (!id) return;
@@ -110,20 +148,58 @@ export const Player: React.FC = () => {
     [],
   );
 
-  const onMessage = useCallback((e: { nativeEvent: { data: string } }) => {
-    try {
-      const data = JSON.parse(e.nativeEvent.data);
-      if (data?.type === "fullscreenchange") {
-        if (data.isFullscreen) {
-          void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        } else {
-          void ScreenOrientation.unlockAsync();
+  const onMessage = useCallback(
+    (e: { nativeEvent: { data: string } }) => {
+      try {
+        const data = JSON.parse(e.nativeEvent.data) as {
+          type?: string;
+          isFullscreen?: boolean;
+          currentTime?: number;
+          duration?: number;
+          paused?: boolean;
+          hidden?: boolean;
+          user?: boolean;
+        };
+        if (data?.type === "fullscreenchange") {
+          if (data.isFullscreen) {
+            void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+          } else {
+            void ScreenOrientation.unlockAsync();
+          }
+          return;
         }
+        if (
+          data?.type === "play" ||
+          data?.type === "pause" ||
+          data?.type === "seeked" ||
+          data?.type === "tick" ||
+          data?.type === "ended"
+        ) {
+          if (!isSoloPlaybackNativeAvailable()) return;
+          if (data.type === "ended") {
+            sessionStarted.current = false;
+            stopSoloPlaybackSession();
+            return;
+          }
+          // Chromium pauses on hide — ignore unless this is a user/lock-screen command.
+          if (data.hidden && data.paused && !data.user) return;
+          if (!sessionStarted.current) {
+            if (data.type !== "play" && data.paused) return;
+            sessionStarted.current = true;
+            void startSoloPlaybackSession(displayTitle, artworkUrl);
+          }
+          updateSoloPlaybackState(
+            !!data.paused,
+            Number(data.currentTime) || 0,
+            Number(data.duration) || 0,
+          );
+        }
+      } catch {
+        /* ignore non-JSON page noise */
       }
-    } catch {
-      /* ignore non-JSON page noise */
-    }
-  }, []);
+    },
+    [artworkUrl, displayTitle],
+  );
 
   const startWatchParty = useCallback(() => {
     if (!isHijackable(selected) || !id) return;
@@ -155,6 +231,7 @@ export const Player: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.playerArea}>
           <WebView
+            ref={webRef}
             key={selected.id}
             style={styles.webview}
             source={{ uri }}
@@ -174,7 +251,9 @@ export const Player: React.FC = () => {
               /* swallow popups */
             }}
             onShouldStartLoadWithRequest={onShouldStartLoad}
-            injectedJavaScriptBeforeContentLoaded={BLOCK_POPUPS_JS}
+            injectedJavaScriptBeforeContentLoaded={
+              BLOCK_POPUPS_JS + (Platform.OS === "android" ? SOLO_BG_JS : "")
+            }
             onMessage={onMessage}
           />
         </View>

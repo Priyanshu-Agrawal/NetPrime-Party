@@ -10,6 +10,8 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
+import com.cody669.Uott.playback.BearoomPlaybackHub
+import com.cody669.Uott.playback.BearoomWebViews
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,6 +44,24 @@ class MainActivity : ReactActivity() {
               mainComponentName,
               fabricEnabled
           ){})
+  }
+
+  override fun onPause() {
+    super.onPause()
+    BearoomWebViews.resume(this)
+    BearoomPlaybackHub.keepAliveSolo()
+  }
+
+  override fun onStop() {
+    super.onStop()
+    BearoomWebViews.resume(this)
+    BearoomPlaybackHub.keepAliveSolo()
+  }
+
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    BearoomWebViews.resume(this)
+    BearoomPlaybackHub.keepAliveSolo()
   }
 
   /**
