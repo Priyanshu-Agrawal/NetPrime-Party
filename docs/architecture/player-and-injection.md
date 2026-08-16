@@ -72,6 +72,17 @@ player joins it.)
    engine nudges `playbackRate` constantly, so suppressing there swallowed the
    user's real taps.
 6. **`window.__vlCmd(cmd)`**: `{action:'play'|'pause'|'seek'|'rate'|'fullscreen', …}`.
+7. **Background keep-alive** (Android): tracks `wasPlaying` = the *intended* play-state (set by
+   play/pause events AND by `__vlCmd`), swallows Chromium's hidden-tab `pause` when
+   `document.hidden && wasPlaying`, and re-`play()`s on `visibilitychange`/tick. Exposed as
+   `window.__soloKeepAlive` for the native hub. ⚠ `__vlCmd` must keep `wasPlaying` in sync or a
+   backgrounded guest re-plays a room-paused video. See [party-background-audio.md](../plans/party-background-audio.md).
+8. **`window.__soloCmd(cmd)`** (lock-screen / notification): drives the video **without**
+   `markApplying`, so the genuine play/pause/seeked reaches `handleUserControl` (host pauses the
+   room / guest detaches) — a lock-screen button behaves like tapping the web controls.
+9. **`window.__vlSetGuest(on)`**: toggles a `<style>` hiding the provider's transport controls
+   (seek bar / ±10s / play-pause) for a non-controlling guest — RN prop `hideTransportControls`
+   (gated on `canSeek`). videasy selectors in [../providers/videasy.md](../providers/videasy.md).
 
 RN → WebView: `webRef.injectJavaScript('window.__vlCmd(' + JSON.stringify(c) + '); true;')`.
 WebView → RN: `onMessage` parses JSON into a `PlayerEvent` → `onPlayerEvent`.

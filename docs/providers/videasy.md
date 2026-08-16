@@ -13,10 +13,35 @@
 - **`<video>` is in the TOP document** (good — top-frame hooks see it) **but is created/resolved only AFTER a user gesture** (tap play). This matters for sniffing (below).
 
 ## Player DOM (for injection targeting)
-Tailwind + CSS-module classes seen via CDP:
-- Center controls container: `[class*="mobileCenterControls_*"]`; buttons are `BUTTON.tabbable p-2 rounded-full` wrapping `SPAN.text-3xl … > svg/path`.
-- Bottom control bar: **`div.absolute.bottom-0.left-0.right-0.z-30.h-44`** (a FIXED 176px-tall flex `items-end` bar holding the scrubber + CC/gear/cloud/fullscreen). `pointer-events: auto`.
-- Settings ("gear") menu tabs: **Quality · Subs · Servers · Speed**.
+Tailwind + CSS-module classes seen via CDP. ⚠ **The party WebView renders the MOBILE layout**
+(mobile UA); headless-desktop Chrome renders a different one (play/±10s move into the bottom bar as
+`#ButtonPlay` + siblings). Mobile facts below (re-verified 2026-08-16):
+- **Center controls** `[class*="mobileCenterControls"]` (`mobileCenterControls_overlayContainer__*`)
+  — the vertical-center overlay holding **rewind-10 / play-pause (`#ButtonPlay`) / forward-10**;
+  buttons are `BUTTON.tabbable.p-2.rounded-full` wrapping `SPAN.text-3xl … > svg/path`.
+- **Seek bar (scrubber)**: a `div.…cursor-pointer.group` container holding the fill
+  `[class*="videoSeekBar"]` (`videoSeekBar_seekLeft__*`); the timecode `0:01 / 02:28:06` is a
+  sibling `div.…tabular-nums`. **Mobile has NO `input[type=range]`** (the desktop layout does) —
+  target the CSS-module class, not a range input.
+- **Bottom control bar**: **`div.absolute.bottom-0.left-0.right-0.z-30.h-44`** (FIXED 176px `items-end`
+  bar with the scrubber row + a control row holding **`#ButtonFullscreen`** + settings tabs).
+  `pointer-events:auto`.
+- **Settings tabs**: `radix-*-trigger-{Quality,Subtitles,Servers,Playback}` (labels **Quality · Subs
+  · Servers · Speed**).
+- Tapping the `<video>` does **not** toggle play/pause (verified) — hiding the buttons is enough to
+  stop a viewer from pausing.
+
+### Guest transport-hide (verified CSS — hides seek/±10s/play, keeps fullscreen + quality)
+`HijackPlayer`'s bridge exposes `window.__vlSetGuest(on)` (RN prop `hideTransportControls`, gated on
+party `canSeek`) so a **non-controlling guest can't fight the host's timeline**. It toggles a `<style>`:
+```css
+[class*="mobileCenterControls"]{display:none!important}   /* rewind-10 / play / forward-10 */
+#ButtonPlay{display:none!important}                        /* play in the desktop layout too */
+[class*="videoSeekBar"]{display:none!important}            /* scrubber fill */
+div.cursor-pointer:has([class*="videoSeekBar"]){display:none!important}  /* whole scrubber (:has() is supported) */
+```
+Verified via CDP (mobile emulation): center / scrubber / play → hidden; **`#ButtonFullscreen` + the
+Quality tab → still visible; video keeps playing.**
 
 ### ⚠ Known layout bug + the committed fix
 In the short inline/collapsed viewport (**~231px tall**), the 176px `h-44` bottom

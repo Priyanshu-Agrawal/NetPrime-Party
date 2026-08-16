@@ -1,5 +1,17 @@
 # Plan — Party background audio + lock-screen (extend solo to the watch party)
 
+> ## ✅ STATUS: IMPLEMENTED (2026-08-16)
+> Shipped across `4d75a76` (bridge keep-alive + `wasPlaying`-intent + `__soloCmd` routing +
+> `resync`), `eb1ed95` (FGS `start()` before the permission prompt + **tick-driven** lease
+> renewal), and `2e7c580` (guest transport-hide + FGS activation on media-present). **All four
+> design parts below landed as written.** The host-lease question resolved to **keep the 6 s
+> lease + guest election, renew from player ticks, no handoff-on-background** (§3, corrected
+> below). Verified on a physical device (Nothing Phone): backgrounded **and screen-locked**
+> party audio continues with the media notification. Caveat: it rides the same Chromium-visibility
+> hack as solo (`AlwaysVisibleRNCWebView`) → re-verify on WebView updates. The sections below are
+> now the **design record**, not a to-do. Related: **guest transport-hide** selectors live in
+> `docs/providers/videasy.md`.
+
 > **Implementation plan for Cursor.** Read `docs/architecture/README.md` and
 > `docs/architecture/watch-party-sync.md` first. This EXTENDS the solo background-audio
 > work (`docs/plans/webview-native-features.md`) to the watch party. It touches the sync
@@ -109,13 +121,16 @@ On RN `AppState → 'active'`: a non-detached member snaps to live (add `engine.
 until they tap **Jump to Live** (current UX, `party.tsx:351-356`). The drift loop is the safety net
 — this just makes the correction instant instead of audible.
 
-## 3. Host lease — rely on the FGS for v1, VERIFY (don't pre-build handoff)
-The host renews a ~6 s lease. If backgrounding throttles the host's JS timers, the lease lapses and
-the **existing** lease-expiry handoff fires (a foregrounded guest becomes host) — not broken, but an
-involuntary handoff right after pocketing the phone could surprise. The solo finding (`currentTime`
-keeps advancing = timers alive under the FGS) suggests the lease likely survives. **v1: rely on the
-FGS, verify on a real device, and treat the existing handoff as the fallback. Do NOT build
-handoff-on-background** unless verification shows it's needed.
+## 3. Host lease — RESOLVED: renew from ticks (keep lease + election)
+The host renews a ~6 s lease. My original guess here ("the FGS keeps the RN timer alive") was
+**wrong** — the real finding: **RN's `setInterval` is paused on Android Home even while the WebView's
+Chromium ticks keep crossing the bridge**, so `party_renew_lease` went silent and a guest won the
+election. Fix (shipped, `eb1ed95`): renew the lease **from the HijackPlayer ticks too** —
+`PartyClient.renewLeaseIfDue()` (2 s-gated, in-flight-guarded), called from `useParty.onPlayerEvent`
+on every `tick`. No SQL, no `handleUserControl` change, **no handoff-on-background** — the 6 s lease +
+guest election are kept as-is. Caveat: a host who **never starts playback** still loses the lease if
+it backgrounds (no ticks → no renewal) — that's a genuinely idle host, and guests still have **Take
+over** / grab-control.
 
 ## 4. QA — 2 devices (this is the definition of done)
 - Host plays → host backgrounds (**Home and lock**) → **guest keeps playing, the room does NOT
