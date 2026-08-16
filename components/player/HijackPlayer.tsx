@@ -40,13 +40,22 @@ export type PlayerEventType =
   | "canplay"
   | "tick"
   | "enterfullscreen"
-  | "exitfullscreen";
+  | "exitfullscreen"
+  | "quality";
+
+export interface QualityLevel {
+  /** Clean resolution label, e.g. "1080p" / "720p" / "Auto". */
+  label: string;
+  active: boolean;
+}
 
 export interface PlayerEvent {
   event: PlayerEventType;
   currentTime: number;
   duration: number;
   paused: boolean;
+  /** Only on a "quality" event — the provider's available quality levels. */
+  qualities?: QualityLevel[];
 }
 
 export interface PlayerHandle {
@@ -56,6 +65,10 @@ export interface PlayerHandle {
   setRate(rate: number): void;
   /** Ask the provider's <video> to enter native HTML5 fullscreen. */
   fullscreen(): void;
+  /** Read the provider's quality levels → emits a "quality" PlayerEvent. */
+  readQuality(): void;
+  /** Switch quality by label (drives videasy's DOM via pointer-dispatch). */
+  setQuality(label: string): void;
 }
 
 interface Props extends MediaRef {
@@ -174,6 +187,38 @@ const BRIDGE_JS = `
     if (vid) post({ event:'tick', currentTime:vid.currentTime||0, duration:vid.duration||0, paused:!!vid.paused });
   }, 1000);
   window.__soloKeepAlive = keepAlive;
+  // --- Quality (videasy's settings tab; hls.js isn't reachable, so drive the DOM
+  // with the SAME pointer-dispatch recipe the dub switch needs — verified: it
+  // flips the active option AND the <video> resolution actually changes). ---
+  function __vlQualityLabel(t){ t=(t||'').trim(); if(t.indexOf('Auto')===0) return 'Auto'; var i=0; while(i<t.length&&t[i]>='0'&&t[i]<='9')i++; return (i>0&&t[i]==='p')?t.slice(0,i+1):t.slice(0,8); }
+  function __vlIsQuality(t){ t=(t||'').trim(); if(t.indexOf('Auto')===0) return true; var i=0; while(i<t.length&&t[i]>='0'&&t[i]<='9')i++; return i>0&&t[i]==='p'; }
+  function __vlQualityButtons(){ return Array.prototype.slice.call(document.querySelectorAll('button')).filter(function(b){ return __vlIsQuality(b.textContent); }); }
+  function __vlReadQuality(){
+    try {
+      var seen={}, qs=[];
+      __vlQualityButtons().forEach(function(b){
+        var label=__vlQualityLabel(b.textContent);
+        if(seen[label]) return; seen[label]=1;
+        qs.push({ label:label, active:(b.className||'').indexOf('primary')>=0 });
+      });
+      post({ event:'quality', currentTime:(vid&&vid.currentTime)||0, duration:(vid&&vid.duration)||0, paused:vid?!!vid.paused:true, qualities:qs });
+    } catch(e){}
+  }
+  function __vlPointerHit(el){
+    if(!el) return;
+    try {
+      var r=el.getBoundingClientRect(), x=r.left+r.width/2, y=r.top+r.height/2;
+      ['pointerover','pointerenter','pointerdown','pointerup','mousedown','mouseup','click'].forEach(function(t){
+        try{ var E=(t.indexOf('pointer')===0)?PointerEvent:MouseEvent; el.dispatchEvent(new E(t,{bubbles:true,cancelable:true,composed:true,clientX:x,clientY:y})); }catch(e){}
+      });
+    } catch(e){}
+  }
+  function __vlSetQuality(label){
+    try {
+      var b=__vlQualityButtons().filter(function(x){ return __vlQualityLabel(x.textContent)===label; })[0];
+      if(b){ __vlPointerHit(b); setTimeout(__vlReadQuality,500); }
+    } catch(e){}
+  }
   window.__vlCmd = function(cmd){
     if (!vid) return;
     try {
@@ -190,6 +235,8 @@ const BRIDGE_JS = `
         var fs = vid.requestFullscreen || vid.webkitRequestFullscreen || vid.webkitEnterFullscreen || vid.mozRequestFullScreen;
         if (fs) fs.call(vid);
       }
+      else if (cmd.action === 'readQuality') { __vlReadQuality(); }
+      else if (cmd.action === 'setQuality') { __vlSetQuality(cmd.label); }
     } catch(e){}
   };
   // Lock-screen / notification: drive video WITHOUT markApplying so genuine
@@ -295,6 +342,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         seek: (seconds: number) => cmd({ action: "seek", time: seconds }),
         setRate: (rate: number) => cmd({ action: "rate", rate }),
         fullscreen: () => cmd({ action: "fullscreen" }),
+        readQuality: () => cmd({ action: "readQuality" }),
+        setQuality: (label: string) => cmd({ action: "setQuality", label }),
       }),
       [cmd],
     );

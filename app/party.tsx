@@ -17,8 +17,10 @@ import {
 import HijackPlayer, {
   type PlayerEvent,
   type PlayerHandle,
+  type QualityLevel,
 } from "@/components/player/HijackPlayer";
 import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
+import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import GifPicker from "@/components/party/GifPicker";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
@@ -158,6 +160,8 @@ export default function Party() {
   const [pwInput, setPwInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showGif, setShowGif] = useState(false);
+  const [showPlayerSettings, setShowPlayerSettings] = useState(false);
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
   // Latest known playback position (seconds) from the player — read when inserting.
   const posRef = useRef(0);
   // Live mm:ss shown on the in-field timestamp button; ticks only while composing.
@@ -280,6 +284,10 @@ export default function Party() {
   }, [chat.messages.length]);
 
   const onEvent = (e: PlayerEvent) => {
+    if (e.event === "quality") {
+      setQualities(e.qualities ?? []);
+      return;
+    }
     if (Number.isFinite(e.currentTime)) {
       posRef.current = e.currentTime;
       // Only re-render the live label while the user is actually composing (1/sec).
@@ -432,6 +440,10 @@ export default function Party() {
                   onSeekBy={party.seekBy}
                   onToggleFullscreen={() => playerRef.current?.fullscreen()}
                   onTapSync={party.jumpToLive}
+                  onOpenSettings={() => {
+                    playerRef.current?.readQuality();
+                    setShowPlayerSettings(true);
+                  }}
                 />
               ) : null}
             </>
@@ -598,6 +610,17 @@ export default function Party() {
           onTransferHost={(uid) => runAdmin("Couldn't transfer host", party.transferHost(uid))}
         />
       ) : null}
+
+      {/* Player settings — speed (host, synced via the anchor) + quality (per-device) */}
+      <PlayerSettingsSheet
+        visible={showPlayerSettings}
+        onClose={() => setShowPlayerSettings(false)}
+        canControl={canSeek}
+        rate={snap?.playback?.rate ?? 1}
+        onSetRate={(r) => party.setRate(r)}
+        qualities={qualities}
+        onSetQuality={(label) => playerRef.current?.setQuality(label)}
+      />
 
       {/* Guest: password prompt for a protected room */}
       <Modal visible={pwPrompt} transparent animationType="fade" onRequestClose={() => setPwPrompt(false)}>

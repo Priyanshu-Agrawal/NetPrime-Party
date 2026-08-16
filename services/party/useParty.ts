@@ -28,6 +28,8 @@ export interface UseParty {
   seekBy: (deltaSec: number) => void;
   /** Seek the room to an absolute position (seconds). Server enforces control perms. */
   seekTo: (sec: number) => void;
+  /** Set the room's playback rate (host). Syncs to everyone via the anchor. */
+  setRate: (rate: number) => void;
   transferHost: (userId: string) => Promise<void>;
   claimHost: () => void;
   // room administration (host-only server-side)
@@ -129,6 +131,7 @@ export function useParty(opts: {
         void client.seek(Math.max(0, curSec + deltaSec) * 1000);
       },
       seekTo: (sec) => void client.seek(Math.max(0, sec) * 1000),
+      setRate: (rate) => void client.setRate(rate),
       transferHost: (uid) => client.transferHost(uid),
       claimHost: () => void client.claimHost(),
       setConfig: (patch, pw) => client.setConfig(patch, pw),

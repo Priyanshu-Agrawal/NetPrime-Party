@@ -175,6 +175,11 @@ export class PartySyncEngine {
       this.setRate(1);
       return;
     }
+    // The room's base playback rate (the host may have changed it). Drift
+    // correction nudges AROUND this base, and "in sync" means playing at exactly
+    // this rate — otherwise a non-1× room would drift every tick and hard-seek
+    // forever. (base === 1 → identical to the original 1× behavior.)
+    const base = this.anchor.rate || 1;
     const exp = this.expectedSec();
     const rawDrift = e.currentTime - exp;
     this.driftSamples.push(rawDrift);
@@ -191,7 +196,7 @@ export class PartySyncEngine {
         this.correcting = false;
         this.driftEma = 0;
         this.driftSamples.length = 0;
-        this.setRate(1);
+        this.setRate(base);
         this.player.seek(exp);
       }
       return;
@@ -199,18 +204,19 @@ export class PartySyncEngine {
     this.persist = 0;
 
     const ema = this.driftEma;
+    const nudge = (): number => clamp(base * (1 - ema / SYNC_WINDOW_S), base * RATE_MIN, base * RATE_MAX);
     if (this.correcting) {
       if (Math.abs(ema) < RESET_BAND_S) {
         this.correcting = false;
-        this.setRate(1);
+        this.setRate(base);
       } else {
-        this.setRate(clamp(1 - ema / SYNC_WINDOW_S, RATE_MIN, RATE_MAX));
+        this.setRate(nudge());
       }
     } else if (Math.abs(ema) >= DEAD_BAND_S) {
       this.correcting = true;
-      this.setRate(clamp(1 - ema / SYNC_WINDOW_S, RATE_MIN, RATE_MAX));
+      this.setRate(nudge());
     } else {
-      this.setRate(1);
+      this.setRate(base);
     }
   }
 }

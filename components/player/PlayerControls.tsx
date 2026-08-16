@@ -62,6 +62,8 @@ export interface PlayerControlsProps {
   onToggleFullscreen?: () => void;
   /** Guest tap-to-sync (jump to live) when out of sync. */
   onTapSync?: () => void;
+  /** Open the player settings sheet (speed / quality). */
+  onOpenSettings?: () => void;
 }
 
 const AUTO_HIDE_MS = 3800;
@@ -77,7 +79,17 @@ function fmt(sec: number): string {
 
 export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsProps>(
   (
-    { canControl, roomPlaying, onPlay, onPause, onSeekTo, onSeekBy, onToggleFullscreen, onTapSync },
+    {
+      canControl,
+      roomPlaying,
+      onPlay,
+      onPause,
+      onSeekTo,
+      onSeekBy,
+      onToggleFullscreen,
+      onTapSync,
+      onOpenSettings,
+    },
     ref,
   ) => {
     const [paused, setPaused] = useState(true);
@@ -244,6 +256,11 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                 </View>
               </View>
               <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
+              {onOpenSettings ? (
+                <Pressable style={styles.fsBtn} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
+                  <Ionicons name="settings-outline" size={ms(16)} color={colors.text} />
+                </Pressable>
+              ) : null}
               {onToggleFullscreen ? (
                 <Pressable style={styles.fsBtn} onPress={onToggleFullscreen} hitSlop={8}>
                   <Ionicons name="expand" size={ms(17)} color={colors.text} />
