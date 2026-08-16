@@ -11,9 +11,8 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 - **Expo SDK 53 / React Native 0.79 / React 19**, New Architecture (Bridgeless) ON.
 - **expo-router** file-based navigation (`app/`).
 - **Supabase** (`kdcghbuknadvcmjctsqk`) — anon auth, Postgres RPCs, Realtime.
-- **react-native-webview 13.13.5** — provider video embeds.
+- **react-native-webview 13.13.5** — provider video embeds (primary playback engine).
 - **react-native-mmkv v4**, **reanimated**, **@gorhom/bottom-sheet**, **expo-blur**.
-- **expo-video ~2.2.3** — installed, not yet wired (see native-player plan).
 - Dev tooling: **execbro-sdk** (feeds the ExecBro MCP; `devtools/execbro.ts`) + **Chrome DevTools over CDP via adb** (see `player-and-injection.md`).
 
 ## Screens (`app/`)
@@ -31,13 +30,13 @@ Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
 | **Watch-party authority + sync** | `services/party/*`, `supabase/migrations/*` | [watch-party-sync.md](./watch-party-sync.md) |
 | **Chat / GIFs / reactions / timestamps** | `services/party/usePartyChat.ts`, `services/gifs.ts`, `components/party/*` | [chat-and-reactions.md](./chat-and-reactions.md) |
 | **App shell / navigation / data / storage** | `app/*`, `contexts/*`, `utils/*`, `theme/*` | [app-shell-and-data.md](./app-shell-and-data.md) |
-| **Native player (planned)** | `components/player/*` (POC) | [native-player.md](./native-player.md) |
+| **Native player (REJECTED as playback)** | research only | [native-player.md](./native-player.md) · [plan](../plans/webview-native-features.md) |
 | **Streaming-integration research** | notes (p-stream / providers landscape) | [../research/streaming-integration-research.md](../research/streaming-integration-research.md) |
 
 ## Playback model (two players today)
 - **Solo** (`app/(player)/player.tsx`): a plain `WebView` of the provider embed — the provider's own page + controls, no injection.
 - **Party** (`app/party.tsx`): `components/player/HijackPlayer.tsx` — a WebView with an **injected JS bridge** so the app can BOTH observe (play/pause/seek/time) AND drive the `<video>`. This powers sync. See [player-and-injection.md](./player-and-injection.md).
-- **Native (planned)**: `expo-video` fed by an `.m3u8` **sniffed from a hidden resolver WebView** — unlocks PiP/cast/background + a native dub picker. See [native-player.md](./native-player.md).
+- **Native playback (REJECTED):** sniffing the provider `.m3u8` into `expo-video` cannot self-heal ephemeral WAF tokens. WebView stays primary; native **features** (PiP/AirPlay/background) wrap the WebView — [webview-native-features.md](../plans/webview-native-features.md). Resolver/dub notes remain in [native-player.md](./native-player.md).
 
 ## Watch party (`services/party/*`)
 > **Deep dive: [watch-party-sync.md](./watch-party-sync.md)** (anchor math, epoch/seq, the
@@ -57,6 +56,6 @@ Fully **Supabase-only authority** (replaced an older Realtime relay that lived i
 - Local: MMKV — watch history (`utils/history.ts`), watchlist (`utils/watchlist.ts`), prefs (`utils/prefs.ts`).
 
 ## Gotchas (don't relitigate)
-- **`@movie-web/providers` was REMOVED** (uninstalled) — its native scrapers resolved nothing (source sites rotted), so `resolveNativeStream` + `utils/polyfills.ts` are gone. Native playback resolves via the **hidden-WebView sniff** instead. (If we ever revisit on-device extraction, the maintained `@p-stream/providers` fork is the candidate — a fresh install, not this package.)
+- **`@movie-web/providers` was REMOVED** (uninstalled) — its native scrapers resolved nothing (source sites rotted), so `resolveNativeStream` + `utils/polyfills.ts` are gone. Native-sniff **playback** was also **rejected** (ephemeral WAF tokens). (If we ever revisit on-device extraction, the maintained `@p-stream/providers` fork is the candidate — a fresh install, not this package.)
 - Emulator `screencap` returns **black once a provider `<video>` binds** (hardware surface) — verify via CDP/fiber, not pixels.
 - `bearoom://` scheme + PiP/background need a **native rebuild** (config in `app.json`, but the installed dev build may predate it).
