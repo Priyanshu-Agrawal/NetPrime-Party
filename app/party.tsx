@@ -242,9 +242,14 @@ export default function Party() {
 
   // Native fullscreen: rotate + expand our player. (HTML5 requestFullscreen needs a
   // gesture INSIDE the WebView that an RN tap can't supply, so we do it RN-side; our
-  // overlay stays on top.)
+  // overlay stays on top.) A black mask covers the WebView reflow + OS rotation, then
+  // fades out once it settles — otherwise videasy's chrome / a white flash / an
+  // overscaled poster show for a frame or two mid-transition.
+  const maskAnim = useRef(new Animated.Value(0)).current;
   const toggleFullscreen = () => {
     const next = !fullscreen;
+    maskAnim.setValue(1);
+    Animated.timing(maskAnim, { toValue: 0, duration: 320, delay: 520, useNativeDriver: true }).start();
     setFullscreen(next);
     (async () => {
       try {
@@ -524,6 +529,15 @@ export default function Party() {
               <FloatingEmoji key={r.id} reaction={r} offset={i} />
             ))}
           </View>
+
+          {/* Fullscreen-rotation mask — hides the WebView reflow + OS rotation. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.black, opacity: maskAnim, zIndex: 100, elevation: 100 },
+            ]}
+          />
         </View>
 
         {/* Host status bar — playback is driven by the web player's own controls

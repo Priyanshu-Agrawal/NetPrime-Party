@@ -32,7 +32,7 @@ import { useFocusEffect, useGlobalSearchParams, useNavigation, useRouter } from 
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
@@ -188,8 +188,12 @@ export const Player: React.FC = () => {
     updateBackgroundPlaybackState(e.paused, Number(e.currentTime) || 0, Number(e.duration) || 0);
   };
 
+  const maskAnim = useRef(new Animated.Value(0)).current;
   const toggleFullscreen = () => {
     const next = !fullscreen;
+    // Black mask over the WebView reflow + OS rotation, faded out once it settles.
+    maskAnim.setValue(1);
+    Animated.timing(maskAnim, { toValue: 0, duration: 320, delay: 520, useNativeDriver: true }).start();
     setFullscreen(next);
     (async () => {
       try {
@@ -263,6 +267,14 @@ export const Player: React.FC = () => {
               ) : null}
             </>
           ) : null}
+          {/* Fullscreen-rotation mask — hides the WebView reflow + OS rotation. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.black, opacity: maskAnim, zIndex: 100, elevation: 100 },
+            ]}
+          />
         </View>
 
         {/* Kept mounted in fullscreen (the absolute player covers it) to avoid an

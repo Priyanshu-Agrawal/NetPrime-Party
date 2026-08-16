@@ -6,8 +6,9 @@
 import GlassCard from "@/components/ui/GlassCard";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { colors, font, ms, radius } from "@/theme/bearoom";
-import { fetchDetails } from "@/utils/tmdbDetails";
+import { fetchDetails, img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +20,9 @@ interface Season {
 interface Episode {
   episode_number: number;
   name?: string;
+  still_path?: string;
+  overview?: string;
+  runtime?: number;
 }
 
 export interface EpisodeSheetProps {
@@ -116,11 +120,32 @@ export default function EpisodeSheet({
                           onClose();
                         }}
                       >
-                        <Text style={[styles.epNum, on && styles.epNumOn]}>{item.episode_number}</Text>
-                        <Text style={[styles.epName, on && styles.epNameOn]} numberOfLines={1}>
-                          {item.name || `Episode ${item.episode_number}`}
-                        </Text>
-                        {on ? <Ionicons name="play" size={ms(14)} color={colors.honey} /> : null}
+                        <View style={styles.thumbWrap}>
+                          <Image
+                            source={img(item.still_path, "w300")}
+                            style={styles.thumb}
+                            contentFit="cover"
+                            transition={150}
+                          />
+                          {on ? (
+                            <View style={styles.thumbPlaying}>
+                              <Ionicons name="play" size={ms(16)} color={colors.onHoney} />
+                            </View>
+                          ) : null}
+                        </View>
+                        <View style={styles.epInfo}>
+                          <View style={styles.epTitleRow}>
+                            <Text style={[styles.epName, on && styles.epNameOn]} numberOfLines={1}>
+                              {item.episode_number}. {item.name || `Episode ${item.episode_number}`}
+                            </Text>
+                            {item.runtime ? <Text style={styles.epRuntime}>{item.runtime}m</Text> : null}
+                          </View>
+                          {item.overview ? (
+                            <Text style={styles.epOverview} numberOfLines={2}>
+                              {item.overview}
+                            </Text>
+                          ) : null}
+                        </View>
                       </Pressable>
                     );
                   }}
@@ -163,23 +188,38 @@ const styles = StyleSheet.create({
   list: { maxHeight: ms(300), marginTop: ms(6) },
   epRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: ms(12),
-    paddingVertical: ms(11),
-    paddingHorizontal: ms(4),
+    alignItems: "flex-start",
+    gap: ms(11),
+    paddingVertical: ms(9),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   epRowOn: {},
-  epNum: {
-    color: colors.textDim,
-    fontFamily: font.headlineSemi,
-    fontSize: ms(14),
-    minWidth: ms(24),
-    textAlign: "center",
+  thumbWrap: {
+    width: ms(112),
+    height: ms(63),
+    borderRadius: radius.sm,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceStrong,
   },
-  epNumOn: { color: colors.honey },
-  epName: { flex: 1, color: colors.text, fontFamily: font.body, fontSize: ms(14) },
+  thumb: { width: "100%", height: "100%" },
+  thumbPlaying: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(240,169,60,0.34)",
+  },
+  epInfo: { flex: 1, paddingTop: ms(1) },
+  epTitleRow: { flexDirection: "row", alignItems: "center", gap: ms(8) },
+  epName: { flex: 1, color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
   epNameOn: { color: colors.honey },
+  epRuntime: { color: colors.textDim, fontFamily: font.label, fontSize: ms(10) },
+  epOverview: {
+    color: colors.textDim,
+    fontFamily: font.body,
+    fontSize: ms(11),
+    lineHeight: ms(15),
+    marginTop: ms(3),
+  },
   dim: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13), paddingVertical: ms(16) },
 });
