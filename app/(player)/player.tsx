@@ -9,6 +9,7 @@ import {
   providerHosts,
   type Provider,
 } from "@/components/player/providerRegistry";
+import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import {
   SOLO_BG_JS,
@@ -81,6 +82,15 @@ export const Player: React.FC = () => {
 
   const navigation = useNavigation();
   const router = useRouter();
+
+  // Resist accidental exit: hardware back confirms before closing the player.
+  useMediaCloseGuard({
+    title: "Stop watching?",
+    message: "This will close the player.",
+    confirmLabel: "Close",
+    onConfirm: () => router.back(),
+  });
+
   const sheetRef = useRef<BottomSheetModal>(null);
   const webRef = useRef<WebView>(null);
   const sessionStarted = useRef(false);

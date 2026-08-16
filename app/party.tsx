@@ -21,6 +21,7 @@ import HijackPlayer, {
 import GifPicker from "@/components/party/GifPicker";
 import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
+import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
 import { getDisplayName } from "@/services/party/identity";
 import type { Member, PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
@@ -196,6 +197,15 @@ export default function Party() {
   const sessionTitleRef = useRef("Bearoom party");
   sessionTitleRef.current = media?.title || params.title || "Bearoom party";
 
+  // Resist accidental exit: hardware back + the top-bar chevron confirm first.
+  const { requestClose } = useMediaCloseGuard({
+    title: "Leave the party?",
+    message: "You'll leave this watch room and stop syncing with everyone.",
+    confirmLabel: "Leave",
+    onConfirm: () => router.back(),
+    enabled: hasMedia,
+  });
+
   // Removed by the host → bounce out with a note.
   useEffect(() => {
     if (!party.kicked) return;
@@ -345,7 +355,7 @@ export default function Party() {
       >
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-          <Pressable style={styles.glassRound} onPress={() => router.back()} hitSlop={8}>
+          <Pressable style={styles.glassRound} onPress={requestClose} hitSlop={8}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </Pressable>
           <Pressable style={styles.codePill} onPress={share}>
