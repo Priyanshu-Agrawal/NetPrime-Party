@@ -309,7 +309,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           </View>
 
           {/* Frosted-glass bottom bar: time · scrub · time · fullscreen */}
-          <GlassCard blur rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
+          {/* blur={false} is LOAD-BEARING: a BlurView (dimezisBlurView) over the playing
+              video re-samples + blurs it every frame on the GPU and badly stutters
+              playback (device-confirmed, esp. 4K). Keep this a solid bar, never a blur. */}
+          <GlassCard blur={false} rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
             <View style={styles.bottomRow} pointerEvents="box-none">
               <Text style={styles.time}>{fmt(displayTime)}</Text>
               <View
@@ -427,6 +430,8 @@ const styles = StyleSheet.create({
     left: ms(10),
     right: ms(10),
     bottom: ms(10),
+    // Solid dark backing (NOT a live blur — see below) so the controls stay readable.
+    backgroundColor: "rgba(18,14,10,0.62)",
     ...glow.soft,
   },
   bottomRow: {

@@ -45,7 +45,9 @@ export default function PlayerSettingsSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.wrap} onPress={() => {}}>
-          <GlassCard blur rounded={radius.xxl} bordered>
+          {/* Solid, not a live blur: blurring the playing video behind the sheet
+              stutters it on the GPU (device-confirmed). */}
+          <GlassCard blur={false} rounded={radius.xxl} bordered style={styles.solidSheet}>
             <View style={[styles.inner, { paddingBottom: Math.max(insets.bottom, ms(16)) }]}>
               <View style={styles.handle} />
               <Text style={styles.title}>Player</Text>
@@ -109,6 +111,7 @@ export default function PlayerSettingsSheet({
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(8,6,4,0.55)", justifyContent: "flex-end" },
+  solidSheet: { backgroundColor: "rgba(20,16,12,0.97)" },
   wrap: { paddingHorizontal: ms(10), paddingBottom: ms(10) },
   inner: { paddingHorizontal: ms(18), paddingTop: ms(10) },
   handle: {

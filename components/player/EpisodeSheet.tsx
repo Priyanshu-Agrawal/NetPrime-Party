@@ -25,12 +25,10 @@ import {
   BottomSheetModal,
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
-import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import React, { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -212,19 +210,10 @@ export const EpisodeSheet = forwardRef<BottomSheetModal, EpisodeSheetProps>(
 
 EpisodeSheet.displayName = "EpisodeSheet";
 
-/** Frosted-glass sheet background (blurs the player behind it). */
+/** Solid dark sheet background — NOT a live blur: blurring the playing video behind the
+ *  sheet stutters it on the GPU (device-confirmed). */
 function SheetBackground({ style }: any) {
-  return (
-    <View style={[style, styles.sheetBgClip]}>
-      <BlurView
-        intensity={48}
-        tint="dark"
-        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={[StyleSheet.absoluteFill, styles.sheetBgTint]} />
-    </View>
-  );
+  return <View style={[style, styles.sheetBgClip]} />;
 }
 
 export default EpisodeSheet;
@@ -235,10 +224,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
     overflow: "hidden",
-    backgroundColor: "rgba(16,13,10,0.72)",
-  },
-  sheetBgTint: {
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(16,13,10,0.95)",
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
