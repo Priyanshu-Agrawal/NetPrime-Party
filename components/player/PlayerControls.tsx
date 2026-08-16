@@ -252,11 +252,11 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           <View style={styles.center} pointerEvents="box-none">
             {canControl ? (
               <View style={styles.centerRow} pointerEvents="box-none">
-                <Pressable style={styles.chip} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
+                <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
                   <MaterialIcons name="replay-10" size={ms(29)} color={colors.text} />
                 </Pressable>
                 <Pressable
-                  style={styles.playBtn}
+                  style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}
                   onPress={() => {
                     if (paused) onPlay();
                     else onPause();
@@ -271,12 +271,12 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                     style={paused ? { marginLeft: ms(3) } : undefined}
                   />
                 </Pressable>
-                <Pressable style={styles.chip} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
+                <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
                   <MaterialIcons name="forward-10" size={ms(29)} color={colors.text} />
                 </Pressable>
               </View>
             ) : outOfSync ? (
-              <Pressable style={styles.syncBtn} onPress={() => { onTapSync?.(); show(); }} hitSlop={10}>
+              <Pressable style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]} onPress={() => { onTapSync?.(); show(); }} hitSlop={10}>
                 <Ionicons name="flash" size={ms(16)} color={colors.onHoney} />
                 <Text style={styles.syncText}>Tap to sync</Text>
               </Pressable>
@@ -303,12 +303,12 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               </View>
               <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
               {onOpenSettings ? (
-                <Pressable style={styles.fsBtn} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
+                <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
                   <Ionicons name="settings-outline" size={ms(16)} color={colors.text} />
                 </Pressable>
               ) : null}
               {onToggleFullscreen ? (
-                <Pressable style={styles.fsBtn} onPress={onToggleFullscreen} hitSlop={8}>
+                <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={onToggleFullscreen} hitSlop={8}>
                   <Ionicons name="expand" size={ms(17)} color={colors.text} />
                 </Pressable>
               ) : null}
@@ -325,6 +325,9 @@ PlayerControls.displayName = "PlayerControls";
 const styles = StyleSheet.create({
   center: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   centerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(26) },
+  // Press feedback: round controls dim + shrink slightly; flat icon buttons just dim.
+  pressed: { opacity: 0.5, transform: [{ scale: 0.92 }] },
+  pressedFlat: { opacity: 0.45 },
   // Translucent honey-accented glass chip (blur-free for perf — matches the party pills).
   chip: {
     width: ms(52),

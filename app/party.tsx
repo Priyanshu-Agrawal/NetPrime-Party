@@ -471,8 +471,11 @@ export default function Party() {
                   onToggleFullscreen={toggleFullscreen}
                   onTapSync={party.jumpToLive}
                   onOpenSettings={() => {
+                    // Both reads drive videasy's ONE settings tab, so stagger them —
+                    // firing at once makes audio steal the active tab before quality
+                    // finishes reading (→ empty quality panel, stuck on "Loading…").
                     playerRef.current?.readQuality();
-                    playerRef.current?.readAudio();
+                    setTimeout(() => playerRef.current?.readAudio(), 750);
                     setShowPlayerSettings(true);
                   }}
                 />
