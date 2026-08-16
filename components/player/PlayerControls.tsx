@@ -28,6 +28,7 @@ import React, {
   useState,
 } from "react";
 import {
+  ActivityIndicator,
   Animated,
   LayoutChangeEvent,
   PanResponder,
@@ -41,6 +42,8 @@ export interface PlaybackState {
   currentTime: number;
   duration: number;
   paused: boolean;
+  /** HTMLMediaElement.readyState; <3 while playing ⇒ the stream stalled → spinner. */
+  readyState?: number;
 }
 
 export interface PlayerControlsHandle {
@@ -105,6 +108,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     const [visible, setVisible] = useState(true);
     const [barWidth, setBarWidth] = useState(0);
     const [scrubbing, setScrubbing] = useState(false);
+    // Buffering spinner: the stream stalled (readyState<3) while meant to be playing.
+    const [buffering, setBuffering] = useState(false);
+    const bufferingRef = useRef(false);
+    const bufferTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrubbingRef = useRef(false);
     const durationRef = useRef(0);
     // Commit-hold: after release, keep the thumb at the dropped spot until the video
@@ -122,6 +129,29 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           if (Number.isFinite(s.duration)) {
             setDuration(s.duration);
             durationRef.current = s.duration;
+          }
+          // Buffering: the stream stalled (readyState<3) while meant to be playing —
+          // segment starvation. videasy used to show its own spinner here; we hid its
+          // chrome, so surface our own. Debounced so a brief dip (e.g. just after a
+          // seek) doesn't flash the spinner.
+          const stalled = !s.paused && typeof s.readyState === "number" && s.readyState < 3;
+          if (stalled && !bufferingRef.current) {
+            if (bufferTimer.current == null) {
+              bufferTimer.current = setTimeout(() => {
+                bufferTimer.current = null;
+                bufferingRef.current = true;
+                setBuffering(true);
+              }, 450);
+            }
+          } else if (!stalled) {
+            if (bufferTimer.current != null) {
+              clearTimeout(bufferTimer.current);
+              bufferTimer.current = null;
+            }
+            if (bufferingRef.current) {
+              bufferingRef.current = false;
+              setBuffering(false);
+            }
           }
           // Committed seek reached its target → resume following live.
           if (seekTargetRef.current != null && Math.abs(s.currentTime - seekTargetRef.current) < 1.5) {
@@ -158,6 +188,14 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     useEffect(() => {
       setVisible(true);
     }, [paused]);
+
+    // Clear the buffering-debounce timer on unmount.
+    useEffect(
+      () => () => {
+        if (bufferTimer.current) clearTimeout(bufferTimer.current);
+      },
+      [],
+    );
 
     const show = useCallback(() => {
       setVisible(true);
@@ -310,6 +348,17 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             </View>
           </GlassCard>
         </Animated.View>
+
+        {/* Buffering spinner — OUTSIDE the auto-hide fade, so a stalled stream shows
+            feedback even when the controls are hidden (the case we regressed by hiding
+            videasy's own spinner). */}
+        {buffering ? (
+          <View style={styles.bufferLayer} pointerEvents="none">
+            <View style={styles.bufferBadge}>
+              <ActivityIndicator color={colors.honeyBright} size="large" />
+            </View>
+          </View>
+        ) : null}
       </Pressable>
     );
   },
@@ -319,6 +368,15 @@ PlayerControls.displayName = "PlayerControls";
 
 const styles = StyleSheet.create({
   center: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  bufferLayer: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  bufferBadge: {
+    width: ms(78),
+    height: ms(78),
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(16,13,10,0.55)",
+  },
   centerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(26) },
   // Press feedback: round controls dim + shrink slightly; flat icon buttons just dim.
   pressed: { opacity: 0.5, transform: [{ scale: 0.92 }] },

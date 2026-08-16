@@ -55,6 +55,9 @@ export interface PlayerEvent {
   currentTime: number;
   duration: number;
   paused: boolean;
+  /** HTMLMediaElement.readyState. <3 while playing ⇒ the stream stalled/buffering
+   *  (segment starvation) — drives the buffering spinner. */
+  readyState?: number;
   /** Only on a "quality" event — the provider's available quality levels. */
   qualities?: QualityLevel[];
   /** Only on an "audio" event — the provider's available audio/dub tracks. */
@@ -175,10 +178,10 @@ const BRIDGE_JS = `
         if (isApplying()) return;
         if (ev === 'play' || ev === 'playing') wasPlaying = true;
         if (ev === 'pause' || ev === 'ended') wasPlaying = false;
-        post({ event:ev, currentTime:v.currentTime||0, duration:v.duration||0, paused:!!v.paused });
+        post({ event:ev, currentTime:v.currentTime||0, duration:v.duration||0, paused:!!v.paused, readyState:v.readyState });
       });
     });
-    post({ event:'ready', currentTime:v.currentTime||0, duration:v.duration||0, paused:!!v.paused });
+    post({ event:'ready', currentTime:v.currentTime||0, duration:v.duration||0, paused:!!v.paused, readyState:v.readyState });
   }
   var finder = setInterval(function(){
     var v = findVideo(document);
@@ -193,7 +196,7 @@ const BRIDGE_JS = `
   });
   setInterval(function(){
     keepAlive();
-    if (vid) post({ event:'tick', currentTime:vid.currentTime||0, duration:vid.duration||0, paused:!!vid.paused });
+    if (vid) post({ event:'tick', currentTime:vid.currentTime||0, duration:vid.duration||0, paused:!!vid.paused, readyState:vid.readyState });
   }, 1000);
   window.__soloKeepAlive = keepAlive;
   // --- Quality (videasy's settings tab; hls.js isn't reachable, so drive the DOM

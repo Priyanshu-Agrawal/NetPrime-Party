@@ -351,6 +351,7 @@ export default function Party() {
       currentTime: e.currentTime || 0,
       duration: e.duration || 0,
       paused: !!e.paused,
+      readyState: e.readyState,
     });
     if (!isBackgroundPlaybackAvailable()) return;
     if (e.event === "ended") {

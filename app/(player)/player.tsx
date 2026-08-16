@@ -159,6 +159,7 @@ export const Player: React.FC = () => {
       currentTime: e.currentTime || 0,
       duration: e.duration || 0,
       paused: !!e.paused,
+      readyState: e.readyState,
     });
     // Background audio (Android): start the FGS on real playback, keep it fed. Skip
     // while blurred (e.g. behind the party) so we don't fight it for the shared session.
