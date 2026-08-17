@@ -10,6 +10,7 @@ import {
 } from "@/components/details/sections";
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import { DetailsSkeleton, EpisodeRowSkeleton } from "@/src/ui";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
@@ -38,7 +39,6 @@ import type { RouteProp } from "@react-navigation/native";
 import type { PlayerStackParamList } from "@/src/navigation/types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   FlatList,
   Linking,
@@ -135,11 +135,7 @@ const TvDetailsScreen: React.FC = () => {
   }, [d]);
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.honey} />
-      </View>
-    );
+    return <DetailsSkeleton />;
   }
   if (error || !d) {
     return (
@@ -389,7 +385,7 @@ const TvDetailsScreen: React.FC = () => {
                 </Pressable>
               ))
             ) : (
-              <ActivityIndicator color={colors.honey} style={{ marginTop: 20 }} />
+              <EpisodeRowSkeleton />
             )}
           </Section>
         ) : null}

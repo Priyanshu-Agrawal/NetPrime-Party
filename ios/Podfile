@@ -49,6 +49,30 @@ target 'Bearoom' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
+# @generated begin bearoom-fmt-xcode-post-install - expo prebuild (DO NOT MODIFY) sync-b19a0849a413e80b90410e000ab2f7f26190d13e
+    # fmt 11.0.2 + Xcode 26 Clang: FMT_STRING is not a constant expression.
+    installer.pods_project.targets.each do |target|
+      if target.name == 'fmt'
+        target.build_configurations.each do |config|
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        end
+      end
+    end
+    fmt_base = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base)
+      content = File.read(fmt_base)
+      unless content.include?('Bearoom Xcode 26 fmt workaround')
+        patched = content.gsub(
+          /^(#elif defined\(__cpp_consteval\)\n#\s+define FMT_USE_CONSTEVAL) 1/,
+          "// Bearoom Xcode 26 fmt workaround: disable consteval\n\\1 0"
+        )
+        if patched != content
+          File.chmod(0644, fmt_base)
+          File.write(fmt_base, patched)
+        end
+      end
+    end
+# @generated end bearoom-fmt-xcode-post-install
 
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.

@@ -8,6 +8,7 @@ export { GlassChip } from "./GlassChip";
 export { Chip } from "./Chip";
 export { PosterCard } from "./PosterCard";
 export { PosterSkeleton } from "./PosterSkeleton";
+export { DetailsSkeleton, EpisodeRowSkeleton } from "./DetailsSkeleton";
 export { LibraryScreenHeader } from "./LibraryScreenHeader";
 export { RatingBadge } from "./RatingBadge";
 export { Badge } from "./Badge";

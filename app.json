@@ -32,6 +32,7 @@
     "plugins": [
       "expo-dev-client",
       "./plugins/bearoom-playback/app.plugin.js",
+      "./plugins/with-fmt-xcode-fix.js",
       [
         "expo-splash-screen",
         {
