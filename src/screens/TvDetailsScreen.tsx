@@ -32,10 +32,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { goBack, openPartyHost, openPlayer } from "@/src/navigation/actions";
+import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootNavigation } from "@/src/navigation/helpers";
 import type { PlayerStackParamList } from "@/src/navigation/types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -57,8 +56,6 @@ const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.3);
 
 const TvDetailsScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
-  const rootNavigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<PlayerStackParamList, "TvDetails">>();
   const { id } = route.params;
@@ -161,7 +158,7 @@ const TvDetailsScreen: React.FC = () => {
       episode: ep,
       poster_path: d.poster_path,
     });
-    navigation.navigate("Player", {
+    openPlayer({
       id: id!.toString(),
       type: "tv",
       season: String(sea),
@@ -179,7 +176,7 @@ const TvDetailsScreen: React.FC = () => {
 
   const handleWatchTogether = () => {
     const firstEp = seasonData?.episodes?.[0]?.episode_number ?? 1;
-    rootNavigation.navigate("Party", {
+    openPartyHost({
       role: "host",
       room: genRoomCode(),
       provider: defaultHijackProvider()?.id,
@@ -218,7 +215,7 @@ const TvDetailsScreen: React.FC = () => {
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>
-          <GlassIconButton onPress={() => navigation.goBack()}>
+          <GlassIconButton onPress={goBack}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </GlassIconButton>
           <Animated.Text numberOfLines={1} style={[styles.headerTitle, headerTitleStyle]}>

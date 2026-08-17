@@ -6,7 +6,6 @@
  */
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import {
-  fetchList,
   itemTitle,
   itemType,
   itemYear,
@@ -17,7 +16,8 @@ import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { navigate, navigateDetails } from "@/src/navigation/navigationRef";
+import { loadHero } from "@/src/features/home/tmdbCache";
+import { openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
@@ -41,8 +41,8 @@ export function HeroCarousel() {
 
   useEffect(() => {
     let aborted = false;
-    fetchList("trending/all/week")
-      .then((r) => !aborted && setItems(r.filter((m) => m.backdrop_path).slice(0, 8)))
+    loadHero()
+      .then((r) => !aborted && setItems(r))
       .catch(() => {});
     return () => {
       aborted = true;
@@ -69,23 +69,20 @@ export function HeroCarousel() {
   const play = (item: MediaItem) => {
     const type = itemType(item, "movie");
     if (type === "movie") {
-      navigate("PlayerStack", {
-        screen: "Player",
-        params: {
-          id: String(item.id),
-          type: "movie",
-          title: itemTitle(item),
-          poster_path: item.poster_path || "",
-          year: itemYear(item),
-        },
+      openPlayer({
+        id: String(item.id),
+        type: "movie",
+        title: itemTitle(item),
+        poster_path: item.poster_path || "",
+        year: itemYear(item),
       });
     } else {
-      navigateDetails(item, "tv");
+      openDetails(item, "tv");
     }
   };
 
-  const openDetails = (item: MediaItem, fallback: "movie" | "tv") => {
-    navigateDetails(item, fallback);
+  const goDetails = (item: MediaItem, fallback: "movie" | "tv") => {
+    openDetails(item, fallback);
   };
 
   if (items.length === 0) {
@@ -107,7 +104,7 @@ export function HeroCarousel() {
           return (
             <Pressable
               style={styles.slide}
-              onPress={() => openDetails(item, "movie")}
+              onPress={() => goDetails(item, "movie")}
             >
               <Image
                 source={{ uri: `https://image.tmdb.org/t/p/w780${item.backdrop_path}` }}
@@ -161,7 +158,7 @@ export function HeroCarousel() {
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [styles.infoBtn, pressed && styles.pressed]}
-                    onPress={() => openDetails(item, "movie")}
+                    onPress={() => goDetails(item, "movie")}
                   >
                     <Ionicons name="information-circle-outline" size={18} color={colors.text} />
                     <Text style={styles.infoText}>Details</Text>
@@ -169,7 +166,7 @@ export function HeroCarousel() {
                   <Pressable
                     style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]}
                     onPress={() =>
-                      navigate("Party", {
+                      openPartyHost({
                         role: "host",
                         room: genRoomCode(),
                         provider: defaultHijackProvider()?.id,

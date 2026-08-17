@@ -1,6 +1,6 @@
 import { getWatchHistory } from "@/utils/history";
 import { MaterialIcons } from "@expo/vector-icons";
-import { navigate } from "@/src/navigation/navigationRef";
+import { openPlayer } from "@/src/navigation/actions";
 import type { PlayerStackParamList } from "@/src/navigation/types";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
@@ -74,10 +74,7 @@ export default function WatchHistory() {
       }
     }
 
-    navigate("PlayerStack", {
-      screen: "Player",
-      params,
-    });
+    openPlayer(params);
   }
 
   return (

@@ -1,1 +1,1 @@
-export { default } from "@/components/watchHistory";
+export { default } from "@/src/features/profile/WatchHistoryView";

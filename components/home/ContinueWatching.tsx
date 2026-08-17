@@ -9,7 +9,7 @@ import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { navigate } from "@/src/navigation/navigationRef";
+import { openPlayer } from "@/src/navigation/actions";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -42,16 +42,13 @@ export function ContinueWatching() {
   if (items.length === 0) return null;
 
   const resume = (item: HistoryItem) => {
-    navigate("PlayerStack", {
-      screen: "Player",
-      params: {
-        id: item.id,
-        type: item.type === "tv" ? "tv" : "movie",
-        ...(item.season ? { season: item.season } : {}),
-        ...(item.episode ? { ep: item.episode } : {}),
-        title: item.title,
-        poster_path: item.poster_path || "",
-      },
+    openPlayer({
+      id: item.id,
+      type: item.type === "tv" ? "tv" : "movie",
+      ...(item.season ? { season: item.season } : {}),
+      ...(item.episode ? { ep: item.episode } : {}),
+      title: item.title,
+      poster_path: item.poster_path || "",
     });
   };
 

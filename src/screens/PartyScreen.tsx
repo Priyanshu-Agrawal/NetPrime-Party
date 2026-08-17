@@ -33,9 +33,9 @@ import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/service
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { exitMedia } from "@/src/navigation/actions";
+import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
-import type { RootNavigation } from "@/src/navigation/helpers";
 import type { RootStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
@@ -145,7 +145,6 @@ function MessageText({ text, onSeek }: { text: string; onSeek: (sec: number) => 
 }
 
 export default function Party() {
-  const navigation = useNavigation<RootNavigation>();
   const route = useRoute<RouteProp<RootStackParamList, "Party">>();
   const insets = useSafeAreaInsets();
   const params = route.params ?? {};
@@ -236,7 +235,7 @@ export default function Party() {
     title: "Leave the party?",
     message: "You'll leave this watch room and stop syncing with everyone.",
     confirmLabel: "Leave",
-    onConfirm: () => navigation.goBack(),
+    onConfirm: exitMedia,
     enabled: hasMedia,
   });
 
@@ -244,9 +243,9 @@ export default function Party() {
   useEffect(() => {
     if (!party.kicked) return;
     bearAlert("Removed", "The host removed you from this room.", [
-      { text: "OK", onPress: () => navigation.goBack() },
+      { text: "OK", onPress: exitMedia },
     ]);
-  }, [party.kicked, navigation]);
+  }, [party.kicked]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {

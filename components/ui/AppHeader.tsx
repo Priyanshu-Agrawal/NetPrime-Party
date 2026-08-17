@@ -8,7 +8,7 @@
  */
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
-import { navigate } from "@/src/navigation/navigationRef";
+import { openJoinParty, openSearchTab } from "@/src/navigation/actions";
 import React from "react";
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
@@ -33,7 +33,7 @@ export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
         {showSearch ? (
           <Pressable
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-            onPress={onSearchPress ?? (() => navigate("MainTabs", { screen: "Search" }))}
+            onPress={onSearchPress ?? openSearchTab}
             hitSlop={6}
           >
             <Ionicons name="search" size={18} color={colors.text} />
@@ -41,7 +41,7 @@ export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
         ) : null}
         <Pressable
           style={({ pressed }) => [styles.hostBtn, pressed && styles.pressed]}
-          onPress={() => navigate("JoinParty")}
+          onPress={openJoinParty}
           hitSlop={6}
         >
           <Ionicons name="people" size={15} color={colors.onHoney} />

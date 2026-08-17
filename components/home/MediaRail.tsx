@@ -5,14 +5,17 @@
  * section icon (fire / heart / etc).
  */
 import {
-  fetchList,
   itemTitle,
   type MediaItem,
 } from "@/utils/tmdbLists";
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { navigateDetails } from "@/src/navigation/navigationRef";
+import {
+  getCachedList,
+  loadList,
+} from "@/src/features/home/tmdbCache";
+import { openDetails as openDetailsAction } from "@/src/navigation/actions";
 import React, { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -29,11 +32,10 @@ function PosterCard({
   const uri = item.poster_path
     ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
     : undefined;
-  const openDetails = () => navigateDetails(item, fallbackType);
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
-      onPress={openDetails}
+      onPress={() => openDetailsAction(item, fallbackType)}
     >
       <View style={styles.posterWrap}>
         {uri ? (
@@ -42,7 +44,7 @@ function PosterCard({
             style={styles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={300}
+            transition={0}
           />
         ) : (
           <View style={[styles.poster, styles.noPoster]}>
@@ -76,11 +78,11 @@ export function MediaRail({
   icon?: keyof typeof Ionicons.glyphMap;
   onSeeAll?: () => void;
 }) {
-  const [items, setItems] = useState<MediaItem[] | null>(null);
+  const [items, setItems] = useState<MediaItem[] | null>(() => getCachedList(path) ?? null);
 
   useEffect(() => {
     let aborted = false;
-    fetchList(path)
+    loadList(path)
       .then((r) => !aborted && setItems(r))
       .catch(() => !aborted && setItems([]));
     return () => {

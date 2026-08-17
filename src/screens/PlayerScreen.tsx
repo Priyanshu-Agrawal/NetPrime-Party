@@ -28,10 +28,10 @@ import { img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useKeepAwake } from "expo-keep-awake";
+import { exitMedia, openPartyHost } from "@/src/navigation/actions";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { RootNavigation } from "@/src/navigation/helpers";
 import type { PlayerStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
@@ -53,14 +53,13 @@ export const PlayerScreen: React.FC = () => {
   const { id, type, season, ep, title, poster_path } = route.params;
 
   const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
-  const rootNavigation = useNavigation<RootNavigation>();
 
   // Resist accidental exit: hardware back confirms before closing the player.
   useMediaCloseGuard({
     title: "Stop watching?",
     message: "This will close the player.",
     confirmLabel: "Close",
-    onConfirm: () => navigation.goBack(),
+    onConfirm: exitMedia,
   });
 
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -215,17 +214,17 @@ export const PlayerScreen: React.FC = () => {
 
   const startWatchParty = useCallback(() => {
     if (!isHijackable(selected) || !id) return;
-    rootNavigation.navigate("Party", {
-        role: "host",
-        room: genRoomCode(),
-        provider: selected.id,
-        id,
-        type: media.type,
-        ...(media.season ? { season: String(media.season) } : {}),
-        ...(media.episode ? { ep: String(media.episode) } : {}),
-        ...(title ? { title } : {}),
-      });
-  }, [selected, id, media, rootNavigation, title]);
+    openPartyHost({
+      role: "host",
+      room: genRoomCode(),
+      provider: selected.id,
+      id,
+      type: media.type,
+      ...(media.season ? { season: String(media.season) } : {}),
+      ...(media.episode ? { ep: String(media.episode) } : {}),
+      ...(title ? { title } : {}),
+    });
+  }, [selected, id, media, title]);
 
   const onSelectProvider = useCallback((pid: string) => {
     const p = getProvider(pid);
