@@ -1,10 +1,12 @@
 import AppHeader from "@/components/ui/AppHeader";
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
-import { detailsRoute, itemTitle, type MediaItem } from "@/utils/tmdbLists";
+import { navigateDetails } from "@/src/navigation/navigationRef";
+import { itemTitle, type MediaItem } from "@/utils/tmdbLists";
+import type { RootNavigation } from "@/src/navigation/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -66,8 +68,8 @@ function SkeletonCard() {
   );
 }
 
-const Search: React.FC = () => {
-  const router = useRouter();
+const SearchScreen: React.FC = () => {
+  const navigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
@@ -194,7 +196,7 @@ const Search: React.FC = () => {
     return (
       <Pressable
         style={styles.card}
-        onPress={() => router.push(detailsRoute(item, "movie") as any)}
+        onPress={() => navigateDetails(item, "movie")}
       >
         <View style={styles.posterWrap}>
           {uri ? (
@@ -244,7 +246,7 @@ const Search: React.FC = () => {
           <Pressable
             key={m.label}
             style={styles.moodTile}
-            onPress={() => (m.party ? router.push("/joinParty") : handleSearch(m.query))}
+            onPress={() => (m.party ? navigation.navigate("JoinParty") : handleSearch(m.query))}
           >
             <View style={styles.moodIcon}>
               <Ionicons name={m.icon} size={20} color={colors.honey} />
@@ -468,6 +470,4 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14) },
 });
 
-export const options = { animation: "fade" };
-
-export default React.memo(Search);
+export default React.memo(SearchScreen);

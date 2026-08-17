@@ -28,7 +28,11 @@ import { img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useKeepAwake } from "expo-keep-awake";
-import { useFocusEffect, useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootNavigation } from "@/src/navigation/helpers";
+import type { PlayerStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,27 +46,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
  * others fall back to the provider's own web controls. Background audio, fullscreen,
  * and the close-guard carry over. The "Watch Party" button launches the synced party.
  */
-export const Player: React.FC = () => {
+export const PlayerScreen: React.FC = () => {
   useKeepAwake();
 
-  const { id, type, season, ep, title, poster_path } = useGlobalSearchParams<{
-    id: string;
-    type: string;
-    season?: string;
-    ep?: string;
-    title?: string;
-    poster_path?: string;
-  }>();
+  const route = useRoute<RouteProp<PlayerStackParamList, "Player">>();
+  const { id, type, season, ep, title, poster_path } = route.params;
 
-  const navigation = useNavigation();
-  const router = useRouter();
+  const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
+  const rootNavigation = useNavigation<RootNavigation>();
 
   // Resist accidental exit: hardware back confirms before closing the player.
   useMediaCloseGuard({
     title: "Stop watching?",
     message: "This will close the player.",
     confirmLabel: "Close",
-    onConfirm: () => router.back(),
+    onConfirm: () => navigation.goBack(),
   });
 
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -84,10 +82,6 @@ export const Player: React.FC = () => {
   const displayTitle = title || "Bearoom";
   const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
   const canParty = isHijackable(selected);
-
-  useEffect(() => {
-    navigation.setOptions({ headerShown: false, animation: "fade" });
-  }, [navigation]);
 
   // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {
@@ -221,9 +215,7 @@ export const Player: React.FC = () => {
 
   const startWatchParty = useCallback(() => {
     if (!isHijackable(selected) || !id) return;
-    router.push({
-      pathname: "/party",
-      params: {
+    rootNavigation.navigate("Party", {
         role: "host",
         room: genRoomCode(),
         provider: selected.id,
@@ -232,9 +224,8 @@ export const Player: React.FC = () => {
         ...(media.season ? { season: String(media.season) } : {}),
         ...(media.episode ? { ep: String(media.episode) } : {}),
         ...(title ? { title } : {}),
-      },
-    });
-  }, [selected, id, media, router, title]);
+      });
+  }, [selected, id, media, rootNavigation, title]);
 
   const onSelectProvider = useCallback((pid: string) => {
     const p = getProvider(pid);
@@ -342,7 +333,7 @@ export const Player: React.FC = () => {
           tmdbId={media.tmdbId}
           season={media.season}
           episode={media.episode}
-          onSelect={(s, e) => router.setParams({ season: String(s), ep: String(e) })}
+          onSelect={(s, e) => navigation.setParams({ season: String(s), ep: String(e) })}
         />
       ) : null}
 
@@ -402,4 +393,4 @@ const styles = StyleSheet.create({
   partyTextDisabled: { color: colors.textFaint },
 });
 
-export default Player;
+export default PlayerScreen;

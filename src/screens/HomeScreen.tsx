@@ -5,33 +5,25 @@ import AppHeader from "@/components/ui/AppHeader";
 import GlassCard from "@/components/ui/GlassCard";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
-import { hasOnboarded } from "@/utils/prefs";
+import type { RootNavigation } from "@/src/navigation/helpers";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { Redirect, useNavigation, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect } from "react";
+import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default React.memo(function HomePage() {
-  const navigation = useNavigation();
-  const router = useRouter();
+  const navigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
   const headerBlurStyle = useFadeInStyle(scrollY, 24, 120);
-
-  useEffect(() => {
-    navigation.setOptions({ headerShown: false });
-  }, [navigation]);
-
-  // First launch → onboarding. Safe here (inside the navigator; all hooks ran).
-  if (!hasOnboarded()) return <Redirect href="/onboarding" />;
 
   return (
     <View style={styles.root}>
@@ -59,7 +51,7 @@ export default React.memo(function HomePage() {
               </View>
               <Pressable
                 style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
-                onPress={() => router.push("/joinParty")}
+                onPress={() => navigation.navigate("JoinParty")}
                 hitSlop={6}
               >
                 <Text style={styles.ctaBtnText}>Invite</Text>
@@ -74,7 +66,7 @@ export default React.memo(function HomePage() {
           path="trending/tv/week"
           kind="tv"
           icon="flame"
-          onSeeAll={() => router.push("/trendingShows")}
+          onSeeAll={() => navigation.navigate("TrendingShows")}
         />
         <MediaRail title="Now Playing" path="movie/now_playing" kind="movie" />
         <MediaRail title="Popular Movies" path="movie/popular" kind="movie" />

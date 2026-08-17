@@ -10,7 +10,10 @@ import { img } from "@/utils/tmdbDetails";
 import { getWatchlist, removeFromWatchlist, type WatchlistItem } from "@/utils/watchlist";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { RootNavigation } from "@/src/navigation/helpers";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { PlayerStackParamList } from "@/src/navigation/types";
 import React, { useCallback, useState } from "react";
 import { Dimensions, FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,8 +24,8 @@ const GAP = ms(12);
 const PAD = ms(16);
 const CARD_W = Math.floor((width - PAD * 2 - GAP * (COLS - 1)) / COLS);
 
-export default function MyList() {
-  const router = useRouter();
+export default function MyListScreen() {
+  const navigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<WatchlistItem[]>([]);
 
@@ -32,11 +35,19 @@ export default function MyList() {
     }, []),
   );
 
-  const open = (item: WatchlistItem) =>
-    router.push({
-      pathname: item.type === "tv" ? "/(player)/tvDetails" : "/(player)/details",
-      params: { id: item.id },
-    });
+  const open = (item: WatchlistItem) => {
+    if (item.type === "tv") {
+      navigation.navigate("PlayerStack", {
+        screen: "TvDetails",
+        params: { id: item.id, type: "tv" },
+      });
+    } else {
+      navigation.navigate("PlayerStack", {
+        screen: "MovieDetails",
+        params: { id: item.id, type: "movie" },
+      });
+    }
+  };
 
   const remove = (item: WatchlistItem) =>
     bearAlert(item.title, "Remove from My List?", [
@@ -53,9 +64,8 @@ export default function MyList() {
 
   return (
     <View style={styles.root}>
-      <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { paddingTop: insets.top + ms(6) }]}>
-        <GlassIconButton onPress={() => router.back()} size={38}>
+        <GlassIconButton onPress={() => navigation.goBack()} size={38}>
           <Ionicons name="chevron-back" size={ms(21)} color={colors.text} />
         </GlassIconButton>
         <Text style={styles.title}>My List</Text>

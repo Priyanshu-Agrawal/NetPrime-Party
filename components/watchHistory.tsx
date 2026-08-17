@@ -1,6 +1,8 @@
 import { getWatchHistory } from "@/utils/history";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { navigate } from "@/src/navigation/navigationRef";
+import type { PlayerStackParamList } from "@/src/navigation/types";
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
@@ -18,7 +20,6 @@ import { useColorScheme } from "@/contexts/colorContext/useColorScheme";
 export default function WatchHistory() {
   const [items, setItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const router = useRouter();
 
   const isDark = (useColorScheme() ?? 'light') === 'dark';
   const backgroundColor = useThemeColor({}, 'background');
@@ -56,14 +57,15 @@ export default function WatchHistory() {
   }, []);
 
   function openItem(item: any) {
-    const params: Record<string, string> = {
+    const type = item.type === "tv" ? "tv" : "movie";
+    const params: PlayerStackParamList["Player"] = {
       id: String(item.id ?? ""),
-      type: item.type === "tv" ? "tv" : "movie",
+      type,
       title: item.title || item.name || "",
       poster_path: item.poster_path || "",
     };
 
-    if (item.type === "tv") {
+    if (type === "tv") {
       if (item.season !== undefined && item.season !== null) {
         params.season = String(item.season);
       }
@@ -72,8 +74,8 @@ export default function WatchHistory() {
       }
     }
 
-    router.push({
-      pathname: "/(player)/player",
+    navigate("PlayerStack", {
+      screen: "Player",
       params,
     });
   }

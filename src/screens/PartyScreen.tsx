@@ -33,7 +33,10 @@ import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/service
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { RootNavigation } from "@/src/navigation/helpers";
+import type { RootStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -142,18 +145,10 @@ function MessageText({ text, onSeek }: { text: string; onSeek: (sec: number) => 
 }
 
 export default function Party() {
-  const router = useRouter();
+  const navigation = useNavigation<RootNavigation>();
+  const route = useRoute<RouteProp<RootStackParamList, "Party">>();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{
-    role?: string;
-    room?: string;
-    provider?: string;
-    id?: string;
-    type?: string;
-    season?: string;
-    ep?: string;
-    title?: string;
-  }>();
+  const params = route.params ?? {};
   const isHostParam = params.role === "host";
   const room = (params.room ?? "").toUpperCase();
 
@@ -241,7 +236,7 @@ export default function Party() {
     title: "Leave the party?",
     message: "You'll leave this watch room and stop syncing with everyone.",
     confirmLabel: "Leave",
-    onConfirm: () => router.back(),
+    onConfirm: () => navigation.goBack(),
     enabled: hasMedia,
   });
 
@@ -249,9 +244,9 @@ export default function Party() {
   useEffect(() => {
     if (!party.kicked) return;
     bearAlert("Removed", "The host removed you from this room.", [
-      { text: "OK", onPress: () => router.back() },
+      { text: "OK", onPress: () => navigation.goBack() },
     ]);
-  }, [party.kicked, router]);
+  }, [party.kicked, navigation]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
@@ -457,7 +452,6 @@ export default function Party() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar hidden={fullscreen} style="light" />
 
       <View style={styles.flex}>

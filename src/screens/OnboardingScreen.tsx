@@ -10,7 +10,8 @@ import { setOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import { Stack, useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import type { RootNavigation } from "@/src/navigation/helpers";
 import React, { useRef, useState } from "react";
 import {
   Dimensions,
@@ -60,7 +61,7 @@ const SLIDES: Slide[] = [
 ];
 
 export default function Onboarding() {
-  const router = useRouter();
+  const navigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
@@ -79,7 +80,7 @@ export default function Onboarding() {
     const n = name.trim();
     if (n) setDisplayName(n);
     setOnboarded();
-    router.replace("/(tabs)");
+    navigation.replace("MainTabs");
   };
 
   const next = () => {
@@ -89,7 +90,6 @@ export default function Onboarding() {
 
   return (
     <View style={styles.root}>
-      <Stack.Screen options={{ headerShown: false, animation: "fade" }} />
       <LinearGradient
         colors={["rgba(240,169,60,0.10)", "transparent"]}
         style={styles.topGlow}

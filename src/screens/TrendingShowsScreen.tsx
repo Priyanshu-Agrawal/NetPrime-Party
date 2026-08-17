@@ -13,7 +13,8 @@ import { Image } from "expo-image";
 import { useMovieContext } from "@/contexts/movieContext";
 import { Series } from "@/contexts/movieContext/types";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import type { RootNavigation } from "@/src/navigation/helpers";
 import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -35,15 +36,15 @@ export default function TrendingShowsScreen() {
   const colorScheme = useColorScheme();
   const color = Colors[colorScheme ?? "dark"];
   const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
-  const router = useRouter();
+  const navigation = useNavigation<RootNavigation>();
   
   const flatListRef = useRef<FlatList>(null);
   const [showGoToTop, setShowGoToTop] = useState(false);
 
   const handlePress = (id: number) => {
-    router.push({
-      pathname: "/(player)/tvDetails",
-      params: { id: id.toString() },
+    navigation.navigate("PlayerStack", {
+      screen: "TvDetails",
+      params: { id: id.toString(), type: "tv" },
     });
   };
 
@@ -97,7 +98,7 @@ export default function TrendingShowsScreen() {
     return (
       <SafeAreaView style={[styles.screen, { backgroundColor: color.background }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={28} color={color.icon} />
           </TouchableOpacity>
           <Text style={[styles.title, { color: color.text }]}>Trending Shows</Text>
@@ -113,7 +114,7 @@ export default function TrendingShowsScreen() {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: color.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialIcons name="arrow-back" size={28} color={color.icon} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: color.text }]}>Trending Shows</Text>

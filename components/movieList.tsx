@@ -19,14 +19,13 @@ import {
 import { useMovieContext } from "@/contexts/movieContext";
 import { Series } from "@/contexts/movieContext/types";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { navigate } from "@/src/navigation/navigationRef";
 import React, { useEffect, useState } from "react";
 import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
 
 const { width } = Dimensions.get("window"); // Get screen width
 
 const MovieList: React.FC = React.memo(function MovieList() {
-  const router = useRouter();
   const { loadingSeries, error, currentPage, series, fetchPopularMovies } =
     useMovieContext();
   const colorScheme = useColorScheme();
@@ -44,9 +43,9 @@ const MovieList: React.FC = React.memo(function MovieList() {
   }, [loadingSeries]);
 
   const handlePress = (id: number) => {
-    router.push({
-      pathname: "/(player)/tvDetails",
-      params: { id: id.toString() },
+    navigate("PlayerStack", {
+      screen: "TvDetails",
+      params: { id: id.toString(), type: "tv" },
     });
   };
 

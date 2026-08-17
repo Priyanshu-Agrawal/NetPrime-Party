@@ -9,52 +9,49 @@
  */
 import GlassIconButton from "@/components/ui/GlassIconButton";
 import HoneyButton from "@/components/ui/HoneyButton";
+import type { RootNavigation } from "@/src/navigation/helpers";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { normalizeRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Stack, useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const CODE_LEN = 6;
 
 export default function JoinParty() {
-  const router = useRouter();
+  const navigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
-  const [code, setCode] = React.useState("");
+  const [code, setCode] = useState("");
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const valid = code.length >= 4;
 
-  // Auto-focus the (invisible) field so the keyboard is ready immediately.
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 350);
-    return () => clearTimeout(t);
-  }, []);
-
   const join = () => {
     if (!valid) return;
-    router.replace({ pathname: "/party", params: { role: "guest", room: code } });
+    navigation.replace("Party", { role: "guest", room: code });
   };
 
   // "Host your own room" → back to browsing; a title's "Watch together" starts
   // the host party. (Hosting is content-first, so we send them to pick a title.)
-  const host = () => router.replace("/(tabs)");
+  const host = () => navigation.replace("MainTabs");
 
   const cells = Array.from({ length: CODE_LEN }, (_, i) => i);
 
+
+
   return (
-    <View style={styles.root}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <View  style={styles.root}>
 
       {/* Faint honey wash pooling at the top, like the design's radial glow. */}
       <LinearGradient
@@ -64,14 +61,16 @@ export default function JoinParty() {
       />
 
       <View style={[styles.bar, { paddingTop: insets.top + ms(6) }]}>
-        <GlassIconButton onPress={() => router.back()} size={40}>
+        <GlassIconButton onPress={() => navigation.goBack()} size={40}>
           <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
         </GlassIconButton>
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.body}
+        style={[styles.scroll,styles.body]}
+        behavior="padding"
+        removeClippedSubviews
+        onTouchStart={() => Keyboard.dismiss()}
       >
         {/* Paw hero */}
         <View style={styles.heroWrap}>
@@ -88,7 +87,7 @@ export default function JoinParty() {
         <Pressable style={styles.cellRow} onPress={() => inputRef.current?.focus()}>
           {cells.map((i) => {
             const char = code[i] ?? "";
-            const active = i === Math.min(code.length, CODE_LEN - 1);
+            const active = focused && i === Math.min(code.length, CODE_LEN - 1);
             return (
               <View
                 key={i}
@@ -110,6 +109,8 @@ export default function JoinParty() {
             ref={inputRef}
             value={code}
             onChangeText={(t) => setCode(normalizeRoomCode(t).slice(0, CODE_LEN))}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             style={styles.hiddenInput}
             keyboardType="visible-password"
             autoCapitalize="characters"
@@ -150,7 +151,14 @@ const styles = StyleSheet.create({
   topGlow: { position: "absolute", top: 0, left: 0, right: 0, height: ms(260) },
   bar: { paddingHorizontal: ms(12), paddingBottom: ms(8) },
 
-  body: { flex: 1, alignItems: "center", paddingHorizontal: ms(28), justifyContent: "center", marginTop: -ms(40) },
+  scroll: { flex: 1 },
+  body: {
+    flexGrow: 1,
+    alignItems: "center",
+    paddingHorizontal: ms(28),
+    justifyContent: "center",
+    marginTop: -ms(40),
+  },
 
   heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: ms(22) },
   heroGlow: {

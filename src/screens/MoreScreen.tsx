@@ -16,7 +16,8 @@ import { checkGithubRelease } from "@/utils/checkGithubRelease";
 import { clearAppCache, clearWatchHistory, getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { RootNavigation } from "@/src/navigation/helpers";
 import React, { useCallback, useState } from "react";
 import {
   Linking,
@@ -36,7 +37,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 type IconName = keyof typeof Ionicons.glyphMap;
 
 export default function MoreScreen() {
-  const router = useRouter();
+  const navigation = useNavigation<RootNavigation>();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(() => getDisplayName() ?? "Guest");
   const [editVisible, setEditVisible] = useState(false);
@@ -184,8 +185,8 @@ export default function MoreScreen() {
 
         {/* Library */}
         <Card>
-          <Row icon="time-outline" label="Watch history" onPress={() => router.push("/watchHistory")} />
-          <Row icon="bookmark-outline" label="My list" onPress={() => router.push("/myList")} />
+          <Row icon="time-outline" label="Watch history" onPress={() => navigation.navigate("WatchHistory")} />
+          <Row icon="bookmark-outline" label="My list" onPress={() => navigation.navigate("MyList")} />
           <Row icon="download-outline" label="Downloads" onPress={() => comingSoon("Downloads")} last />
         </Card>
 

@@ -17,7 +17,7 @@ import { Colors } from "@/constants/Colors";
 import { Movie, useMovieContext } from "@/contexts/movieContext";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { navigate } from "@/src/navigation/navigationRef";
 import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
 
 const { width } = Dimensions.get("window"); // Get screen width
@@ -40,8 +40,6 @@ const PopularList: React.FC<PopularListProps> = ({ ListHeaderComponent }) => {
   const colorScheme = useColorScheme();
   const color = Colors[colorScheme ?? "dark"];
   const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
-
-  const router = useRouter();
 
   const flatListRef = useRef<FlatList>(null);
   const [showShimmer, setShowShimmer] = useState(false);
@@ -107,8 +105,8 @@ const PopularList: React.FC<PopularListProps> = ({ ListHeaderComponent }) => {
   }
 
   const handlePress = (id: number) => {
-    router.push({
-      pathname: "/(player)/details",
+    navigate("PlayerStack", {
+      screen: "MovieDetails",
       params: { id: id.toString(), type: "movie" },
     });
   };

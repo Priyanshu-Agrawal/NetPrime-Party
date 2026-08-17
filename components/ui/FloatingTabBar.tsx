@@ -12,15 +12,18 @@ import { colors, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
+import { navigate } from "@/src/navigation/navigationRef";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import GlassCard from "./GlassCard";
 
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  index: "home",
-  home: "home",
+  Home: "home-sharp",
+  Search: "search",
+  More: "person",
+  index: "home-sharp",
+  home: "home-sharp",
   search: "search",
   more: "person",
   profile: "person",
@@ -28,7 +31,6 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   const goTab = (routeName: string, key: string, focused: boolean) => {
     void Haptics.selectionAsync();
@@ -38,7 +40,7 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   // Split real tabs so the Party action can sit in the middle (after Search).
   const tabs = state.routes.map((route, i) => ({ route, focused: state.index === i }));
-  const searchIdx = tabs.findIndex((t) => t.route.name === "search");
+  const searchIdx = tabs.findIndex((t) => t.route.name === "Search");
   const head = searchIdx >= 0 ? tabs.slice(0, searchIdx + 1) : tabs;
   const tail = searchIdx >= 0 ? tabs.slice(searchIdx + 1) : [];
 
@@ -73,7 +75,7 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
             accessibilityLabel="Watch party"
             onPress={() => {
               void Haptics.selectionAsync();
-              router.push("/joinParty");
+              navigate("JoinParty");
             }}
             style={styles.tab}
           >

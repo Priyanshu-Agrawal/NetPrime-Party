@@ -9,7 +9,8 @@ import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect, useRouter } from "expo-router";
+import { navigate } from "@/src/navigation/navigationRef";
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -17,7 +18,6 @@ const CARD_W = ms(210);
 const CARD_H = ms(118);
 
 export function ContinueWatching() {
-  const router = useRouter();
   const [items, setItems] = useState<HistoryItem[]>([]);
 
   useFocusEffect(
@@ -42,11 +42,11 @@ export function ContinueWatching() {
   if (items.length === 0) return null;
 
   const resume = (item: HistoryItem) => {
-    router.push({
-      pathname: "/(player)/player",
+    navigate("PlayerStack", {
+      screen: "Player",
       params: {
         id: item.id,
-        type: item.type,
+        type: item.type === "tv" ? "tv" : "movie",
         ...(item.season ? { season: item.season } : {}),
         ...(item.episode ? { ep: item.episode } : {}),
         title: item.title,

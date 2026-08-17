@@ -32,7 +32,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useGlobalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type { RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootNavigation } from "@/src/navigation/helpers";
+import type { PlayerStackParamList } from "@/src/navigation/types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -52,11 +56,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.3);
 
-const Details: React.FC = () => {
-  const router = useRouter();
-  const navigation = useNavigation();
+const MovieDetailsScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
+  const rootNavigation = useNavigation<RootNavigation>();
+  const route = useRoute<RouteProp<PlayerStackParamList, "MovieDetails">>();
+  const { id } = route.params;
   const insets = useSafeAreaInsets();
-  const { id } = useGlobalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [d, setD] = useState<any>(null);
   const [error, setError] = useState<string>();
@@ -67,10 +72,6 @@ const Details: React.FC = () => {
   const { scrollHandler, scrollY } = useCollapsingHeader(headerH);
   const headerTitleStyle = useFadeInStyle(scrollY, HERO_H * 0.5, HERO_H * 0.72);
   const headerBgStyle = useFadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
-
-  useEffect(() => {
-    navigation.setOptions({ headerShown: false, animation: "fade" });
-  }, [navigation]);
 
   useEffect(() => {
     let aborted = false;
@@ -139,29 +140,23 @@ const Details: React.FC = () => {
       type: "movie",
       poster_path: d.poster_path,
     });
-    router.push({
-      pathname: "/(player)/player",
-      params: {
-        id: id!.toString(),
-        type: "movie",
-        title: d.title,
-        poster_path: d.poster_path || "",
-        year: d.release_date?.slice(0, 4) || "",
-      },
+    navigation.navigate("Player", {
+      id: id!.toString(),
+      type: "movie",
+      title: d.title,
+      poster_path: d.poster_path || "",
+      year: d.release_date?.slice(0, 4) || "",
     });
   };
 
   const handleWatchTogether = () => {
-    router.push({
-      pathname: "/party",
-      params: {
-        role: "host",
-        room: genRoomCode(),
-        provider: defaultHijackProvider()?.id,
-        id: id!.toString(),
-        type: "movie",
-        title: d.title,
-      },
+    rootNavigation.navigate("Party", {
+      role: "host",
+      room: genRoomCode(),
+      provider: defaultHijackProvider()?.id,
+      id: id!.toString(),
+      type: "movie",
+      title: d.title,
     });
   };
 
@@ -192,7 +187,7 @@ const Details: React.FC = () => {
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>
-          <GlassIconButton onPress={() => router.back()}>
+          <GlassIconButton onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </GlassIconButton>
           <Animated.Text numberOfLines={1} style={[styles.headerTitle, headerTitleStyle]}>
@@ -361,9 +356,9 @@ const Details: React.FC = () => {
                 <Pressable
                   style={styles.recCard}
                   onPress={() =>
-                    router.replace({
-                      pathname: "/(player)/details",
-                      params: { id: String(item.id), type: "movie" },
+                    navigation.replace("MovieDetails", {
+                      id: String(item.id),
+                      type: "movie",
                     })
                   }
                 >
@@ -531,4 +526,4 @@ const styles = StyleSheet.create({
   recTitle: { color: colors.text, fontFamily: font.bodyMed, fontSize: ms(12), marginTop: 6 },
 });
 
-export default Details;
+export default MovieDetailsScreen;

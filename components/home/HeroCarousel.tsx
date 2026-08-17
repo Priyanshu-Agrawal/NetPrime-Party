@@ -6,7 +6,6 @@
  */
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import {
-  detailsRoute,
   fetchList,
   itemTitle,
   itemType,
@@ -18,7 +17,7 @@ import { genRoomCode } from "@/utils/roomCode";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { navigate, navigateDetails } from "@/src/navigation/navigationRef";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
@@ -35,7 +34,6 @@ const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.12);
 
 export function HeroCarousel() {
-  const router = useRouter();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList<MediaItem>>(null);
@@ -71,8 +69,8 @@ export function HeroCarousel() {
   const play = (item: MediaItem) => {
     const type = itemType(item, "movie");
     if (type === "movie") {
-      router.push({
-        pathname: "/(player)/player",
+      navigate("PlayerStack", {
+        screen: "Player",
         params: {
           id: String(item.id),
           type: "movie",
@@ -82,8 +80,12 @@ export function HeroCarousel() {
         },
       });
     } else {
-      router.push(detailsRoute(item, "tv") as any);
+      navigateDetails(item, "tv");
     }
+  };
+
+  const openDetails = (item: MediaItem, fallback: "movie" | "tv") => {
+    navigateDetails(item, fallback);
   };
 
   if (items.length === 0) {
@@ -105,7 +107,7 @@ export function HeroCarousel() {
           return (
             <Pressable
               style={styles.slide}
-              onPress={() => router.push(detailsRoute(item, "movie") as any)}
+              onPress={() => openDetails(item, "movie")}
             >
               <Image
                 source={{ uri: `https://image.tmdb.org/t/p/w780${item.backdrop_path}` }}
@@ -159,7 +161,7 @@ export function HeroCarousel() {
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [styles.infoBtn, pressed && styles.pressed]}
-                    onPress={() => router.push(detailsRoute(item, "movie") as any)}
+                    onPress={() => openDetails(item, "movie")}
                   >
                     <Ionicons name="information-circle-outline" size={18} color={colors.text} />
                     <Text style={styles.infoText}>Details</Text>
@@ -167,16 +169,13 @@ export function HeroCarousel() {
                   <Pressable
                     style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]}
                     onPress={() =>
-                      router.push({
-                        pathname: "/party",
-                        params: {
-                          role: "host",
-                          room: genRoomCode(),
-                          provider: defaultHijackProvider()?.id,
-                          id: String(item.id),
-                          type: itemType(item, "movie"),
-                          title: itemTitle(item),
-                        },
+                      navigate("Party", {
+                        role: "host",
+                        room: genRoomCode(),
+                        provider: defaultHijackProvider()?.id,
+                        id: String(item.id),
+                        type: itemType(item, "movie"),
+                        title: itemTitle(item),
                       })
                     }
                     hitSlop={8}

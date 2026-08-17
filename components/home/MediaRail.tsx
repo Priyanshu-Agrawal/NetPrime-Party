@@ -5,7 +5,6 @@
  * section icon (fire / heart / etc).
  */
 import {
-  detailsRoute,
   fetchList,
   itemTitle,
   type MediaItem,
@@ -13,7 +12,7 @@ import {
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { navigateDetails } from "@/src/navigation/navigationRef";
 import React, { useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -27,14 +26,14 @@ function PosterCard({
   item: MediaItem;
   fallbackType: "movie" | "tv";
 }) {
-  const router = useRouter();
   const uri = item.poster_path
     ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
     : undefined;
+  const openDetails = () => navigateDetails(item, fallbackType);
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
-      onPress={() => router.push(detailsRoute(item, fallbackType) as any)}
+      onPress={openDetails}
     >
       <View style={styles.posterWrap}>
         {uri ? (

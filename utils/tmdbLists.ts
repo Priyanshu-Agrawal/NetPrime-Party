@@ -44,13 +44,15 @@ export function itemYear(item: MediaItem): string {
   return (item.release_date || item.first_air_date || "").slice(0, 4);
 }
 
-/** Route params for a details screen based on media type. */
-export function detailsRoute(item: MediaItem, fallback: "movie" | "tv") {
+/** Navigation target for a details screen based on media type. */
+export type DetailsRoute =
+  | { screen: "MovieDetails"; params: { id: string; type: "movie" } }
+  | { screen: "TvDetails"; params: { id: string; type: "tv" } };
+
+export function detailsRoute(item: MediaItem, fallback: "movie" | "tv"): DetailsRoute {
   const type = itemType(item, fallback);
-  return {
-    pathname: (type === "tv" ? "/(player)/tvDetails" : "/(player)/details") as
-      | "/(player)/tvDetails"
-      | "/(player)/details",
-    params: { id: String(item.id), type },
-  };
+  if (type === "tv") {
+    return { screen: "TvDetails", params: { id: String(item.id), type: "tv" } };
+  }
+  return { screen: "MovieDetails", params: { id: String(item.id), type: "movie" } };
 }

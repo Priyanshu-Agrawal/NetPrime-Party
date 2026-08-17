@@ -8,7 +8,7 @@
  */
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { navigate } from "@/src/navigation/navigationRef";
 import React from "react";
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
@@ -21,7 +21,6 @@ interface Props {
 }
 
 export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
-  const router = useRouter();
   return (
     <View style={[styles.bar, style]}>
       <View style={styles.brandRow}>
@@ -34,7 +33,7 @@ export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
         {showSearch ? (
           <Pressable
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
-            onPress={onSearchPress ?? (() => router.push("/(tabs)/search"))}
+            onPress={onSearchPress ?? (() => navigate("MainTabs", { screen: "Search" }))}
             hitSlop={6}
           >
             <Ionicons name="search" size={18} color={colors.text} />
@@ -42,7 +41,7 @@ export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
         ) : null}
         <Pressable
           style={({ pressed }) => [styles.hostBtn, pressed && styles.pressed]}
-          onPress={() => router.push("/joinParty")}
+          onPress={() => navigate("JoinParty")}
           hitSlop={6}
         >
           <Ionicons name="people" size={15} color={colors.onHoney} />
