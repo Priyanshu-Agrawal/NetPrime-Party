@@ -1,4 +1,4 @@
-package com.cody669.Uott.playback
+package com.scriptingbear.bearoom.playback
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -21,8 +21,8 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
-import com.cody669.Uott.MainActivity
-import com.cody669.Uott.R
+import com.scriptingbear.bearoom.MainActivity
+import com.scriptingbear.bearoom.R
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
@@ -39,9 +39,9 @@ class BearoomPlaybackService : Service() {
     const val NOTIF_ID = 42
     const val EXTRA_TITLE = "title"
     const val EXTRA_ARTWORK = "artworkUrl"
-    const val ACTION_REMOTE_PLAY = "com.cody669.Uott.playback.PLAY"
-    const val ACTION_REMOTE_PAUSE = "com.cody669.Uott.playback.PAUSE"
-    const val ACTION_REMOTE_STOP = "com.cody669.Uott.playback.STOP"
+    const val ACTION_REMOTE_PLAY = "com.scriptingbear.bearoom.playback.PLAY"
+    const val ACTION_REMOTE_PAUSE = "com.scriptingbear.bearoom.playback.PAUSE"
+    const val ACTION_REMOTE_STOP = "com.scriptingbear.bearoom.playback.STOP"
 
     @Volatile
     private var instance: BearoomPlaybackService? = null

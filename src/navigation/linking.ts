@@ -5,7 +5,7 @@ import type { RootStackParamList } from "./types";
 const prefix = Linking.createURL("/");
 
 export const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: [prefix, "bearoom://", "exp+netprime://"],
+  prefixes: [prefix, "bearoom://", "exp+bearoom://"],
   config: {
     screens: {
       Onboarding: "onboarding",

@@ -1,4 +1,4 @@
-package com.cody669.Uott
+package com.scriptingbear.bearoom
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
@@ -10,8 +10,10 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
-import com.cody669.Uott.playback.BearoomPlaybackHub
-import com.cody669.Uott.playback.BearoomWebViews
+// @generated begin bearoom-playback-main-activity-import - expo prebuild (DO NOT MODIFY) sync-3f9cd26ba184bb26a77bc38b4d9a15ec946f8e57
+import com.scriptingbear.bearoom.playback.BearoomPlaybackHub
+import com.scriptingbear.bearoom.playback.BearoomWebViews
+// @generated end bearoom-playback-main-activity-import
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,7 +47,7 @@ class MainActivity : ReactActivity() {
               fabricEnabled
           ){})
   }
-
+// @generated begin bearoom-playback-main-activity-lifecycle - expo prebuild (DO NOT MODIFY) sync-52de360f228d3879738501fe00a60e6475c29df1
   override fun onPause() {
     super.onPause()
     BearoomWebViews.resume(this)
@@ -63,6 +65,7 @@ class MainActivity : ReactActivity() {
     BearoomWebViews.resume(this)
     BearoomPlaybackHub.keepAliveSolo()
   }
+// @generated end bearoom-playback-main-activity-lifecycle
 
   /**
     * Align the back button behavior with Android S

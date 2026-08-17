@@ -49,7 +49,8 @@ back to Original** when the title has no dub (common).
 Quality→`availableVideoTracks`/`videoTrack` · Speed→`playbackRate`(+`preservesPitch`) · Subtitles→`availableSubtitleTracks`/`subtitleTrack` (videasy's are external → v2: sniff/Wyzie + synth `EXT-X-MEDIA` wrapper manifest) · **Dub→server re-resolve+`replaceAsync`** · PiP→`startPictureInPicture` (config plugin already in `app.json`) · Thumbnails→`generateThumbnailsAsync` · buffered→`bufferedPosition` (party group-pause-on-buffer) · fullscreen→`view.enterFullscreen()`.
 
 ## Config / build
-- `expo-video ~2.2.3` installed; **config plugin already in `app.json`** (`supportsPictureInPicture:true`) → PiP wired both platforms. `expo-dev-client` present. If the installed dev client predates expo-video, **one native rebuild** is needed; enabling `supportsBackgroundPlayback` needs **`expo prebuild` + rebuild**. Otherwise the work is JS-only.
+- Android background playback (FGS + MediaSession) is applied by **`plugins/bearoom-playback`** — survives `expo prebuild --clean`. Source of truth for Kotlin lives under `plugins/bearoom-playback/android/`; do not hand-edit generated `MainApplication`/`MainActivity` playback blocks.
+- `expo-dev-client` present. If the installed dev client predates native changes, **one native rebuild** is needed.
 
 ## Scope
 - **v1 (POC, party-only):** hidden resolver → sniff videasy `master.m3u8` (**Hindi/Fade default → Original fallback**) → native playback + native controls (play/pause/seek/±10s/scrub/quality/speed) + **dub picker** + WebView fallback on ~8s sniff-fail.

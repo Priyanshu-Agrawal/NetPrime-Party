@@ -1,4 +1,4 @@
-package com.cody669.Uott.playback
+package {{PACKAGE}}.playback
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

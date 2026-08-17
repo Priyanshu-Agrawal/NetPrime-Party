@@ -1,4 +1,4 @@
-package com.cody669.Uott.playback
+package {{PACKAGE}}.playback
 
 import android.app.Activity
 import android.view.View

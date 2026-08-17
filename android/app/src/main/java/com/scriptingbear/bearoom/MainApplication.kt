@@ -1,4 +1,4 @@
-package com.cody669.Uott
+package com.scriptingbear.bearoom
 
 import android.app.Application
 import android.content.res.Configuration
@@ -15,6 +15,9 @@ import com.facebook.soloader.SoLoader
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
+// @generated begin bearoom-playback-main-application-import - expo prebuild (DO NOT MODIFY) sync-3e7f5c180cdd1116b7d9c8c41cc8cff2e96c9db9
+import com.scriptingbear.bearoom.playback.BearoomPlaybackPackage
+// @generated end bearoom-playback-main-application-import
 
 class MainApplication : Application(), ReactApplication {
 
@@ -23,7 +26,11 @@ class MainApplication : Application(), ReactApplication {
         object : DefaultReactNativeHost(this) {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
-            packages.add(com.cody669.Uott.playback.BearoomPlaybackPackage())
+// @generated begin bearoom-playback-main-application-package - expo prebuild (DO NOT MODIFY) sync-6f34cd6042dc7c86f3f4cc4be567704f88541a3d
+            packages.add(com.scriptingbear.bearoom.playback.BearoomPlaybackPackage())
+// @generated end bearoom-playback-main-application-package
+            // Packages that cannot be autolinked yet can be added manually here, for example:
+            // packages.add(MyReactNativePackage())
             return packages
           }
 

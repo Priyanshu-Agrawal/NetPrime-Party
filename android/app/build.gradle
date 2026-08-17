@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.cody669.Uott'
+    namespace 'com.scriptingbear.bearoom'
     defaultConfig {
-        applicationId 'com.cody669.Uott'
+        applicationId 'com.scriptingbear.bearoom'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -148,9 +148,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.media:media:1.7.1")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    implementation("androidx.media:media:1.7.1")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

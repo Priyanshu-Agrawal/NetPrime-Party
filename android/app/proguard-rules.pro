@@ -12,3 +12,6 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+# @generated begin bearoom-playback-proguard - expo prebuild (DO NOT MODIFY) sync-52102bb4f15eb6beae645567e807b59dd535f61b
+-keep class com.scriptingbear.bearoom.playback.** { *; }
+# @generated end bearoom-playback-proguard

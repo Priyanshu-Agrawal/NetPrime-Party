@@ -20,12 +20,15 @@ import {
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { DarkTheme, NavigationContainer } from "@react-navigation/native";
 import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
-import React from "react";
-import { Appearance, useColorScheme } from "react-native";
+import React, { useCallback, useEffect } from "react";
+import { Appearance, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 Appearance.setColorScheme("dark");
 
@@ -43,7 +46,7 @@ const navTheme = {
 
 export default function App() {
   const colorScheme = useColorScheme();
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Outfit_600SemiBold,
     Outfit_700Bold,
     Outfit_800ExtraBold,
@@ -52,18 +55,34 @@ export default function App() {
     Inter_600SemiBold,
   });
 
-  SystemUI.setBackgroundColorAsync(colors.bg);
+  const ready = fontsLoaded || !!fontError;
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    if (fontError) {
+      console.warn("[App] Custom fonts failed to load; using system fonts.", fontError);
+    }
+  }, [fontError]);
+
+  const onLayoutRootView = useCallback(async () => {
+    if (ready) {
+      await SplashScreen.hideAsync();
+    }
+  }, [ready]);
+
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(colors.bg);
+  }, []);
+
+  if (!ready) {
+    return <View style={{ flex: 1, backgroundColor: colors.bg }} onLayout={onLayoutRootView} />;
+  }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardProvider
-        statusBarTranslucent
-        navigationBarTranslucent
-        preserveEdgeToEdge
-        preload={false}
-      >
+    <GestureHandlerRootView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      onLayout={onLayoutRootView}
+    >
+      <KeyboardProvider preload={false}>
         <BottomSheetModalProvider>
           <MovieContextProvider>
             <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
