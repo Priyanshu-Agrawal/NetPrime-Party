@@ -22,7 +22,6 @@ import {
   generateRandomBearConfig,
   HAIR_OPTIONS,
   MOUTH_OPTIONS,
-  OptionItem,
   OUTFIT_OPTIONS,
 } from "@/services/avatar/bearAvatar";
 import {
@@ -33,21 +32,19 @@ import {
   setDisplayName,
   setGender,
 } from "@/services/party/identity";
-import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
+import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
