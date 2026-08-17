@@ -8,6 +8,8 @@
  *
  * Cozy cinema-lounge skin (Stitch "Bearoom Watch Party").
  */
+import GifPicker from "@/components/party/GifPicker";
+import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import {
   isBackgroundPlaybackAvailable,
   startBackgroundPlaybackSession,
@@ -21,8 +23,6 @@ import HijackPlayer, {
 } from "@/components/player/HijackPlayer";
 import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
-import GifPicker from "@/components/party/GifPicker";
-import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import GlassButton from "@/components/ui/GlassButton";
 import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
@@ -42,7 +42,6 @@ import {
   AppState,
   Easing,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -52,6 +51,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
@@ -305,8 +305,12 @@ export default function Party() {
     return () => {
       ScreenOrientation.unlockAsync().catch(() => {});
       if (maskTimer.current) clearTimeout(maskTimer.current);
+      maskTimer.current = null;
+      maskFade.stopAnimation();
+      maskFade.setValue(0);
+      setMasking(false);
     };
-  }, []);
+  }, [maskFade]);
 
   useEffect(() => {
     if (!hasMedia || !isBackgroundPlaybackAvailable()) {
@@ -446,17 +450,17 @@ export default function Party() {
     setDraft("");
   };
 
+  // Home-indicator / nav padding when the keyboard is closed. When open, the same
+  // value is fed to KeyboardStickyView `offset.opened` so the padding cancels out
+  // and the composer sits flush on the IME (no manual Keyboard height math).
+  const bottomPad = Math.max(insets.bottom, 10);
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar hidden={fullscreen} style="light" />
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        // Android edge-to-edge (Expo SDK 53) stops `adjustResize` from lifting the RN
-        // layout, so the KAV must do it — behavior must NOT be undefined on Android.
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <View style={styles.flex}>
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
           <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8}>
@@ -604,7 +608,8 @@ export default function Party() {
           </View>
         ) : null}
 
-        {/* Chat */}
+        {/* Chat — keeps its flex height when the keyboard opens (not resized).
+            The sticky composer translates over the bottom of the list. */}
         <FlatList
           ref={listRef}
           style={styles.flex}
@@ -612,6 +617,8 @@ export default function Party() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.chatContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           renderItem={({ item, index }) => {
             const prev = chat.messages[index - 1];
             const next = chat.messages[index + 1];
@@ -632,65 +639,67 @@ export default function Party() {
               <Text style={styles.chatEmptyText}>Say something to the pack</Text>
             </View>
           }
-          keyboardShouldPersistTaps="handled"
         />
 
-        {/* Input area */}
-        <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          {reactionsOn && canParticipate ? (
-            <View style={styles.quickRow}>
-              {QUICK_REACTIONS.map((e) => (
-                <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
-                  <Text style={styles.quickEmoji}>{e}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-          {canSendChat ? (
-            <View style={styles.inputRow}>
-              {reactionsOn ? (
-                <GlassButton style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6}>
-                  <Text style={styles.gifBtnText}>GIF</Text>
-                </GlassButton>
-              ) : null}
-              <View style={styles.inputBox}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Say something to the pack…"
-                  placeholderTextColor={colors.textDim}
-                  value={draft}
-                  onChangeText={setDraft}
-                  onFocus={() => {
-                    setLivePos(Math.floor(posRef.current));
-                    setInputFocused(true);
-                  }}
-                  onBlur={() => setInputFocused(false)}
-                  selectionColor={colors.honey}
-                  returnKeyType="send"
-                  onSubmitEditing={send}
-                  blurOnSubmit={false}
-                />
-                {hasMedia ? (
-                  <Pressable style={styles.stampBtn} onPress={insertTimestamp} hitSlop={6}>
-                    <Ionicons name="time-outline" size={ms(13)} color={colors.honey} />
-                    <Text style={styles.stampBtnText}>{fmtMedia(livePos)}</Text>
+        {/* Reaction bar + composer: one sticky toolbar. Translate only — never
+            resize the FlatList / player / header above. */}
+        <KeyboardStickyView offset={{ closed: 0, opened: bottomPad }}>
+          <View style={[styles.inputArea, { paddingBottom: bottomPad }]}>
+            {reactionsOn && canParticipate ? (
+              <View style={styles.quickRow}>
+                {QUICK_REACTIONS.map((e) => (
+                  <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
+                    <Text style={styles.quickEmoji}>{e}</Text>
                   </Pressable>
-                ) : null}
+                ))}
               </View>
-              <Pressable style={styles.sendBtn} onPress={send}>
-                <Ionicons name="send" size={16} color={colors.onHoney} />
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.chatOffRow}>
-              <Ionicons name="lock-closed" size={14} color={colors.textFaint} />
-              <Text style={styles.chatOffText}>
-                {config?.chatEnabled === false ? "Chat is off for guests" : "You're muted by the host"}
-              </Text>
-            </View>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+            ) : null}
+            {canSendChat ? (
+              <View style={styles.inputRow}>
+                {reactionsOn ? (
+                  <GlassButton style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6}>
+                    <Text style={styles.gifBtnText}>GIF</Text>
+                  </GlassButton>
+                ) : null}
+                <View style={styles.inputBox}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Say something to the pack…"
+                    placeholderTextColor={colors.textDim}
+                    value={draft}
+                    onChangeText={setDraft}
+                    onFocus={() => {
+                      setLivePos(Math.floor(posRef.current));
+                      setInputFocused(true);
+                    }}
+                    onBlur={() => setInputFocused(false)}
+                    selectionColor={colors.honey}
+                    returnKeyType="send"
+                    onSubmitEditing={send}
+                    blurOnSubmit={false}
+                  />
+                  {hasMedia ? (
+                    <Pressable style={styles.stampBtn} onPress={insertTimestamp} hitSlop={6}>
+                      <Ionicons name="time-outline" size={ms(13)} color={colors.honey} />
+                      <Text style={styles.stampBtnText}>{fmtMedia(livePos)}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Pressable style={styles.sendBtn} onPress={send}>
+                  <Ionicons name="send" size={16} color={colors.onHoney} />
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.chatOffRow}>
+                <Ionicons name="lock-closed" size={14} color={colors.textFaint} />
+                <Text style={styles.chatOffText}>
+                  {config?.chatEnabled === false ? "Chat is off for guests" : "You're muted by the host"}
+                </Text>
+              </View>
+            )}
+          </View>
+        </KeyboardStickyView>
+      </View>
 
       {/* Fullscreen-rotation cover — a sibling of the whole app content so it hides the
           WebView reflow, the OS rotation, AND the party UI that re-appears on collapse.
@@ -990,7 +999,7 @@ const styles = StyleSheet.create({
   avatarMore: { backgroundColor: colors.surfaceStrong },
   avatarText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(12) },
 
-  player: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black },
+  player: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black, overflow: "hidden" },
   playerFs: {
     position: "absolute",
     top: 0,

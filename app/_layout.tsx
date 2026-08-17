@@ -14,6 +14,7 @@ import { Appearance, useColorScheme } from "react-native";
 // regardless of the device's light/dark system setting — no native rebuild.
 Appearance.setColorScheme("dark");
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { MovieContextProvider } from "./../contexts/movieContext";
 import { useFonts } from "expo-font";
 import {
@@ -48,17 +49,32 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <MovieContextProvider>
-          <StatusBar
-            style={colorScheme === "light" ? "dark" : "light"}
-            translucent
-          />
-          <Stack screenOptions={{ headerShown: false }} />
-          <AlertHost />
-        </MovieContextProvider>
-      </BottomSheetModalProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* Edge-to-edge Android: keep IME insets under library control without
+          collapsing layouts. statusBar/nav translucent match Expo edge-to-edge. */}
+      <KeyboardProvider
+        statusBarTranslucent
+        navigationBarTranslucent
+        preserveEdgeToEdge
+        preload={false}
+      >
+        <BottomSheetModalProvider>
+          <MovieContextProvider>
+            <StatusBar
+              style={colorScheme === "light" ? "dark" : "light"}
+              translucent
+            />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "slide_from_right",
+                contentStyle: { backgroundColor: colors.bg },
+              }}
+            />
+            <AlertHost />
+          </MovieContextProvider>
+        </BottomSheetModalProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }
