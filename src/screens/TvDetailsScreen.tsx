@@ -32,7 +32,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { goBack, openPartyHost, openPlayer } from "@/src/navigation/actions";
+import { goBack, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { PlayerStackParamList } from "@/src/navigation/types";
@@ -445,12 +445,7 @@ const TvDetailsScreen: React.FC = () => {
               renderItem={({ item }: any) => (
                 <Pressable
                   style={styles.recCard}
-                  onPress={() =>
-                    navigation.replace("TvDetails", {
-                      id: String(item.id),
-                      type: "tv",
-                    })
-                  }
+                  onPress={() => openDetails({ id: item.id, media_type: "tv" }, "tv")}
                 >
                   <View style={styles.recImgWrap}>
                     <Image source={{ uri: img(item.poster_path, "w342") || undefined }} style={styles.recImg} contentFit="cover" transition={200} />
@@ -586,7 +581,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(16,13,10,0.28)",
+    backgroundColor: colors.overlay,
     borderRadius: radius.md,
   },
   epTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14) },

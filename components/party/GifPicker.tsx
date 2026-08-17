@@ -269,7 +269,7 @@ function SkeletonGrid() {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(8,6,4,0.6)" },
+  backdrop: { flex: 1, backgroundColor: colors.modalBackdrop },
   sheet: {
     position: "absolute",
     left: 0,

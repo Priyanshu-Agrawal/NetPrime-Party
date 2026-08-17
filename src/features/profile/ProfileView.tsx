@@ -11,7 +11,9 @@ import AppHeader from "@/components/ui/AppHeader";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { getDisplayName, setDisplayName } from "@/services/party/identity";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { Text } from "@/src/ui";
+import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
+import { pressedStyle } from "@/theme/styles/interaction";
 import { checkGithubRelease } from "@/utils/checkGithubRelease";
 import { clearAppCache, clearWatchHistory, getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,7 +28,6 @@ import {
   Pressable,
   Share,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -460,7 +461,7 @@ const styles = StyleSheet.create({
   // Modals
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(8,6,4,0.72)",
+    backgroundColor: colors.modalBackdrop,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: ms(28),

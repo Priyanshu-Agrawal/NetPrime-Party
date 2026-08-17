@@ -30,7 +30,7 @@ import { getDisplayName } from "@/services/party/identity";
 import type { Member, PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
 import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/services/party/usePartyChat";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { colors, chat, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { exitMedia } from "@/src/navigation/actions";
@@ -65,11 +65,10 @@ const EMPTY_MEMBERS: Member[] = [];
 // avatar + name shown once per group, bubbles tight-stacked, one timestamp at the end.
 const CHAT_GROUP_MS = 4 * 60 * 1000;
 // A stable, readable accent per sender (name + avatar) so a group chat is easy to scan.
-const SENDER_COLORS = ["#F0A93C", "#E8759B", "#63B3E8", "#7FD6A6", "#C79BF0", "#E8B24B", "#5FD2C6", "#F0906A"];
 function senderColor(userId: string): string {
   let h = 0;
   for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) | 0;
-  return SENDER_COLORS[Math.abs(h) % SENDER_COLORS.length];
+  return chat.senderColors[Math.abs(h) % chat.senderColors.length];
 }
 
 // Instagram-style corners: the tail side (right for mine, left for incoming) keeps
@@ -1101,7 +1100,7 @@ const styles = StyleSheet.create({
   bubbleMine: {
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(240,169,60,0.3)",
+    borderColor: colors.chatBorder,
   },
   bubbleText: { color: colors.text, fontFamily: font.body, fontSize: ms(13), lineHeight: ms(18) },
   bubbleColMine: { alignItems: "flex-end", gap: ms(3), flexShrink: 1 },
@@ -1163,7 +1162,7 @@ const styles = StyleSheet.create({
     gap: ms(3),
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(240,169,60,0.35)",
+    borderColor: colors.chatBorderStrong,
     paddingHorizontal: ms(9),
     height: ms(30),
     borderRadius: radius.pill,
@@ -1226,7 +1225,7 @@ const styles = StyleSheet.create({
 
   pwBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(8,6,4,0.72)",
+    backgroundColor: colors.modalBackdrop,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: ms(28),

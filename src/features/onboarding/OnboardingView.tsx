@@ -5,7 +5,10 @@
  * and a Skip. Sets the onboarded flag (utils/prefs) and enters the app.
  */
 import { setDisplayName, getDisplayName } from "@/services/party/identity";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { Button, Text } from "@/src/ui";
+import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
+import { gradients } from "@/theme/styles/gradients";
+import { pressedStyle } from "@/theme/styles/interaction";
 import { setOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -20,7 +23,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
@@ -88,11 +90,7 @@ export default function Onboarding() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={["rgba(240,169,60,0.10)", "transparent"]}
-        style={styles.topGlow}
-        pointerEvents="none"
-      />
+      <LinearGradient colors={[...gradients.onboardingGlow]} style={styles.topGlow} pointerEvents="none" />
 
       <Pressable style={[styles.skip, { top: insets.top + ms(6) }]} onPress={finish} hitSlop={10}>
         <BlurView
@@ -102,7 +100,7 @@ export default function Onboarding() {
           style={StyleSheet.absoluteFill}
         />
         <View style={[StyleSheet.absoluteFill, styles.skipTint]} />
-        <Text style={styles.skipText}>Skip</Text>
+        <Text variant="label">Skip</Text>
       </Pressable>
 
       <ScrollView
@@ -124,16 +122,20 @@ export default function Onboarding() {
             </View>
 
             {s.titleAccent ? (
-              <Text style={styles.title}>
+              <Text variant="display" style={styles.title}>
                 {s.titleTop}
                 {"\n"}
-                <Text style={styles.titleAccent}>{s.titleAccent}</Text>
+                <Text honey>{s.titleAccent}</Text>
               </Text>
             ) : (
-              <Text style={styles.title}>{s.title}</Text>
+              <Text variant="display" style={styles.title}>
+                {s.title}
+              </Text>
             )}
 
-            <Text style={styles.body}>{s.body}</Text>
+            <Text variant="bodyDim" style={styles.body}>
+              {s.body}
+            </Text>
 
             {s.key === "name" ? (
               <View style={styles.nameField}>
@@ -161,10 +163,12 @@ export default function Onboarding() {
             <View key={i} style={[styles.dot, i === page && styles.dotActive]} />
           ))}
         </View>
-        <Pressable style={styles.cta} onPress={next}>
-          <Text style={styles.ctaText}>{page >= last ? "Get Started" : "Next"}</Text>
-          <Ionicons name="arrow-forward" size={ms(18)} color={colors.onHoney} />
-        </Pressable>
+        <Button
+          label={page >= last ? "Get Started" : "Next"}
+          icon="arrow-forward"
+          onPress={next}
+          full
+        />
       </View>
     </View>
   );
@@ -186,13 +190,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  skipTint: { backgroundColor: "rgba(16,13,10,0.28)" },
-  skipText: { color: colors.text, fontFamily: font.label, fontSize: ms(13) },
+  skipTint: { backgroundColor: colors.overlay },
 
   pager: { flex: 1 },
-  slide: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: ms(32) },
+  slide: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xxxl - 8 },
 
-  heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: ms(28) },
+  heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: spacing.xxl },
   heroGlow: {
     position: "absolute",
     width: ms(160),
@@ -213,23 +216,8 @@ const styles = StyleSheet.create({
     ...glow.honey,
   },
 
-  title: {
-    color: colors.text,
-    fontFamily: font.headlineXbold,
-    fontSize: ms(30),
-    lineHeight: ms(36),
-    textAlign: "center",
-  },
-  titleAccent: { color: colors.honey },
-  body: {
-    color: colors.textDim,
-    fontFamily: font.body,
-    fontSize: ms(15),
-    lineHeight: ms(22),
-    textAlign: "center",
-    marginTop: ms(14),
-    maxWidth: ms(320),
-  },
+  title: { fontSize: ms(30), lineHeight: ms(36), textAlign: "center" },
+  body: { textAlign: "center", marginTop: ms(14), maxWidth: ms(320), fontSize: ms(15), lineHeight: ms(22) },
 
   nameField: {
     flexDirection: "row",
@@ -246,19 +234,8 @@ const styles = StyleSheet.create({
   },
   nameInput: { flex: 1, color: colors.text, fontFamily: font.bodySemi, fontSize: ms(16) },
 
-  footer: { paddingHorizontal: ms(28) },
+  footer: { paddingHorizontal: spacing.xxl + 8 },
   dots: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(7), marginBottom: ms(22) },
   dot: { width: ms(7), height: ms(7), borderRadius: ms(4), backgroundColor: colors.borderStrong },
   dotActive: { width: ms(22), backgroundColor: colors.honey },
-  cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: ms(8),
-    height: ms(54),
-    borderRadius: radius.pill,
-    backgroundColor: colors.honey,
-    ...glow.honey,
-  },
-  ctaText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(16) },
 });

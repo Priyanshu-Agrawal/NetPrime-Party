@@ -2,16 +2,18 @@ import ContinueWatching from "@/components/home/ContinueWatching";
 import HeroCarousel from "@/components/home/HeroCarousel";
 import MediaRail from "@/components/home/MediaRail";
 import AppHeader from "@/components/ui/AppHeader";
-import GlassCard from "@/components/ui/GlassCard";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { openJoinParty, openLibrary } from "@/src/navigation/actions";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { GlassCard, Text } from "@/src/ui";
+import { colors, ms, radius, spacing } from "@/theme/bearoom";
+import { gradients } from "@/theme/styles/gradients";
+import { pressedStyle } from "@/theme/styles/interaction";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -32,27 +34,37 @@ export default React.memo(function HomePage() {
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: 108 }}
+        contentContainerStyle={{ paddingBottom: ms(108) }}
       >
         <HeroCarousel />
 
-        {/* Watch-party CTA */}
         <View style={styles.ctaWrap}>
-          <GlassCard rounded={radius.xl} padded={14} style={styles.cta}>
+          <GlassCard
+            blur={false}
+            rounded={radius.lg}
+            padded={spacing.sm + 2}
+            style={styles.cta}
+          >
             <View style={styles.ctaRow}>
               <View style={styles.ctaIcon}>
-                <Ionicons name="people" size={20} color={colors.honey} />
+                <Ionicons name="people" size={ms(16)} color={colors.honey} />
               </View>
               <View style={styles.ctaText}>
-                <Text style={styles.ctaTitle}>Start a watch party</Text>
-                <Text style={styles.ctaSub}>Watch in sync with your pack, anywhere.</Text>
+                <Text variant="label" style={styles.ctaTitle}>
+                  Start a watch party
+                </Text>
+                <Text variant="caption" style={styles.ctaSub}>
+                  Watch in sync with your pack, anywhere.
+                </Text>
               </View>
               <Pressable
-                style={({ pressed }) => [styles.ctaBtn, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.ctaBtn, pressed && pressedStyle]}
                 onPress={openJoinParty}
                 hitSlop={6}
               >
-                <Text style={styles.ctaBtnText}>Invite</Text>
+                <Text variant="caption" honey style={styles.ctaBtnText}>
+                  Invite
+                </Text>
               </Pressable>
             </View>
           </GlassCard>
@@ -75,8 +87,6 @@ export default React.memo(function HomePage() {
         <MediaRail title="Airing Today" path="tv/airing_today" kind="tv" />
       </Animated.ScrollView>
 
-      {/* Persistent top bar — gains a frosted-glass background once content
-          scrolls under it so it never merges with the rails. */}
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
           <BlurView
@@ -88,7 +98,7 @@ export default React.memo(function HomePage() {
           <View style={styles.headerBgLine} />
         </Animated.View>
         <LinearGradient
-          colors={[colors.bg, "rgba(16,13,10,0.55)", "transparent"]}
+          colors={[...gradients.headerFade]}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
@@ -101,7 +111,6 @@ export default React.memo(function HomePage() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
 
   topBarBg: {
     position: "absolute",
@@ -118,65 +127,28 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
   },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  brand: {
-    color: colors.text,
-    fontFamily: font.headlineXbold,
-    fontSize: ms(22),
-    letterSpacing: 0.2,
-  },
-  brandAccent: { color: colors.honey },
-  topActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hostBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: colors.honey,
-    paddingHorizontal: 12,
-    height: 36,
-    borderRadius: radius.pill,
-    ...glow.honey,
-  },
-  hostText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(12) },
 
-  ctaWrap: { paddingHorizontal: 16, marginTop: -14 },
-  cta: { position: "relative",backgroundColor: "rgba(57, 33, 0, 0.2)" },
-  ctaRow: { flexDirection: "row", alignItems: "center", gap: 12, },
+  ctaWrap: { paddingHorizontal: spacing.lg, marginTop: -ms(10) },
+  cta: { backgroundColor: colors.surfaceStrong },
+  ctaRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm + 2 },
   ctaIcon: {
-    width: 40,
-    height: 40,
+    width: ms(32),
+    height: ms(32),
     borderRadius: radius.pill,
     backgroundColor: colors.honeySoft,
     alignItems: "center",
     justifyContent: "center",
   },
-  ctaText: { flex: 1 },
-  ctaTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
-  ctaSub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(12), marginTop: 2 },
+  ctaText: { flex: 1, gap: ms(1) },
+  ctaTitle: { fontSize: ms(13) },
+  ctaSub: { fontSize: ms(11), lineHeight: ms(14) },
   ctaBtn: {
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.honey,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
     borderRadius: radius.pill,
   },
-  ctaBtnText: { color: colors.honey, fontFamily: font.label, fontSize: ms(12) },
+  ctaBtnText: { fontSize: ms(11) },
 });

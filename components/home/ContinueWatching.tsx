@@ -1,18 +1,19 @@
 /**
- * "Continue Watching" home rail — reads local watch history, shows in-progress
- * titles with a honey resume progress bar, and jumps straight back into the
- * player. Refreshes every time the home screen regains focus. Bearoom compact
- * skin: wide 2:1 glass thumbnails with a glowing honey progress bar.
+ * "Continue Watching" home rail — reads local watch history with resume progress.
  */
 import { getWatchHistory, type HistoryItem } from "@/utils/history";
-import { colors, ms, font, radius } from "@/theme/bearoom";
+import { colors, ms, radius, spacing } from "@/theme/bearoom";
+import { gradients } from "@/theme/styles/gradients";
+import { layout } from "@/theme/styles/layout";
+import { pressedStyle } from "@/theme/styles/interaction";
+import { SectionHeader, Text } from "@/src/ui";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { openPlayer } from "@/src/navigation/actions";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 const CARD_W = ms(210);
 const CARD_H = ms(118);
@@ -54,10 +55,7 @@ export function ContinueWatching() {
 
   return (
     <View style={styles.rail}>
-      <View style={styles.head}>
-        <Text style={styles.title}>Continue watching</Text>
-        <Ionicons name="chevron-forward" size={15} color={colors.textDim} />
-      </View>
+      <SectionHeader title="Continue watching" />
       <FlatList
         data={items}
         horizontal
@@ -74,7 +72,7 @@ export function ContinueWatching() {
             : undefined;
           return (
             <Pressable
-              style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [styles.card, pressed && pressedStyle]}
               onPress={() => resume(item)}
             >
               {uri ? (
@@ -87,24 +85,21 @@ export function ContinueWatching() {
                 />
               ) : (
                 <View style={[StyleSheet.absoluteFill, styles.noPoster]}>
-                  <Ionicons name="film-outline" size={24} color={colors.textFaint} />
+                  <Ionicons name="film-outline" size={ms(24)} color={colors.textFaint} />
                 </View>
               )}
-              <LinearGradient
-                colors={["transparent", "rgba(16,13,10,0.35)", "rgba(16,13,10,0.92)"]}
-                style={StyleSheet.absoluteFill}
-              />
+              <LinearGradient colors={[...gradients.continueWatching]} style={StyleSheet.absoluteFill} />
               <View style={styles.playBadge}>
-                <Ionicons name="play" size={18} color={colors.text} />
+                <Ionicons name="play" size={ms(18)} color={colors.text} />
               </View>
               <View style={styles.meta}>
                 {item.type === "tv" && item.season ? (
-                  <Text style={styles.sub}>
+                  <Text variant="caption" honey style={styles.sub}>
                     S{item.season}
                     {item.episode ? ` · E${item.episode}` : ""}
                   </Text>
                 ) : null}
-                <Text style={styles.cardTitle} numberOfLines={1}>
+                <Text variant="label" numberOfLines={1}>
                   {item.title}
                 </Text>
               </View>
@@ -122,21 +117,8 @@ export function ContinueWatching() {
 }
 
 const styles = StyleSheet.create({
-  rail: { marginTop: 20 },
-  head: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  title: {
-    color: colors.text,
-    fontFamily: font.headlineSemi,
-    fontSize: ms(18),
-    letterSpacing: -0.2,
-  },
-  list: { paddingHorizontal: 16, gap: 10 },
+  rail: { marginTop: spacing.xl },
+  list: { paddingHorizontal: spacing.lg, gap: layout.railGap },
   card: {
     width: CARD_W,
     height: CARD_H,
@@ -150,10 +132,10 @@ const styles = StyleSheet.create({
   noPoster: { alignItems: "center", justifyContent: "center" },
   playBadge: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
+    top: layout.railGap,
+    right: layout.railGap,
+    width: ms(32),
+    height: ms(32),
     borderRadius: radius.pill,
     backgroundColor: colors.scrim,
     borderWidth: StyleSheet.hairlineWidth,
@@ -161,19 +143,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  meta: { paddingHorizontal: 10, paddingBottom: 10 },
-  cardTitle: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
-  sub: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(10), letterSpacing: 0.3, marginBottom: 2 },
+  meta: { paddingHorizontal: layout.railGap, paddingBottom: layout.railGap },
+  sub: { fontSize: ms(10), letterSpacing: 0.3, marginBottom: ms(2) },
   progressTrack: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 3,
-    backgroundColor: "rgba(246,239,227,0.2)",
+    height: ms(3),
+    backgroundColor: colors.progressTrack,
   },
   progressFill: {
-    height: 3,
+    height: ms(3),
     backgroundColor: colors.honey,
     shadowColor: colors.honey,
     shadowOpacity: 0.8,

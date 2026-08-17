@@ -1,29 +1,22 @@
 /**
- * My List — the titles the user saved from Details (bookmark / + My List).
- * A responsive poster grid backed by utils/watchlist (MMKV). Long-press a poster
- * to remove it; tap to open its details.
+ * My List — saved titles from Details (bookmark / + My List).
  */
-import GlassIconButton from "@/components/ui/GlassIconButton";
-import PosterCard from "@/components/ui/PosterCard";
-import { colors, font, ms } from "@/theme/bearoom";
+import { bearAlert } from "@/components/ui/BearAlert";
+import { IconButton, PosterCard, Screen, Text } from "@/src/ui";
+import { colors, ms, spacing } from "@/theme/bearoom";
+import { gridColumnWidth, layout } from "@/theme/styles/layout";
 import { img } from "@/utils/tmdbDetails";
 import { getWatchlist, removeFromWatchlist, type WatchlistItem } from "@/utils/watchlist";
-import { bearAlert } from "@/components/ui/BearAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { goBack, openDetails } from "@/src/navigation/actions";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
-import { Dimensions, FlatList, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FlatList, StyleSheet, View } from "react-native";
 
-const { width } = Dimensions.get("window");
 const COLS = 3;
-const GAP = ms(12);
-const PAD = ms(16);
-const CARD_W = Math.floor((width - PAD * 2 - GAP * (COLS - 1)) / COLS);
+const CARD_W = gridColumnWidth(COLS);
 
 export default function MyListScreen() {
-  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<WatchlistItem[]>([]);
 
   useFocusEffect(
@@ -53,20 +46,22 @@ export default function MyListScreen() {
     ]);
 
   return (
-    <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + ms(6) }]}>
-        <GlassIconButton onPress={goBack} size={38}>
+    <Screen edges={["top"]}>
+      <View style={styles.header}>
+        <IconButton onPress={goBack} size={ms(38)}>
           <Ionicons name="chevron-back" size={ms(21)} color={colors.text} />
-        </GlassIconButton>
-        <Text style={styles.title}>My List</Text>
+        </IconButton>
+        <Text variant="h2">My List</Text>
         <View style={{ width: ms(38) }} />
       </View>
 
       {items.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="bookmark-outline" size={ms(40)} color={colors.textFaint} />
-          <Text style={styles.emptyTitle}>Your list is empty</Text>
-          <Text style={styles.emptySub}>Save movies & shows from their details page to find them here.</Text>
+          <Text variant="h3">Your list is empty</Text>
+          <Text variant="bodyDim" style={styles.emptySub}>
+            Save movies & shows from their details page to find them here.
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -74,7 +69,7 @@ export default function MyListScreen() {
           keyExtractor={(i) => `${i.type}:${i.id}`}
           numColumns={COLS}
           showsVerticalScrollIndicator={false}
-          columnWrapperStyle={{ gap: GAP }}
+          columnWrapperStyle={{ gap: layout.gridGap }}
           contentContainerStyle={styles.grid}
           renderItem={({ item }) => (
             <PosterCard
@@ -88,22 +83,30 @@ export default function MyListScreen() {
           )}
         />
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: ms(12),
-    paddingBottom: ms(10),
+    paddingHorizontal: spacing.md,
+    paddingBottom: layout.railGap,
   },
-  title: { color: colors.text, fontFamily: font.headline, fontSize: ms(20) },
-  grid: { paddingHorizontal: PAD, paddingTop: ms(6), paddingBottom: ms(40), gap: GAP },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: ms(40), gap: ms(10) },
-  emptyTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(17), marginTop: ms(4) },
-  emptySub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(13), textAlign: "center", lineHeight: ms(19) },
+  grid: {
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.sm - 2,
+    paddingBottom: spacing.xxxl + 12,
+    gap: layout.gridGap,
+  },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxxl,
+    gap: layout.railGap,
+  },
+  emptySub: { textAlign: "center", lineHeight: ms(19) },
 });

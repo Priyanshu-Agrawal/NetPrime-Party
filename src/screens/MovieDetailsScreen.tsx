@@ -32,7 +32,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { goBack, openPartyHost, openPlayer } from "@/src/navigation/actions";
+import { goBack, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { PlayerStackParamList } from "@/src/navigation/types";
@@ -353,10 +353,7 @@ const MovieDetailsScreen: React.FC = () => {
                 <Pressable
                   style={styles.recCard}
                   onPress={() =>
-                    navigation.replace("MovieDetails", {
-                      id: String(item.id),
-                      type: "movie",
-                    })
+                    openDetails({ id: item.id, media_type: "movie" }, "movie")
                   }
                 >
                   <View style={styles.recImgWrap}>
@@ -482,7 +479,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  clipScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(16,13,10,0.25)" },
+  clipScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay },
   clipPlay: {
     width: 44,
     height: 44,

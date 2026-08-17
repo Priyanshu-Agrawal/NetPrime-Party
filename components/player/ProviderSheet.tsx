@@ -48,7 +48,7 @@ import { colors, font } from "@/theme/bearoom";
 const COLORS = {
   bg: colors.bgElevated,
   accent: colors.honey,
-  warn: "#E0A316",
+  warn: colors.honeyBright,
   white: colors.text,
   muted: colors.textDim,
   divider: colors.border,
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: "hidden",
-    backgroundColor: "rgba(16,13,10,0.95)",
+    backgroundColor: colors.sheetOverlay,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "rgba(0,123,255,0.15)",
+    backgroundColor: colors.infoTint,
   },
   partyPillText: {
     color: COLORS.accent,
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "rgba(224,163,22,0.15)",
+    backgroundColor: colors.warnTint,
   },
   unstablePillText: {
     color: COLORS.warn,

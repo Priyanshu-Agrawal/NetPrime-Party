@@ -261,7 +261,7 @@ function MenuRow({ icon, label, onPress, tint, last }: { icon: keyof typeof Ioni
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(8,6,4,0.6)" },
+  backdrop: { flex: 1, backgroundColor: colors.modalBackdrop },
   sheet: {
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: radius.xxl,
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   done: { marginTop: ms(14), height: ms(52), borderRadius: radius.pill, backgroundColor: colors.honey, alignItems: "center", justifyContent: "center", ...glow.honey },
   doneText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(16) },
 
-  menuBackdrop: { flex: 1, backgroundColor: "rgba(8,6,4,0.6)", justifyContent: "flex-end" },
+  menuBackdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: "flex-end" },
   menuSheet: {
     backgroundColor: colors.bgElevated,
     borderTopLeftRadius: radius.xxl,

@@ -9,6 +9,7 @@
  * Which providers are controllable is recorded in hijackCapabilities; the party
  * only ever mounts this for a provider whose `hijack.supported` is true.
  */
+import { colors } from "@/theme/bearoom";
 import React, {
   forwardRef,
   useCallback,
@@ -479,7 +480,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           startInLoadingState
           renderLoading={() => (
             <View style={[styles.web, styles.center]}>
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.white} />
               <Text style={styles.msg}>Loading {provider.name}…</Text>
             </View>
           )}
@@ -507,19 +508,19 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
 HijackPlayer.displayName = "HijackPlayer";
 
 const styles = StyleSheet.create({
-  web: { flex: 1, backgroundColor: "#000" },
+  web: { flex: 1, backgroundColor: colors.playerBg },
   center: { alignItems: "center", justifyContent: "center", gap: 10 },
-  msg: { color: "#bbb", fontSize: 14, paddingHorizontal: 24, textAlign: "center" },
+  msg: { color: colors.textDim, fontSize: 14, paddingHorizontal: 24, textAlign: "center" },
   banner: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(224,163,22,0.9)",
+    backgroundColor: colors.bannerBg,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  bannerText: { color: "#111", fontSize: 12, textAlign: "center", fontWeight: "600" },
+  bannerText: { color: colors.onHoney, fontSize: 12, textAlign: "center", fontWeight: "600" },
 });
 
 export default HijackPlayer;

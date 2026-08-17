@@ -163,6 +163,19 @@ GestureHandlerRootView            (flex:1)
 | TMDB bearer token | Cloudflare Worker secret `TMDB_TOKEN` | ❌ never in app |
 | **KLIPY** `app_key` | `EXPO_PUBLIC_KLIPY_KEY` in gitignored `.env.local` + EAS secrets | ❌ never committed |
 
+## Styling (Bearoom design system)
+
+Dark-only app (`Appearance.setColorScheme("dark")` in `App.tsx`). All visual tokens live in **`theme/bearoom.ts`**; import via **`@/theme`** or **`@/theme/bearoom`**.
+
+| Layer | Path | Role |
+|---|---|---|
+| Tokens | `theme/bearoom.ts` | Colors, spacing, radius, typography, glow, glass, chat |
+| Style helpers | `theme/styles/*` | `textVariant()`, gradients, layout, surfaces, interaction |
+| UI kit | `src/ui/*` | `Text`, `Box`, `Stack`, `Button`, `PosterCard`, `Screen`, … |
+| Legacy re-exports | `components/ui/*` | Thin re-exports to `src/ui` for existing imports |
+
+**Rules:** No inline `#hex` or `rgba()` outside `theme/`. Use `<Text variant="…" />`, `spacing.*`, `gradients.*`, and kit components in features. Run `npm run check:theme` in CI.
+
 ## Gotchas
 - Dark is forced at module load; don't wire a light theme expecting `useColorScheme`.
 - `SystemUI.setBackgroundColorAsync` in render bodies (root + player layout) — cosmetic,

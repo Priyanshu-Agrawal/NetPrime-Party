@@ -1,18 +1,13 @@
 /**
- * Auto-rotating featured hero for the top of the home screen — a swipeable,
- * self-advancing spotlight of trending titles with backdrop, rating, overview
- * and quick Play / Details / Watch-together actions. Bearoom cozy-cinema skin:
- * warm charcoal scrims, glass meta chips, honey primary action.
+ * Auto-rotating featured hero for the top of the home screen.
  */
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
-import {
-  itemTitle,
-  itemType,
-  itemYear,
-  type MediaItem,
-} from "@/utils/tmdbLists";
-import { colors, ms, font, glow, radius } from "@/theme/bearoom";
+import { itemTitle, itemType, itemYear, type MediaItem } from "@/utils/tmdbLists";
+import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
+import { gradients } from "@/theme/styles/gradients";
+import { pressedStyle } from "@/theme/styles/interaction";
 import { genRoomCode } from "@/utils/roomCode";
+import { Badge, Button, Text } from "@/src/ui";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -24,7 +19,6 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -81,10 +75,6 @@ export function HeroCarousel() {
     }
   };
 
-  const goDetails = (item: MediaItem, fallback: "movie" | "tv") => {
-    openDetails(item, fallback);
-  };
-
   if (items.length === 0) {
     return <View style={[styles.hero, styles.skeleton]} />;
   }
@@ -102,10 +92,7 @@ export function HeroCarousel() {
         renderItem={({ item }) => {
           const type = itemType(item, "movie");
           return (
-            <Pressable
-              style={styles.slide}
-              onPress={() => goDetails(item, "movie")}
-            >
+            <Pressable style={styles.slide} onPress={() => openDetails(item, "movie")}>
               <Image
                 source={{ uri: `https://image.tmdb.org/t/p/w780${item.backdrop_path}` }}
                 style={StyleSheet.absoluteFill}
@@ -113,12 +100,9 @@ export function HeroCarousel() {
                 cachePolicy="memory-disk"
                 transition={400}
               />
+              <LinearGradient colors={[...gradients.heroBottom]} style={StyleSheet.absoluteFill} />
               <LinearGradient
-                colors={["transparent", "rgba(16,13,10,0.7)", colors.bg]}
-                style={StyleSheet.absoluteFill}
-              />
-              <LinearGradient
-                colors={["rgba(16,13,10,0.8)", "transparent"]}
+                colors={[...gradients.heroTop]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={StyleSheet.absoluteFill}
@@ -126,45 +110,31 @@ export function HeroCarousel() {
               <View style={styles.content}>
                 <View style={styles.chipRow}>
                   {item.vote_average ? (
-                    <View style={styles.chip}>
-                      <Ionicons name="star" size={11} color={colors.honey} />
-                      <Text style={styles.chipText}>{item.vote_average.toFixed(1)}</Text>
-                    </View>
+                    <Badge label={item.vote_average.toFixed(1)} tone="default" icon="star" />
                   ) : null}
-                  {itemYear(item) ? (
-                    <View style={styles.chip}>
-                      <Text style={styles.chipText}>{itemYear(item)}</Text>
-                    </View>
-                  ) : null}
-                  <View style={styles.chip}>
-                    <Text style={styles.chipText}>{type === "tv" ? "Series" : "Movie"}</Text>
-                  </View>
+                  {itemYear(item) ? <Badge label={String(itemYear(item))} tone="muted" /> : null}
+                  <Badge label={type === "tv" ? "Series" : "Movie"} tone="muted" />
                 </View>
-                <Text style={styles.title} numberOfLines={2}>
+                <Text variant="display" style={styles.title} numberOfLines={2}>
                   {itemTitle(item)}
                 </Text>
                 {item.overview ? (
-                  <Text style={styles.overview} numberOfLines={3}>
+                  <Text variant="bodyDim" style={styles.overview} numberOfLines={3}>
                     {item.overview}
                   </Text>
                 ) : null}
                 <View style={styles.actions}>
+                  <Button label="Play" icon="play" onPress={() => play(item)} size="xs" />
+                  <Button
+                    label="Details"
+                    icon="information-circle-outline"
+                    variant="glass"
+                    onPress={() => openDetails(item, "movie")}
+                    size="xs"
+                    glowing={false}
+                  />
                   <Pressable
-                    style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}
-                    onPress={() => play(item)}
-                  >
-                    <Ionicons name="play" size={18} color={colors.onHoney} />
-                    <Text style={styles.playText}>Play</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.infoBtn, pressed && styles.pressed]}
-                    onPress={() => goDetails(item, "movie")}
-                  >
-                    <Ionicons name="information-circle-outline" size={18} color={colors.text} />
-                    <Text style={styles.infoText}>Details</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]}
+                    style={({ pressed }) => [styles.togetherBtn, pressed && pressedStyle]}
                     onPress={() =>
                       openPartyHost({
                         role: "host",
@@ -177,8 +147,10 @@ export function HeroCarousel() {
                     }
                     hitSlop={8}
                   >
-                    <Ionicons name="paw" size={14} color={colors.honey} />
-                    <Text style={styles.togetherText}>Watch together</Text>
+                    <Ionicons name="paw" size={ms(14)} color={colors.honey} />
+                    <Text variant="caption" honey>
+                      Watch together
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -199,80 +171,15 @@ const styles = StyleSheet.create({
   hero: { width, height: HERO_H },
   skeleton: { backgroundColor: colors.bgElevated },
   slide: { width, height: HERO_H, justifyContent: "flex-end" },
-  content: { paddingHorizontal: 16, paddingBottom: 22 },
-  chipRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  chipText: {
-    color: colors.text,
-    fontFamily: font.label,
-    fontSize: ms(10),
-    letterSpacing: 0.3,
-  },
-  title: {
-    color: colors.text,
-    fontFamily: font.headlineXbold,
-    fontSize: ms(30),
-    letterSpacing: -0.5,
-    marginBottom: 6,
-  },
-  overview: {
-    color: colors.textDim,
-    fontFamily: font.body,
-    fontSize: ms(13),
-    lineHeight: 19,
-    marginBottom: 16,
-  },
-  actions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
-  playBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: colors.honey,
-    paddingHorizontal: 22,
-    paddingVertical: 11,
-    borderRadius: radius.pill,
-    ...glow.honey,
-  },
-  playText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(14) },
-  infoBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: radius.pill,
-  },
-  infoText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(14) },
-  togetherBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-  togetherText: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(12) },
-  dots: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    flexDirection: "row",
-    gap: 5,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(246,239,227,0.4)",
-  },
-  dotActive: { backgroundColor: colors.honey, width: 16 },
+  content: { paddingHorizontal: spacing.lg, paddingBottom: ms(22) },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm - 2, marginBottom: spacing.sm + 2 },
+  title: { fontSize: ms(30), letterSpacing: -0.5, marginBottom: spacing.sm - 2 },
+  overview: { fontSize: ms(13), lineHeight: ms(19), marginBottom: spacing.lg },
+  actions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  togetherBtn: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  dots: { position: "absolute", top: ms(14), right: ms(14), flexDirection: "row", gap: ms(5) },
+  dot: { width: ms(6), height: ms(6), borderRadius: ms(3), backgroundColor: colors.heroDotActive },
+  dotActive: { backgroundColor: colors.honey, width: ms(16) },
 });
 
 export default HeroCarousel;

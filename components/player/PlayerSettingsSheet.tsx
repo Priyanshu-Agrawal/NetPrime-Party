@@ -110,8 +110,8 @@ export default function PlayerSettingsSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(8,6,4,0.55)", justifyContent: "flex-end" },
-  solidSheet: { backgroundColor: "rgba(20,16,12,0.97)" },
+  backdrop: { flex: 1, backgroundColor: colors.modalBackdrop, justifyContent: "flex-end" },
+  solidSheet: { backgroundColor: colors.bgElevated },
   wrap: { paddingHorizontal: ms(10), paddingBottom: ms(10) },
   inner: { paddingHorizontal: ms(18), paddingTop: ms(10) },
   handle: {

@@ -16,6 +16,7 @@
  */
 import GlassCard from "@/components/ui/GlassCard";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { gradients } from "@/theme/styles/gradients";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, {
@@ -263,7 +264,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
         >
           {/* Warm cinema scrim — subtle top vignette, stronger under the bar. */}
           <LinearGradient
-            colors={["rgba(16,13,10,0.28)", "rgba(16,13,10,0.05)", "rgba(16,13,10,0.30)", "rgba(16,13,10,0.72)"]}
+            colors={[...gradients.playerControls]}
             locations={[0, 0.4, 0.72, 1]}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(16,13,10,0.55)",
+    backgroundColor: colors.playerChip,
   },
   centerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(26) },
   // Press feedback: round controls dim + shrink slightly; flat icon buttons just dim.
@@ -431,7 +432,7 @@ const styles = StyleSheet.create({
     right: ms(10),
     bottom: ms(10),
     // Solid dark backing (NOT a live blur — see below) so the controls stay readable.
-    backgroundColor: "rgba(18,14,10,0.62)",
+    backgroundColor: colors.playerCenter,
     ...glow.soft,
   },
   bottomRow: {

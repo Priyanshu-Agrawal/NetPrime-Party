@@ -59,9 +59,53 @@ export const colors = {
   // semantics
   live: "#F0A93C",
   danger: "#E5736B", // muted warm red (sign out / destructive)
+  dangerSoft: "rgba(229,115,107,0.16)",
   onHoney: "#1A1206", // dark warm ink for text/icons ON honey buttons
   scrim: "rgba(16, 13, 10, 0.72)",
   black: "#000000",
+
+  // semantic aliases (derived — do not change visual values)
+  overlay: "rgba(16, 13, 10, 0.28)",
+  overlayStrong: "rgba(8, 6, 4, 0.72)",
+  modalBackdrop: "rgba(8, 6, 4, 0.72)",
+  sheetOverlay: "rgba(16,13,10,0.95)",
+  infoTint: "rgba(0,123,255,0.15)",
+  warnTint: "rgba(224,163,22,0.15)",
+  bannerBg: "rgba(224,163,22,0.9)",
+  playerChip: "rgba(16,13,10,0.55)",
+  playerCenter: "rgba(18,14,10,0.62)",
+  episodeActive: "rgba(240,169,60,0.34)",
+  hintBg: "#0a0a0a",
+  playerBg: "#000000",
+  ratingStar: "#F0A93C",
+  progressTrack: "rgba(246,239,227,0.2)",
+  progressFill: "rgba(246,239,227,0.4)",
+  heroDotActive: "rgba(246,239,227,0.4)",
+  heroDotInactive: "rgba(246,239,227,0.2)",
+  ctaTint: "rgba(57, 33, 0, 0.2)",
+  chatBorder: "rgba(240,169,60,0.3)",
+  chatBorderStrong: "rgba(240,169,60,0.35)",
+  white: "#FFFFFF",
+} as const;
+
+/** Per-sender accent colors for party chat (stable, readable). */
+export const chat = {
+  senderColors: [
+    "#F0A93C",
+    "#E8759B",
+    "#63B3E8",
+    "#7FD6A6",
+    "#C79BF0",
+    "#E8B24B",
+    "#5FD2C6",
+    "#F0906A",
+  ] as const,
+};
+
+export const interaction = {
+  pressedOpacity: 0.9,
+  pressedScale: 0.97,
+  disabledOpacity: 0.5,
 } as const;
 
 export const radius = {
@@ -81,6 +125,13 @@ export const spacing = {
   xl: 20,
   xxl: 28,
   xxxl: 40,
+} as const;
+
+export const layoutTokens = {
+  screenPadding: spacing.lg,
+  railGap: 10,
+  sectionGap: spacing.xl,
+  posterAspect: 1.5,
 } as const;
 
 /**
@@ -136,5 +187,16 @@ export const glow = {
 /** Default BlurView params for frosted glass surfaces. */
 export const glass = { intensity: 24, tint: "dark" } as const;
 
-export const theme = { colors, radius, spacing, font, type, glow, glass };
+export const theme = {
+  colors,
+  radius,
+  spacing,
+  font,
+  type,
+  glow,
+  glass,
+  chat,
+  interaction,
+  layout: layoutTokens,
+};
 export default theme;
