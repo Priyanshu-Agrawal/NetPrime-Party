@@ -4,7 +4,7 @@
 > Kept current as the app evolves — update it when you change these subsystems.
 
 Bearoom is a React Native (Expo) **streaming + synchronized watch-party** app.
-Android package `com.cody669.Uott`. Cozy cinema skin (honey `#F0A93C`,
+Android package `com.scriptingbear.bearoom`. Cozy cinema skin (honey `#F0A93C`,
 `theme/bearoom.ts`).
 
 ## Stack

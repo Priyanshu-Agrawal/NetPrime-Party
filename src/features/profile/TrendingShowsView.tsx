@@ -1,49 +1,123 @@
-import { useMovieContext } from "@/contexts/movieContext";
-import type { Series } from "@/contexts/movieContext/types";
-import { goBack, openDetails } from "@/src/navigation/actions";
-import { Button, IconButton, PosterCard, Screen, Text } from "@/src/ui";
-import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
-import { gradients } from "@/theme/styles/gradients";
+import { openDetails } from "@/src/navigation/actions";
+import {
+  Button,
+  LibraryScreenHeader,
+  PosterCard,
+  PosterSkeleton,
+  Screen,
+  Text,
+} from "@/src/ui";
+import { ms, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
-import { pressedStyle } from "@/theme/styles/interaction";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
-import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
+import { fetchListPage, itemTitle, type MediaItem } from "@/utils/tmdbLists";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
 
-const CARD_W = gridColumnWidth(2, layout.screenPadding + spacing.sm, spacing.lg);
-const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
+const COLS = 3;
+const CARD_W = gridColumnWidth(COLS);
+const LIST_PATH = "trending/tv/week";
+
+const SKELETON_DATA = Array.from({ length: 12 }, (_, i) => ({
+  __skeleton: true as const,
+  id: `sk-${i}`,
+}));
 
 export default function TrendingShowsScreen() {
-  const {
-    series,
-    loadingSeries,
-    error,
-    seriesCurrentPage,
-    seriesTotalPages,
-    fetchPopularSeries,
-    seriesHasMore,
-  } = useMovieContext();
+  const [items, setItems] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const flatListRef = useRef<FlatList>(null);
-  const [showGoToTop, setShowGoToTop] = useState(false);
+  const pageRef = useRef(1);
+  const totalPagesRef = useRef(1);
 
-  if (error && series.length === 0) {
+  const applyPageMeta = useCallback((nextPage: number, nextTotalPages: number) => {
+    pageRef.current = nextPage;
+    totalPagesRef.current = nextTotalPages;
+    setPage(nextPage);
+    setTotalPages(nextTotalPages);
+  }, []);
+
+  const fetchInitial = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchListPage(LIST_PATH, 1);
+      setItems(data.results.map((item) => ({ ...item, media_type: "tv" as const })));
+      applyPageMeta(data.page, data.total_pages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred.");
+      setItems([]);
+      applyPageMeta(1, 1);
+    } finally {
+      setLoading(false);
+    }
+  }, [applyPageMeta]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading || pageRef.current >= totalPagesRef.current) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = pageRef.current + 1;
+      const data = await fetchListPage(LIST_PATH, nextPage);
+      setItems((prev) => {
+        const merged = [...prev];
+        for (const item of data.results) {
+          if (!merged.some((existing) => existing.id === item.id)) {
+            merged.push({ ...item, media_type: "tv" });
+          }
+        }
+        return merged;
+      });
+      applyPageMeta(data.page, data.total_pages);
+    } catch {
+      // Keep already-loaded rows visible if a later page fails.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyPageMeta, loading, loadingMore]);
+
+  useEffect(() => {
+    void fetchInitial();
+  }, [fetchInitial]);
+
+  const listData = useMemo(
+    () => (loading ? SKELETON_DATA : items),
+    [loading, items],
+  );
+
+  const hasMore = page < totalPages;
+
+  const renderCard = ({ item }: { item: MediaItem }) => {
+    const uri = item.poster_path
+      ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
+      : undefined;
+    return (
+      <View style={styles.gridItem}>
+        <PosterCard
+          width={CARD_W}
+          poster={uri}
+          title={itemTitle(item)}
+          rating={item.vote_average ?? undefined}
+          kind="tv"
+          onPress={() => openDetails(item, "tv")}
+          imageTransition={250}
+        />
+      </View>
+    );
+  };
+
+  if (error && items.length === 0 && !loading) {
     return (
       <Screen edges={["top"]}>
-        <View style={styles.header}>
-          <IconButton onPress={goBack} size={38}>
-            <Ionicons name="chevron-back" size={ms(21)} color={colors.text} />
-          </IconButton>
-          <Text variant="h2">Trending Shows</Text>
-          <View style={{ width: ms(38) }} />
-        </View>
+        <LibraryScreenHeader title="Trending Shows" />
         <View style={styles.centered}>
           <Text variant="body" danger>
             {error}
           </Text>
-          <Button label="Retry" onPress={() => fetchPopularSeries(1)} style={{ marginTop: spacing.lg }} />
+          <Button label="Retry" onPress={() => void fetchInitial()} style={{ marginTop: spacing.lg }} />
         </View>
       </Screen>
     );
@@ -51,90 +125,51 @@ export default function TrendingShowsScreen() {
 
   return (
     <Screen edges={["top"]}>
-      <View style={styles.header}>
-        <IconButton onPress={goBack} size={38}>
-          <Ionicons name="chevron-back" size={ms(21)} color={colors.text} />
-        </IconButton>
-        <Text variant="h2">Trending Shows</Text>
-        <View style={{ width: ms(38) }} />
-      </View>
+      <LibraryScreenHeader title="Trending Shows" />
 
       <FlatList
-        ref={flatListRef}
-        onScroll={(e) => setShowGoToTop(e.nativeEvent.contentOffset.y > 400)}
-        scrollEventThrottle={16}
+        data={listData as any[]}
+        renderItem={({ item }) =>
+          (item as any).__skeleton ? <PosterSkeleton /> : renderCard({ item })
+        }
+        keyExtractor={(item: any, i) => (item.__skeleton ? item.id : `${item.id}-${i}`)}
+        numColumns={COLS}
+        columnWrapperStyle={{ gap: layout.gridGap }}
+        contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
-        data={series}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.container}
-        columnWrapperStyle={styles.columnWrapper}
         onEndReached={() => {
-          if (!loadingSeries && seriesHasMore && seriesCurrentPage < seriesTotalPages) {
-            fetchPopularSeries(seriesCurrentPage + 1);
-          }
+          if (hasMore && !loading && !loadingMore) void loadMore();
         }}
-        onEndReachedThreshold={0.5}
-        renderItem={({ item }: { item: Series }) => (
-          <PosterCard
-            width={CARD_W}
-            poster={item.poster_path ? `https://image.tmdb.org/t/p/w342${item.poster_path}` : undefined}
-            title={item.name || (item as any).title}
-            rating={item.vote_average ?? undefined}
-            kind="tv"
-            onPress={() => openDetails({ id: item.id, media_type: "tv" }, "tv")}
-          />
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
+        onEndReachedThreshold={0.45}
         ListFooterComponent={
-          loadingSeries ? (
-            <View style={styles.shimmerRow}>
-              <ShimmerPlaceholder shimmerColors={[...gradients.shimmerDark]} style={styles.shimmer} />
-              <ShimmerPlaceholder shimmerColors={[...gradients.shimmerDark]} style={styles.shimmer} />
+          loadingMore ? (
+            <View style={styles.footerSkeletonRow}>
+              {Array.from({ length: COLS }, (_, i) => (
+                <PosterSkeleton key={`footer-sk-${i}`} />
+              ))}
             </View>
           ) : null
         }
       />
-
-      {showGoToTop ? (
-        <Pressable
-          style={({ pressed }) => [styles.fab, pressed && pressedStyle]}
-          onPress={() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true })}
-        >
-          <Ionicons name="arrow-up" size={ms(18)} color={colors.onHoney} />
-          <Text variant="label" style={{ color: colors.onHoney }}>
-            Top
-          </Text>
-        </Pressable>
-      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm + 2,
+  grid: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm - 2,
+    paddingBottom: ms(120),
   },
-  container: { paddingHorizontal: spacing.sm + 2, paddingBottom: spacing.xl },
-  columnWrapper: { justifyContent: "space-between", gap: spacing.lg },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: layout.screenPadding },
-  shimmerRow: { flexDirection: "row", justifyContent: "space-between", marginTop: spacing.lg, gap: spacing.lg },
-  shimmer: { height: ms(250), width: CARD_W, borderRadius: radius.lg },
-  fab: {
-    position: "absolute",
-    bottom: spacing.xl + 5,
-    alignSelf: "center",
+  gridItem: { width: CARD_W, marginBottom: spacing.lg },
+  footerSkeletonRow: {
     flexDirection: "row",
+    gap: layout.gridGap,
+  },
+  centered: {
+    flex: 1,
     alignItems: "center",
-    gap: spacing.sm - 2,
-    backgroundColor: colors.honey,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
-    ...glow.honey,
+    justifyContent: "center",
+    padding: layout.screenPadding,
   },
 });

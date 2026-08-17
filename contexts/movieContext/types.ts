@@ -34,7 +34,6 @@ export interface Series {
     vote_count: number;
 }
 
-// Define the shape of the data that the context will hold
 export interface MovieContextState {
     movies: Movie[];
     loading: boolean;
@@ -42,17 +41,11 @@ export interface MovieContextState {
     currentPage: number;
     totalPages: number;
     totalResults: number;
-    series: Series[];
-    seriesCurrentPage: number;
-    seriesTotalPages: number;
-    seriesTotalResults: number;
 }
 
-// Define the shape of actions/functions consumers can use
 export interface MovieContextActions {
     fetchPopularMovies: (page?: number) => Promise<void>;
-    fetchPopularSeries: (page?: number) => Promise<void>;
 }
 
-// Combine for the full context value
-export type MovieContextType = MovieContextState & MovieContextActions & { hasMore: boolean, seriesHasMore: boolean, loadingMovies: boolean, loadingSeries: boolean };
+export type MovieContextType = MovieContextState &
+  MovieContextActions & { hasMore: boolean; loadingMovies: boolean };

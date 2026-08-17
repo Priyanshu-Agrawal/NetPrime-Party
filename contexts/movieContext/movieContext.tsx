@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { Movie, MovieContextType, Series } from "./types";
+import { Movie, MovieContextType } from "./types";
 
 // TMDb API Configuration.
 // TMDB's API host (api.themoviedb.org) is blocked/RST on many Indian ISPs, so
@@ -37,25 +37,16 @@ export const MovieContextProvider: React.FC<MovieContextProviderProps> = ({
   children,
 }) => {
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [series, setSeries] = useState<Series[]>([]);
   const [loadingMovies, setLoadingMovies] = useState<boolean>(true);
-  const [loadingSeries, setLoadingSeries] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalResults, setTotalResults] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
 
-  const [seriesCurrentPage, setSeriesCurrentPage] = useState<number>(1);
-  const [seriesTotalPages, setSeriesTotalPages] = useState<number>(1);
-  const [seriesTotalResults, setSeriesTotalResults] = useState<number>(0);
-  const [seriesHasMore, setSeriesHasMore] = useState<boolean>(true);
-
-  // Remove useCallback, make fetchPopularMovies a regular function
   const fetchPopularMovies = useCallback(async (page: number = 1) => {
-    // if (loadingMovies) return; // Prevent multiple fetches
     setLoadingMovies(true);
-    setError(null); // Clear previous errors
+    setError(null);
 
     try {
       const response = await fetch(
@@ -66,7 +57,6 @@ export const MovieContextProvider: React.FC<MovieContextProviderProps> = ({
       );
 
       if (!response.ok) {
-        // Handle HTTP errors (e.g., 401 Unauthorized, 404 Not Found)
         const errorData = await response.json();
         throw new Error(
           errorData.status_message || `HTTP error! status: ${response.status}`,
@@ -97,109 +87,43 @@ export const MovieContextProvider: React.FC<MovieContextProviderProps> = ({
       } else {
         setError("An unknown error occurred.");
       }
-      setMovies([]); // Clear movies on error
+      setMovies([]);
       setHasMore(false);
     } finally {
       setLoadingMovies(false);
     }
   }, []);
 
-  const fetchPopularSeries = useCallback(async (page: number = 1) => {
-    setLoadingSeries(true);
-    setError(null); // Clear previous errors
-
-    try {
-      const response = await fetch(
-        `${API_URL}trending/tv/day?language=en-US&page=${page}`,
-        {
-          headers: API_HEADERS,
-        },
-      );
-
-      if (!response.ok) {
-        // Handle HTTP errors (e.g., 401 Unauthorized, 404 Not Found)
-        const errorData = await response.json();
-        throw new Error(
-          errorData.status_message || `HTTP error! status: ${response.status}`,
-        );
-      }
-
-      const data = await response.json();
-      if (page === 1) {
-        setSeries(data.results);
-      } else {
-        setSeries((prev) => {
-          const newItems = data.results.filter(
-            (newItem: Series) => !prev.some((prevItem) => prevItem.id === newItem.id)
-          );
-          return [...prev, ...newItems];
-        });
-      }
-      setSeriesCurrentPage(data.page);
-      setSeriesTotalPages(data.total_pages);
-      setSeriesTotalResults(data.total_results);
-      setSeriesHasMore(data.page < data.total_pages);
-    } catch (err) {
-      console.error("Failed to fetch series:", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unknown error occurred.");
-      }
-      setSeries([]); // Clear movies on error
-    } finally {
-      setLoadingSeries(false);
-    }
-  }, []);
-
-  // Fetch movies on initial component mount
   useEffect(() => {
     fetchPopularMovies(1);
-    fetchPopularSeries(1);
-  }, [fetchPopularMovies, fetchPopularSeries]); // Only run on mount
+  }, [fetchPopularMovies]);
 
-  // Memoize the context value to prevent unnecessary re-renders of consumers
   const contextValue = useMemo<
     MovieContextType & {
       hasMore: boolean;
       loadingMovies: boolean;
-      loadingSeries: boolean;
     }
   >(
     () => ({
       movies,
-      loading: loadingMovies || loadingSeries,
+      loading: loadingMovies,
       loadingMovies,
-      loadingSeries,
       error,
       currentPage,
       totalPages,
       totalResults,
       fetchPopularMovies,
-      fetchPopularSeries,
-      series,
       hasMore,
-      seriesCurrentPage,
-      seriesTotalPages,
-      seriesTotalResults,
-      seriesHasMore,
     }),
     [
       movies,
       loadingMovies,
-      loadingSeries,
       error,
       currentPage,
       totalPages,
       totalResults,
       fetchPopularMovies,
-      fetchPopularSeries,
-      series,
       hasMore,
-      seriesCurrentPage,
-      seriesTotalPages,
-      seriesTotalResults,
-      seriesHasMore,
     ],
   );
 
@@ -210,7 +134,6 @@ export const MovieContextProvider: React.FC<MovieContextProviderProps> = ({
   );
 };
 
-// Custom hook for consuming the context
 export const useMovieContext = () => {
   const context = useContext(MovieContext);
   if (context === undefined) {

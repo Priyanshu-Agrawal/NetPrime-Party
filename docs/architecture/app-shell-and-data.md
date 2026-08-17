@@ -23,7 +23,7 @@ app/_layout.tsx            Root Stack (headerless). Mounts the provider stack + 
 ├─ onboarding.tsx          FIRST-LAUNCH — 3-slide, sets name + setOnboarded()
 ├─ myList.tsx              MY LIST — watchlist poster grid (MMKV), long-press remove
 ├─ watchHistory.tsx        re-export of components/watchHistory.tsx
-└─ trendingShows.tsx       TRENDING TV — paginated FlatList from movieContext
+└─ trendingShows.tsx       TRENDING TV — paginated 3-col grid via fetchListPage(trending/tv/week)
 ```
 - Root `_layout` sets `unstable_settings = { initialRouteName: "index" }` and renders
   a single headerless `<Stack>` — every group/screen auto-registers. `(tabs)` uses
@@ -71,10 +71,12 @@ GestureHandlerRootView            (flex:1)
 > `Accept-Encoding: identity` + no-cache (required for the Worker — note this if you
 > ever add compression/caching). The Worker source is `tmdb-proxy-worker.js`.
 
-- The **context** only fetches two lists (no caching, plain `fetch` on mount):
-  movies → `movie/now_playing`, series → `trending/tv/day`, both paginated with
-  id-dedupe + `hasMore`. Exposes `movies`, `series`, `loading*`, page counters, and
-  `fetchPopularMovies/Series(page?)`. `useMovieContext()` throws outside the provider.
+- The **context** only fetches one list (no caching, plain `fetch` on mount):
+  movies → `movie/now_playing`, paginated with id-dedupe + `hasMore`. Exposes
+  `movies`, `loadingMovies`, page counters, and `fetchPopularMovies(page?)`.
+  Trending Shows uses `fetchListPage("trending/tv/week")` locally in
+  `TrendingShowsView` (same endpoint as the Home rail). `useMovieContext()` throws
+  outside the provider.
 - Richer catalog data comes from **helpers**, not the context:
   - **`utils/tmdbDetails.ts`** — one big `fetchDetails(type,id)` with
     `append_to_response` (credits/videos/images/recommendations/similar/reviews/

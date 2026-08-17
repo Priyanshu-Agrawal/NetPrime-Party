@@ -62,6 +62,10 @@ export const colors = {
   dangerSoft: "rgba(229,115,107,0.16)",
   onHoney: "#1A1206", // dark warm ink for text/icons ON honey buttons
   scrim: "rgba(16, 13, 10, 0.72)",
+  /** Frosted pill overlays on hero/posters — readable on busy imagery. */
+  glassChipBg: "rgba(16, 13, 10, 0.52)",
+  glassChipTint: "rgba(246, 239, 227, 0.10)",
+  glassChipBorder: "rgba(246, 239, 227, 0.26)",
   black: "#000000",
 
   // semantic aliases (derived — do not change visual values)

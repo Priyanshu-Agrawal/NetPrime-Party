@@ -7,7 +7,7 @@ import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { genRoomCode } from "@/utils/roomCode";
-import { Badge, Button, Text } from "@/src/ui";
+import { Button, GlassChip, Text } from "@/src/ui";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -110,10 +110,12 @@ export function HeroCarousel() {
               <View style={styles.content}>
                 <View style={styles.chipRow}>
                   {item.vote_average ? (
-                    <Badge label={item.vote_average.toFixed(1)} tone="default" icon="star" />
+                    <GlassChip label={item.vote_average.toFixed(1)} icon="star" blur />
                   ) : null}
-                  {itemYear(item) ? <Badge label={String(itemYear(item))} tone="muted" /> : null}
-                  <Badge label={type === "tv" ? "Series" : "Movie"} tone="muted" />
+                  {itemYear(item) ? (
+                    <GlassChip label={String(itemYear(item))} blur />
+                  ) : null}
+                  <GlassChip label={type === "tv" ? "Series" : "Movie"} blur />
                 </View>
                 <Text variant="display" style={styles.title} numberOfLines={2}>
                   {itemTitle(item)}

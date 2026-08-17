@@ -2,13 +2,13 @@
  * My List — saved titles from Details (bookmark / + My List).
  */
 import { bearAlert } from "@/components/ui/BearAlert";
-import { IconButton, PosterCard, Screen, Text } from "@/src/ui";
+import { LibraryScreenHeader, PosterCard, Screen, Text } from "@/src/ui";
 import { colors, ms, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
 import { img } from "@/utils/tmdbDetails";
 import { getWatchlist, removeFromWatchlist, type WatchlistItem } from "@/utils/watchlist";
 import { Ionicons } from "@expo/vector-icons";
-import { goBack, openDetails } from "@/src/navigation/actions";
+import { openDetails } from "@/src/navigation/actions";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
@@ -47,13 +47,7 @@ export default function MyListScreen() {
 
   return (
     <Screen edges={["top"]}>
-      <View style={styles.header}>
-        <IconButton onPress={goBack} size={ms(38)}>
-          <Ionicons name="chevron-back" size={ms(21)} color={colors.text} />
-        </IconButton>
-        <Text variant="h2">My List</Text>
-        <View style={{ width: ms(38) }} />
-      </View>
+      <LibraryScreenHeader title="My List" />
 
       {items.length === 0 ? (
         <View style={styles.empty}>
@@ -88,13 +82,6 @@ export default function MyListScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingBottom: layout.railGap,
-  },
   grid: {
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing.sm - 2,

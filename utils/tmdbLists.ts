@@ -30,6 +30,32 @@ export async function fetchList(path: string): Promise<MediaItem[]> {
   );
 }
 
+export interface ListPageResult {
+  results: MediaItem[];
+  page: number;
+  total_pages: number;
+}
+
+/** Paginated TMDB list fetch — powers library "See all" screens. */
+export async function fetchListPage(path: string, page: number): Promise<ListPageResult> {
+  const sep = path.includes("?") ? "&" : "?";
+  const res = await fetch(`${API_URL}${path}${sep}language=en-US&page=${page}`, {
+    headers: API_HEADERS,
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP error! status: ${res.status}`);
+  }
+  const data = await res.json().catch(() => ({}));
+  const results = (data.results ?? []).filter(
+    (m: MediaItem) => m.poster_path,
+  ) as MediaItem[];
+  return {
+    results,
+    page: data.page ?? page,
+    total_pages: data.total_pages ?? 1,
+  };
+}
+
 export function itemType(item: MediaItem, fallback: "movie" | "tv"): "movie" | "tv" {
   if (item.media_type === "movie" || item.media_type === "tv") return item.media_type;
   // trending/all tags media_type; category endpoints don't → use the rail's kind.

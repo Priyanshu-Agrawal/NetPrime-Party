@@ -1,17 +1,15 @@
 import AppHeader from "@/components/ui/AppHeader";
-import { Chip, PosterCard, Text } from "@/src/ui";
+import { Chip, PosterCard, PosterSkeleton, Text } from "@/src/ui";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
-import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { textVariant } from "@/theme/styles/typography";
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { openDetails, openJoinParty } from "@/src/navigation/actions";
 import { itemTitle, type MediaItem } from "@/utils/tmdbLists";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
   FlatList,
   Pressable,
   StyleSheet,
@@ -46,24 +44,19 @@ const SKELETON_DATA = Array.from({ length: 12 }, (_, i) => ({
   id: `sk-${i}`,
 }));
 
-function SkeletonCard() {
-  const op = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(op, { toValue: 0.9, duration: 650, useNativeDriver: true }),
-        Animated.timing(op, { toValue: 0.4, duration: 650, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [op]);
-  return (
-    <View style={{ width: CARD_W, marginBottom: spacing.lg }}>
-      <Animated.View style={[styles.skBox, { opacity: op }]} />
-      <Animated.View style={[styles.skLine, { width: "75%", marginTop: spacing.sm - 1, opacity: op }]} />
-    </View>
-  );
+function filterResults(items: unknown[]): MediaItem[] {
+  return (items ?? []).filter(
+    (item: any) => item?.poster_path && item?.media_type !== "person",
+  ) as MediaItem[];
+}
+
+function mergeProviderResults(tvData: any, movieData: any): MediaItem[] {
+  return [
+    ...(tvData.results ?? []).map((x: MediaItem) => ({ ...x, media_type: "tv" as const })),
+    ...(movieData.results ?? []).map((x: MediaItem) => ({ ...x, media_type: "movie" as const })),
+  ]
+    .filter((m) => m.poster_path)
+    .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
 }
 
 const SearchScreen: React.FC = () => {
@@ -71,52 +64,119 @@ const SearchScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MediaItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const inputRef = useRef<TextInput>(null);
   const latestCallIdRef = useRef<number>(0);
   const currentAbortControllerRef = useRef<AbortController | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageRef = useRef(1);
+  const totalPagesRef = useRef(1);
+  const queryRef = useRef("");
+  const providerRef = useRef<number | null>(null);
 
-  // --- data (logic unchanged) ---------------------------------------------
+  const hasMore = page < totalPages;
+
+  const applyPageMeta = useCallback((nextPage: number, nextTotalPages: number) => {
+    pageRef.current = nextPage;
+    totalPagesRef.current = nextTotalPages;
+    setPage(nextPage);
+    setTotalPages(nextTotalPages);
+  }, []);
+
+  const fetchBrowse = useCallback(
+    async (providerId: number | null, pageNum: number, append: boolean): Promise<void> => {
+      if (!providerId) {
+        const response = await fetch(
+          `${API_URL}trending/all/day?language=en-US&page=${pageNum}`,
+          { headers: API_HEADERS },
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const batch = filterResults(data.results ?? []);
+        setSearchResults((prev) => (append ? [...prev, ...batch] : batch));
+        applyPageMeta(data.page ?? pageNum, data.total_pages ?? 1);
+        return;
+      }
+
+      const [tvRes, movieRes] = await Promise.all([
+        fetch(
+          `${API_URL}discover/tv?language=en-US&sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}&page=${pageNum}`,
+          { headers: API_HEADERS },
+        ),
+        fetch(
+          `${API_URL}discover/movie?language=en-US&sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}&page=${pageNum}`,
+          { headers: API_HEADERS },
+        ),
+      ]);
+      if (!tvRes.ok || !movieRes.ok) throw new Error("HTTP error");
+      const tvData = await tvRes.json();
+      const movieData = await movieRes.json();
+      const batch = mergeProviderResults(tvData, movieData);
+      setSearchResults((prev) => (append ? [...prev, ...batch] : batch));
+      applyPageMeta(
+        pageNum,
+        Math.max(tvData.total_pages ?? 1, movieData.total_pages ?? 1),
+      );
+    },
+    [applyPageMeta],
+  );
+
+  const fetchSearchPage = useCallback(
+    async (query: string, pageNum: number, append: boolean, signal?: AbortSignal): Promise<void> => {
+      const response = await fetch(
+        `${API_URL}search/multi?query=${encodeURIComponent(query)}&language=en-US&page=${pageNum}`,
+        { headers: API_HEADERS, signal },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const batch = filterResults(data.results ?? []);
+      setSearchResults((prev) => (append ? [...prev, ...batch] : batch));
+      applyPageMeta(data.page ?? pageNum, data.total_pages ?? 1);
+    },
+    [applyPageMeta],
+  );
+
   const fetchInitial = useCallback(
     async (providerId: number | null = selectedProvider): Promise<void> => {
       setSearchLoading(true);
       setSearchError(null);
+      providerRef.current = providerId;
+      queryRef.current = "";
       try {
-        if (!providerId) {
-          const response = await fetch(`${API_URL}trending/all/day?language=en-US&page=1`, {
-            headers: API_HEADERS,
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
-          setSearchResults((data.results ?? []).filter((m: MediaItem) => m.poster_path));
-        } else {
-          const [tvRes, movieRes] = await Promise.all([
-            fetch(`${API_URL}discover/tv?language=en-US&sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}`, { headers: API_HEADERS }),
-            fetch(`${API_URL}discover/movie?language=en-US&sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}`, { headers: API_HEADERS }),
-          ]);
-          if (!tvRes.ok || !movieRes.ok) throw new Error(`HTTP error`);
-          const tvData = await tvRes.json();
-          const movieData = await movieRes.json();
-          const combined = [
-            ...(tvData.results ?? []).map((x: MediaItem) => ({ ...x, media_type: "tv" as const })),
-            ...(movieData.results ?? []).map((x: MediaItem) => ({ ...x, media_type: "movie" as const })),
-          ]
-            .filter((m: any) => m.poster_path)
-            .sort((a: any, b: any) => (b.popularity ?? 0) - (a.popularity ?? 0));
-          setSearchResults(combined as MediaItem[]);
-        }
+        await fetchBrowse(providerId, 1, false);
       } catch (err) {
         setSearchError(err instanceof Error ? err.message : "An unknown error occurred.");
         setSearchResults([]);
+        applyPageMeta(1, 1);
       } finally {
         setSearchLoading(false);
       }
     },
-    [selectedProvider],
+    [applyPageMeta, fetchBrowse, selectedProvider],
   );
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || searchLoading || pageRef.current >= totalPagesRef.current) return;
+    setLoadingMore(true);
+    setSearchError(null);
+    try {
+      const nextPage = pageRef.current + 1;
+      if (queryRef.current) {
+        await fetchSearchPage(queryRef.current, nextPage, true);
+      } else {
+        await fetchBrowse(providerRef.current, nextPage, true);
+      }
+    } catch {
+      // Keep already-loaded rows visible if a later page fails.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [fetchBrowse, fetchSearchPage, loadingMore, searchLoading]);
 
   const handleSearch = useCallback(
     async (query: string) => {
@@ -133,10 +193,13 @@ const SearchScreen: React.FC = () => {
       if (!query) {
         setSearchError(null);
         setSearchLoading(false);
+        queryRef.current = "";
         fetchInitial();
         latestCallIdRef.current = 0;
         return;
       }
+      queryRef.current = query;
+      providerRef.current = null;
       if (!searchLoading) setSearchLoading(true);
       setSearchError(null);
       searchTimeoutRef.current = setTimeout(async () => {
@@ -147,25 +210,13 @@ const SearchScreen: React.FC = () => {
         const controller = new AbortController();
         currentAbortControllerRef.current = controller;
         try {
-          const response = await fetch(
-            `${API_URL}search/multi?query=${encodeURIComponent(query)}&language=en-US`,
-            { headers: API_HEADERS, signal: controller.signal },
-          );
-          if (thisCallId !== latestCallIdRef.current || controller.signal.aborted) return;
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
-          if (thisCallId === latestCallIdRef.current) {
-            setSearchResults(
-              (data.results ?? []).filter(
-                (item: any) => item.poster_path && item.media_type !== "person",
-              ),
-            );
-          }
+          await fetchSearchPage(query, 1, false, controller.signal);
         } catch (err) {
           if (err instanceof DOMException && err.name === "AbortError") return;
           if (thisCallId === latestCallIdRef.current) {
             setSearchError(err instanceof Error ? err.message : "Unknown error");
             setSearchResults([]);
+            applyPageMeta(1, 1);
           }
         } finally {
           if (thisCallId === latestCallIdRef.current) setSearchLoading(false);
@@ -173,7 +224,7 @@ const SearchScreen: React.FC = () => {
         }
       }, 450);
     },
-    [fetchInitial, searchLoading],
+    [applyPageMeta, fetchInitial, fetchSearchPage, searchLoading],
   );
 
   useEffect(() => {
@@ -185,28 +236,35 @@ const SearchScreen: React.FC = () => {
   }, [fetchInitial]);
 
   // --- UI ------------------------------------------------------------------
+  const listData = useMemo(
+    () => (searchLoading ? SKELETON_DATA : searchResults),
+    [searchLoading, searchResults],
+  );
+
   const renderCard = ({ item }: { item: MediaItem }) => {
     const uri = item.poster_path
       ? `https://image.tmdb.org/t/p/w342${item.poster_path}`
       : undefined;
     const isTv = item.media_type === "tv";
     return (
-      <PosterCard
-        width={CARD_W}
-        poster={uri}
-        title={itemTitle(item)}
-        rating={item.vote_average ?? undefined}
-        kind={isTv ? "tv" : "movie"}
-        onPress={() => openDetails(item, "movie")}
-        imageTransition={250}
-      />
+      <View style={styles.gridItem}>
+        <PosterCard
+          width={CARD_W}
+          poster={uri}
+          title={itemTitle(item)}
+          rating={item.vote_average ?? undefined}
+          kind={isTv ? "tv" : "movie"}
+          onPress={() => openDetails(item, "movie")}
+          imageTransition={250}
+        />
+      </View>
     );
   };
 
   const BrowseHeader = (
     <View>
       {/* Trending searches */}
-      <Text variant="h3" style={styles.sectionTitle}>
+      <Text variant="h3" style={[styles.sectionTitle, styles.firstSectionTitle]}>
         Trending searches
       </Text>
       <View style={styles.trendWrap}>
@@ -261,7 +319,7 @@ const SearchScreen: React.FC = () => {
 
   return (
     <View style={[styles.safe, { paddingTop: insets.top }]}>
-      <AppHeader onSearchPress={() => inputRef.current?.focus()} />
+      <AppHeader showSearch={false} style={styles.header} />
 
       {/* Search input */}
       <View style={styles.searchWrap}>
@@ -295,14 +353,14 @@ const SearchScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
-          data={(searchLoading ? SKELETON_DATA : searchResults) as any[]}
+          data={listData as any[]}
           renderItem={({ item }) =>
-            (item as any).__skeleton ? <SkeletonCard /> : renderCard({ item })
+            (item as any).__skeleton ? <PosterSkeleton /> : renderCard({ item })
           }
           keyExtractor={(item: any, i) => (item.__skeleton ? item.id : `${item.id}-${i}`)}
           numColumns={COLS}
           columnWrapperStyle={{ gap: layout.gridGap }}
-          contentContainerStyle={styles.grid}
+          contentContainerStyle={[styles.grid, searchQuery ? styles.gridResults : styles.gridBrowse]}
           ListHeaderComponent={!searchQuery ? BrowseHeader : null}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -314,6 +372,19 @@ const SearchScreen: React.FC = () => {
               </View>
             ) : null
           }
+          onEndReached={() => {
+            if (hasMore && !searchLoading && !loadingMore) void loadMore();
+          }}
+          onEndReachedThreshold={0.45}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerSkeletonRow}>
+                {Array.from({ length: COLS }, (_, i) => (
+                  <PosterSkeleton key={`footer-sk-${i}`} />
+                ))}
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -322,6 +393,7 @@ const SearchScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+  header: { paddingBottom: spacing.xs },
 
   searchWrap: {
     flexDirection: "row",
@@ -331,19 +403,21 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     marginHorizontal: spacing.lg,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
     paddingHorizontal: spacing.md + 2,
-    height: ms(50),
+    height: ms(46),
     borderRadius: radius.lg,
   },
   input: { flex: 1, ...textVariant("body"), fontSize: ms(15) },
 
   sectionTitle: {
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     marginBottom: spacing.md,
     fontSize: ms(17),
   },
+  firstSectionTitle: { marginTop: 0 },
   trendWrap: { flexDirection: "row", flexWrap: "wrap", gap: layout.railGap, paddingHorizontal: spacing.lg },
 
   moodGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, paddingHorizontal: spacing.lg },
@@ -371,10 +445,15 @@ const styles = StyleSheet.create({
   provList: { flexGrow: 0, marginBottom: ms(18) },
   provRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
 
-  grid: { paddingHorizontal: spacing.lg, paddingTop: layout.railGap, paddingBottom: ms(120) },
+  grid: { paddingHorizontal: spacing.lg, paddingBottom: ms(120) },
+  gridBrowse: { paddingTop: spacing.xs },
+  gridResults: { paddingTop: 0 },
+  gridItem: { width: CARD_W, marginBottom: spacing.lg },
 
-  skBox: { width: CARD_W, height: CARD_W * 1.5, borderRadius: radius.md, backgroundColor: colors.bgElevated },
-  skLine: { height: ms(10), borderRadius: ms(5), backgroundColor: colors.bgElevated },
+  footerSkeletonRow: {
+    flexDirection: "row",
+    gap: layout.gridGap,
+  },
 
   center: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xxxl + 20, gap: spacing.md },
 });

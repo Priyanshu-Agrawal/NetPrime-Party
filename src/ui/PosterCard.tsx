@@ -1,9 +1,9 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { colors, layoutTokens, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
+import { GlassChip } from "./GlassChip";
 import { RatingBadge } from "./RatingBadge";
 import { Text } from "./Text";
 
@@ -51,9 +51,7 @@ export function PosterCard({
         {rating != null ? <RatingBadge rating={rating} /> : null}
         {kind === "tv" ? (
           <View style={styles.tag}>
-            <Text variant="caption" style={styles.tagText}>
-              TV
-            </Text>
+            <GlassChip label="TV" size="sm" blur={false} />
           </View>
         ) : null}
         {progress != null ? (
@@ -84,12 +82,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: ms(6),
     right: ms(6),
-    paddingHorizontal: ms(6),
-    paddingVertical: ms(2),
-    borderRadius: radius.sm,
-    backgroundColor: colors.scrim,
   },
-  tagText: { fontSize: ms(9), letterSpacing: 0.5, color: colors.text },
   progressTrack: {
     position: "absolute",
     left: spacing.sm,

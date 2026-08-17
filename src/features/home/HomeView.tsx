@@ -63,7 +63,7 @@ export default React.memo(function HomePage() {
                 hitSlop={6}
               >
                 <Text variant="caption" honey style={styles.ctaBtnText}>
-                  Invite
+                  Join now
                 </Text>
               </Pressable>
             </View>
