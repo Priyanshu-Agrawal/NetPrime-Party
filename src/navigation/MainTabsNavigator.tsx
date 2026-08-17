@@ -1,4 +1,4 @@
-import FloatingTabBar from "@/src/ui/FloatingTabBar";
+import { FloatingTabBar } from "@/src/ui/FloatingTabBar";
 import { colors } from "@/theme/bearoom";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";

@@ -2,7 +2,7 @@ import { colors } from "@/theme/bearoom";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import MovieDetailsScreen from "../screens/MovieDetailsScreen";
-import PlayerScreen from "../screens/PlayerScreen";
+import { PlayerScreen } from "../screens/PlayerScreen";
 import TvDetailsScreen from "../screens/TvDetailsScreen";
 import type { PlayerStackParamList } from "./types";
 

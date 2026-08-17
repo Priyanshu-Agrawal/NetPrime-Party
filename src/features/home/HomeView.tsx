@@ -1,6 +1,6 @@
-import ContinueWatching from "@/components/home/ContinueWatching";
-import HeroCarousel from "@/components/home/HeroCarousel";
-import MediaRail from "@/components/home/MediaRail";
+import { ContinueWatching } from "@/components/home/ContinueWatching";
+import { HeroCarousel } from "@/components/home/HeroCarousel";
+import { MediaRail } from "@/components/home/MediaRail";
 import AppHeader from "@/components/ui/AppHeader";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { openJoinParty, openLibrary } from "@/src/navigation/actions";

@@ -8,20 +8,21 @@
  *
  * Cozy cinema-lounge skin (Stitch "Bearoom Watch Party").
  */
-import GifPicker from "@/components/party/GifPicker";
-import RoomSettingsSheet from "@/components/party/RoomSettingsSheet";
+import { GifPicker } from "@/components/party/GifPicker";
+import { RoomSettingsSheet } from "@/components/party/RoomSettingsSheet";
 import {
   isBackgroundPlaybackAvailable,
   startBackgroundPlaybackSession,
   stopBackgroundPlaybackSession,
   updateBackgroundPlaybackState,
 } from "@/components/player/backgroundPlayback";
-import HijackPlayer, {
+import {
+  HijackPlayer,
   type PlayerEvent,
   type PlayerHandle,
   type QualityLevel,
 } from "@/components/player/HijackPlayer";
-import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
+import { PlayerControls, type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import GlassButton from "@/components/ui/GlassButton";

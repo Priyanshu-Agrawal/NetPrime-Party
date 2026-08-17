@@ -1,13 +1,14 @@
-import HijackHint from "@/components/player/HijackHint";
-import HijackPlayer, {
+import { HijackHint } from "@/components/player/HijackHint";
+import {
+  HijackPlayer,
   type PlayerEvent,
   type PlayerHandle,
   type QualityLevel,
 } from "@/components/player/HijackPlayer";
-import EpisodeSheet from "@/components/player/EpisodeSheet";
-import PlayerControls, { type PlayerControlsHandle } from "@/components/player/PlayerControls";
+import { EpisodeSheet } from "@/components/player/EpisodeSheet";
+import { PlayerControls, type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
-import ProviderSheet from "@/components/player/ProviderSheet";
+import { ProviderSheet } from "@/components/player/ProviderSheet";
 import {
   getProvider,
   isHijackable,
