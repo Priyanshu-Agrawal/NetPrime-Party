@@ -18,9 +18,7 @@
  */
 import { BearAvatarConfig, GenderPreference, generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import "react-native-get-random-values";
-import { createMMKV } from "react-native-mmkv";
-
-const storage = createMMKV();
+import { universalStorage as storage } from "@/services/storage/universalStorage";
 
 const K_INSTALLATION = "party.installationId";
 const K_DISPLAY_NAME = "party.displayName";

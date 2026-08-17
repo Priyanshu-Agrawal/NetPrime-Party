@@ -1,9 +1,6 @@
-import RNFS from "react-native-fs";
-import { createMMKV } from "react-native-mmkv";
+import { universalStorage as storage } from "@/services/storage/universalStorage";
 
-const storage = createMMKV();
 const HISTORY_KEY = "watchHistory";
-const HISTORY_FILE = `${RNFS.DocumentDirectoryPath}/watchHistory.json`;
 
 export interface HistoryItem {
   id: string;
@@ -42,18 +39,6 @@ export async function getWatchHistory(): Promise<any[]> {
         if (content) {
             return JSON.parse(content);
         }
-
-        // Fallback/migration from old file-based storage
-        const exists = await RNFS.exists(HISTORY_FILE);
-        if (exists) {
-            const oldContent = await RNFS.readFile(HISTORY_FILE, "utf8");
-            const parsed = JSON.parse(oldContent || "[]");
-            storage.set(HISTORY_KEY, JSON.stringify(parsed));
-            // Optional: delete old file after migration
-            await RNFS.unlink(HISTORY_FILE).catch(() => {});
-            return parsed;
-        }
-
         return [];
     } catch {
         return [];
@@ -126,8 +111,6 @@ export async function getPlaybackPosition(
 export async function clearWatchHistory(): Promise<void> {
     try {
         storage.remove(HISTORY_KEY);
-        const exists = await RNFS.exists(HISTORY_FILE);
-        if (exists) await RNFS.unlink(HISTORY_FILE);
     } catch {
         // ignore
     }
@@ -135,12 +118,7 @@ export async function clearWatchHistory(): Promise<void> {
 
 export async function clearAppCache(): Promise<void> {
     try {
-        // remove watch history
         await clearWatchHistory();
-        // attempt remove cache dir contents
-        const cacheDir = RNFS.CachesDirectoryPath;
-        const items = await RNFS.readDir(cacheDir);
-        await Promise.all(items.map((it) => RNFS.unlink(it.path).catch(() => { })));
     } catch {
         // ignore
     }

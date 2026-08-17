@@ -8,12 +8,12 @@ import React, {
 } from "react";
 import { Movie, MovieContextType } from "./types";
 
-// TMDb API Configuration.
 // TMDB's API host (api.themoviedb.org) is blocked/RST on many Indian ISPs, so
 // data flows through YOUR OWN Cloudflare Worker proxy (tmdb-proxy-worker.js),
 // which reaches TMDB from Cloudflare's network AND injects your TMDB token
 // server-side (Worker secret TMDB_TOKEN). The token is therefore NOT in the app.
-export const API_URL = "https://tmdb.spiderfan-no1.workers.dev/";
+export const API_URL =
+  process.env.EXPO_PUBLIC_TMDB_PROXY_URL || "https://tmdb.spiderfan-no1.workers.dev/";
 
 // Deprecated: the proxy injects the token; nothing sensitive lives in the app.
 export const API_BEARER_TOKEN = "";

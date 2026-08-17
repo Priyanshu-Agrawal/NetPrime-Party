@@ -3,9 +3,8 @@
  * Details (the bookmark / + My List actions) land here and show on the My List
  * screen. Synchronous reads/writes keep the bookmark toggle instant.
  */
-import { createMMKV } from "react-native-mmkv";
+import { universalStorage as storage } from "@/services/storage/universalStorage";
 
-const storage = createMMKV();
 const KEY = "watchlist";
 const MAX = 300;
 

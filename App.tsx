@@ -24,13 +24,19 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import React, { useCallback, useEffect } from "react";
-import { Appearance, useColorScheme, View } from "react-native";
+import { Appearance, Platform, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
-
-Appearance.setColorScheme("dark");
+if (Platform.OS !== "web") {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+  try {
+    Appearance.setColorScheme("dark");
+  } catch {}
+} else if (typeof document !== "undefined") {
+  document.documentElement.style.backgroundColor = colors.bg;
+  document.body.style.backgroundColor = colors.bg;
+}
 
 const navTheme = {
   ...DarkTheme,
@@ -70,7 +76,9 @@ export default function App() {
   }, [ready]);
 
   useEffect(() => {
-    void SystemUI.setBackgroundColorAsync(colors.bg);
+    if (Platform.OS !== "web") {
+      void SystemUI.setBackgroundColorAsync(colors.bg);
+    }
   }, []);
 
   if (!ready) {

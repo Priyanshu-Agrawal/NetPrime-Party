@@ -11,26 +11,29 @@
 import "react-native-url-polyfill/auto";
 import { createClient } from "@supabase/supabase-js";
 import { AppState } from "react-native";
-import { createMMKV } from "react-native-mmkv";
+import { universalStorage } from "./storage/universalStorage";
 
-const SUPABASE_URL = "https://kdcghbuknadvcmjctsqk.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_swMZtjF8JU-aJBnl3HKLnA_bu6yU7RP";
+const SUPABASE_URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || "https://kdcghbuknadvcmjctsqk.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  "sb_publishable_swMZtjF8JU-aJBnl3HKLnA_bu6yU7RP";
 
-// MMKV-backed storage adapter for the auth session (sync — MMKV is synchronous).
-const authStore = createMMKV();
-const MMKVAuthStorage = {
-  getItem: (k: string): string | null => authStore.getString(k) ?? null,
+// Universal storage adapter for the auth session (synchronous).
+const AuthStorageAdapter = {
+  getItem: (k: string): string | null => universalStorage.getString(k) ?? null,
   setItem: (k: string, v: string): void => {
-    authStore.set(k, v);
+    universalStorage.set(k, v);
   },
   removeItem: (k: string): void => {
-    authStore.remove(k);
+    universalStorage.remove(k);
   },
 };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: MMKVAuthStorage as any,
+    storage: AuthStorageAdapter as any,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,

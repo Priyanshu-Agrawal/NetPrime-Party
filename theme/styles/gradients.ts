@@ -10,7 +10,7 @@ export const gradients = {
   continueWatching: ["transparent", "rgba(16,13,10,0.35)", "rgba(16,13,10,0.92)"] as const,
   clipScrim: ["transparent", "rgba(16,13,10,0.25)"] as const,
   detailsOverlay: ["transparent", "transparent", colors.bg] as const,
-  shimmerDark: ["#14100C", "#241B13", "#38291B", "#241B13", "#14100C"] as const,
+  shimmerDark: ["#16120D", "#281F17", "#16120D"] as const,
   shimmerHoney: ["rgba(245,166,35,0.08)", "rgba(245,166,35,0.22)", "rgba(245,166,35,0.08)"] as const,
   playerControls: [
     "rgba(16,13,10,0.28)",

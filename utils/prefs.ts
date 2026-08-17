@@ -3,9 +3,7 @@
  * first-launch onboarding flag and playback preferences (used by the player +
  * the "Playback & data" settings). Kept separate from watch history / identity.
  */
-import { createMMKV } from "react-native-mmkv";
-
-const storage = createMMKV();
+import { universalStorage as storage } from "@/services/storage/universalStorage";
 
 const K_ONBOARDED = "app.onboarded";
 const K_AUTOPLAY = "pref.autoplayNext";

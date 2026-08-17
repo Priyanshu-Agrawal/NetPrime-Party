@@ -4,10 +4,9 @@
  * Provides cross-platform permission checking, requesting, and persistence
  * without interrupting active video playback.
  */
-import { createMMKV } from "react-native-mmkv";
+import { universalStorage as storage } from "@/services/storage/universalStorage";
 import { Linking, PermissionsAndroid, Platform } from "react-native";
 
-const storage = createMMKV();
 const K_NOTIF_PROMPTED = "bearoom.notifications.prompted";
 
 /** Check if notification permission is currently granted */
