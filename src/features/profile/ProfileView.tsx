@@ -7,19 +7,22 @@
  * entry points for screens still to be built (Notifications, Playback, etc.).
  */
 import appJson from "@/app.json";
+import BearAvatar from "@/components/avatar/BearAvatar";
+import BearAvatarCustomizer from "@/components/avatar/BearAvatarCustomizer";
 import AppHeader from "@/components/ui/AppHeader";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
-import { getDisplayName, setDisplayName } from "@/services/party/identity";
+import { BearAvatarConfig } from "@/services/avatar/bearAvatar";
+import { getAvatarConfig, getDisplayName, setDisplayName } from "@/services/party/identity";
+import { openLibrary } from "@/src/navigation/actions";
 import { Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { checkGithubRelease } from "@/utils/checkGithubRelease";
 import { clearAppCache, clearWatchHistory, getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
-import { openLibrary } from "@/src/navigation/actions";
 import { useFocusEffect } from "@react-navigation/native";
+import { BlurView } from "expo-blur";
 import React, { useCallback, useState } from "react";
 import {
   Linking,
@@ -40,9 +43,9 @@ type IconName = keyof typeof Ionicons.glyphMap;
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(() => getDisplayName() ?? "Guest");
-  const [editVisible, setEditVisible] = useState(false);
+  const [avatarConfig, setAvatarConfigState] = useState<BearAvatarConfig>(() => getAvatarConfig());
+  const [customizerVisible, setCustomizerVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
-  const [draftName, setDraftName] = useState(name);
   const [stats, setStats] = useState({ watched: 0, hours: 0, inProgress: 0 });
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => {
@@ -73,16 +76,8 @@ export default function MoreScreen() {
     }, []),
   );
 
-  const saveName = () => {
-    const n = draftName.trim().slice(0, 32) || "Guest";
-    setDisplayName(n);
-    setName(n);
-    setEditVisible(false);
-  };
-
   const openEdit = () => {
-    setDraftName(name);
-    setEditVisible(true);
+    setCustomizerVisible(true);
   };
 
   const invite = () => {
@@ -145,10 +140,7 @@ export default function MoreScreen() {
         {/* Identity */}
         <View style={styles.identity}>
           <Pressable style={styles.avatarWrap} onPress={openEdit}>
-            <View style={styles.avatarGlow} />
-            <View style={styles.avatar}>
-              <Text style={styles.avatarInitial}>{(name || "G").charAt(0).toUpperCase()}</Text>
-            </View>
+            <BearAvatar config={avatarConfig} size={ms(96)} showGlow />
             <View style={styles.editBadge}>
               <Ionicons name="pencil" size={ms(13)} color={colors.onHoney} />
             </View>
@@ -229,35 +221,17 @@ export default function MoreScreen() {
         <AppHeader showSearch={false} />
       </View>
 
-      {/* Edit display name */}
-      <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditVisible(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>Display name</Text>
-            <Text style={styles.sheetSub}>This is how your pack sees you in a party.</Text>
-            <TextInput
-              value={draftName}
-              onChangeText={setDraftName}
-              placeholder="Your name"
-              placeholderTextColor={colors.textFaint}
-              style={styles.sheetInput}
-              selectionColor={colors.honey}
-              autoFocus
-              maxLength={32}
-              returnKeyType="done"
-              onSubmitEditing={saveName}
-            />
-            <View style={styles.sheetActions}>
-              <Pressable style={styles.sheetGhost} onPress={() => setEditVisible(false)}>
-                <Text style={styles.sheetGhostText}>Cancel</Text>
-              </Pressable>
-              <Pressable style={styles.sheetSave} onPress={saveName}>
-                <Text style={styles.sheetSaveText}>Save</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Avatar & Name Customizer */}
+      <BearAvatarCustomizer
+        visible={customizerVisible}
+        initialName={name}
+        initialConfig={avatarConfig}
+        onClose={() => setCustomizerVisible(false)}
+        onSaved={(newConfig, newName) => {
+          setAvatarConfigState(newConfig);
+          setName(newName);
+        }}
+      />
 
       {/* Help & about */}
       <Modal visible={aboutVisible} transparent animationType="fade" onRequestClose={() => setAboutVisible(false)}>

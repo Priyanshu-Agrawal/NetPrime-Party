@@ -16,6 +16,7 @@
  * the user's chosen display name. Everything authoritative (role, permissions,
  * lease, membership) lives on the server and is never trusted from the client.
  */
+import { BearAvatarConfig, GenderPreference, generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import "react-native-get-random-values";
 import { createMMKV } from "react-native-mmkv";
 
@@ -23,6 +24,8 @@ const storage = createMMKV();
 
 const K_INSTALLATION = "party.installationId";
 const K_DISPLAY_NAME = "party.displayName";
+const K_GENDER = "party.gender";
+const K_AVATAR_CONFIG = "party.avatarConfig";
 
 /** RFC-4122 v4, sourced from the crypto polyfill; weak fallback never throws. */
 function uuidv4(): string {
@@ -61,18 +64,56 @@ export function setDisplayName(name: string): void {
   storage.set(K_DISPLAY_NAME, name.trim().slice(0, 32));
 }
 
+/** The user's chosen gender preference (masculine, feminine, neutral) */
+export function getGender(): GenderPreference {
+  const g = storage.getString(K_GENDER);
+  if (g === "masculine" || g === "feminine" || g === "neutral") {
+    return g;
+  }
+  return "neutral";
+}
+
+export function setGender(gender: GenderPreference): void {
+  storage.set(K_GENDER, gender);
+}
+
+/** The user's Bear Avatar configuration */
+export function getAvatarConfig(): BearAvatarConfig {
+  const raw = storage.getString(K_AVATAR_CONFIG);
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+  }
+  const fallback = generateRandomBearConfig(getGender(), getInstallationId());
+  setAvatarConfig(fallback);
+  return fallback;
+}
+
+export function setAvatarConfig(config: BearAvatarConfig): void {
+  storage.set(K_AVATAR_CONFIG, JSON.stringify(config));
+  if (config.gender) {
+    storage.set(K_GENDER, config.gender);
+  }
+}
+
 export interface LocalIdentity {
   installationId: string;
   displayName: string;
+  gender: GenderPreference;
+  avatarConfig: BearAvatarConfig;
 }
 
 /**
- * Convenience for join flows: guarantees an installationId and a non-empty name
- * (falls back to a friendly default the user can change later).
+ * Convenience for join flows: guarantees an installationId, name, and avatar config
  */
 export function getLocalIdentity(): LocalIdentity {
   return {
     installationId: getInstallationId(),
     displayName: getDisplayName() ?? "Guest",
+    gender: getGender(),
+    avatarConfig: getAvatarConfig(),
   };
 }

@@ -1,0 +1,2619 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@dicebear/schema@1.4.0/dist/definition.min.json",
+  "$comment": "BeaRoom Bear avatar system. Warm cinematic bears for watch parties.",
+  "meta": {
+    "license": {
+      "name": "CC0 1.0",
+      "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    "creator": {
+      "name": "BeaRoom"
+    },
+    "source": {
+      "name": "BeaRoom Bear Avatar System"
+    }
+  },
+  "canvas": {
+    "width": 256,
+    "height": 256,
+    "elements": [
+      {
+        "type": "component",
+        "name": "body"
+      },
+      {
+        "type": "component",
+        "name": "ears"
+      },
+      {
+        "type": "component",
+        "name": "head"
+      },
+      {
+        "type": "component",
+        "name": "muzzle"
+      },
+      {
+        "type": "component",
+        "name": "eyes"
+      },
+      {
+        "type": "component",
+        "name": "brows"
+      },
+      {
+        "type": "component",
+        "name": "mouth"
+      },
+      {
+        "type": "component",
+        "name": "presentation"
+      },
+      {
+        "type": "component",
+        "name": "blush"
+      },
+      {
+        "type": "component",
+        "name": "hair"
+      },
+      {
+        "type": "component",
+        "name": "outfit"
+      },
+      {
+        "type": "component",
+        "name": "accessory"
+      },
+      {
+        "type": "component",
+        "name": "partyBadge"
+      }
+    ]
+  },
+  "components": {
+    "body": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "classic": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M72 256 C72 221 87 199 128 199 C169 199 184 221 184 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            }
+          ]
+        },
+        "round": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M62 256 C61 220 84 196 128 196 C172 196 195 220 194 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            }
+          ]
+        },
+        "tiny": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M82 256 C82 226 97 207 128 207 C159 207 174 226 174 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ears": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "round": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "68",
+                "cy": "64",
+                "r": "34",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "188",
+                "cy": "64",
+                "r": "34",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "68",
+                "cy": "64",
+                "r": "18",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "188",
+                "cy": "64",
+                "r": "18",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            }
+          ]
+        },
+        "small": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "75",
+                "cy": "72",
+                "r": "27",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "181",
+                "cy": "72",
+                "r": "27",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "75",
+                "cy": "72",
+                "r": "13",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "181",
+                "cy": "72",
+                "r": "13",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            }
+          ]
+        },
+        "floppy": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "68",
+                "cy": "74",
+                "rx": "32",
+                "ry": "42",
+                "transform": "rotate(-18 68 74)",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "188",
+                "cy": "74",
+                "rx": "32",
+                "ry": "42",
+                "transform": "rotate(18 188 74)",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "68",
+                "cy": "76",
+                "rx": "16",
+                "ry": "23",
+                "transform": "rotate(-18 68 76)",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "188",
+                "cy": "76",
+                "rx": "16",
+                "ry": "23",
+                "transform": "rotate(18 188 76)",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            }
+          ]
+        },
+        "pointed": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M46 82 C50 53 61 35 82 34 C89 54 88 72 81 88 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M210 82 C206 53 195 35 174 34 C167 54 168 72 175 88 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M55 76 C58 58 65 46 76 45 C80 57 80 68 75 79 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M201 76 C198 58 191 46 180 45 C176 57 176 68 181 79 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "earInner"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "head": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "round": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "128",
+                "cy": "130",
+                "r": "88",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            }
+          ]
+        },
+        "soft": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M128 36 C178 36 215 72 215 128 C215 181 180 218 128 220 C76 218 41 181 41 128 C41 72 78 36 128 36 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            }
+          ]
+        },
+        "wide": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "128",
+                "cy": "130",
+                "rx": "95",
+                "ry": "88",
+                "fill": {
+                  "type": "color",
+                  "name": "fur"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "muzzle": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "round": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "128",
+                "cy": "158",
+                "rx": "47",
+                "ry": "34",
+                "fill": {
+                  "type": "color",
+                  "name": "muzzle"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M118 144 Q128 141 138 144 Q141 154 128 156 Q115 154 118 144 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "wide": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "128",
+                "cy": "157",
+                "rx": "55",
+                "ry": "36",
+                "fill": {
+                  "type": "color",
+                  "name": "muzzle"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M116 143 Q128 139 140 143 Q144 154 128 156 Q112 154 116 143 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "small": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "128",
+                "cy": "157",
+                "rx": "40",
+                "ry": "29",
+                "fill": {
+                  "type": "color",
+                  "name": "muzzle"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M120 145 Q128 142 136 145 Q139 153 128 155 Q117 153 120 145 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "eyes": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "neutral": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "95",
+                "cy": "126",
+                "r": "8",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "161",
+                "cy": "126",
+                "r": "8",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "happy": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M86 127 Q95 116 104 127",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M152 127 Q161 116 170 127",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "sleepy": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M86 127 Q95 133 104 127",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M152 127 Q161 133 170 127",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "excited": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "95",
+                "cy": "125",
+                "r": "11",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              },
+              "children": [
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "92",
+                    "cy": "121",
+                    "r": "4",
+                    "fill": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "98",
+                    "cy": "128",
+                    "r": "2",
+                    "fill": "#FFFFFF"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "161",
+                "cy": "125",
+                "r": "11",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              },
+              "children": [
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "158",
+                    "cy": "121",
+                    "r": "4",
+                    "fill": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "164",
+                    "cy": "128",
+                    "r": "2",
+                    "fill": "#FFFFFF"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "surprised": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "95",
+                "cy": "126",
+                "r": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              },
+              "children": [
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "92",
+                    "cy": "123",
+                    "r": "3",
+                    "fill": "#FFFFFF"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "161",
+                "cy": "126",
+                "r": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              },
+              "children": [
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "158",
+                    "cy": "123",
+                    "r": "3",
+                    "fill": "#FFFFFF"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "wink": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "95",
+                "cy": "126",
+                "r": "8",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M152 126 Q161 117 170 126",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "curious": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "95",
+                "cy": "124",
+                "rx": "8",
+                "ry": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              },
+              "children": [
+                {
+                  "type": "element",
+                  "name": "circle",
+                  "attributes": {
+                    "cx": "93",
+                    "cy": "121",
+                    "r": "2.5",
+                    "fill": "#FFFFFF"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "161",
+                "cy": "127",
+                "r": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "mischievous": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M87 124 Q95 120 104 127 Q95 130 87 124 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M152 127 Q161 120 169 124 Q161 130 152 127 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "starry": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M95 116 L98 123 L106 124 L100 129 L102 137 L95 133 L88 137 L90 129 L84 124 L92 123 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M161 116 L164 123 L172 124 L166 129 L168 137 L161 133 L154 137 L156 129 L150 124 L158 123 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "laughing": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M85 128 C87 120 102 120 104 128",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M151 128 C153 120 168 120 170 128",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "6",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "brows": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "none": {
+          "elements": [],
+          "weight": 3
+        },
+        "soft": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M85 111 Q95 105 105 110",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M151 110 Q161 105 171 111",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "raised": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M85 105 Q95 96 106 104",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M150 104 Q161 96 171 105",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "confident": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M84 112 Q95 118 106 112",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M150 112 Q161 118 172 112",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "curious": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M85 103 Q95 95 106 102",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M151 112 Q161 114 171 111",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "mouth": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "smallSmile": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M116 165 Q128 175 140 165",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "wideSmile": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M106 162 Q128 184 150 162 Q149 182 128 184 Q107 182 106 162 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "mouth"
+                }
+              }
+            }
+          ]
+        },
+        "neutral": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "116",
+                "y1": "166",
+                "x2": "140",
+                "y2": "166",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "5",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "openLaugh": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M110 163 Q128 188 146 163 Q128 160 110 163 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "mouth"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M118 175 Q128 184 138 175",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "blush"
+                },
+                "stroke-width": "4",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "tinyO": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "128",
+                "cy": "167",
+                "r": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "mouth"
+                }
+              }
+            }
+          ]
+        },
+        "tongue": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M110 163 Q128 188 146 163 Q146 186 128 188 Q110 186 110 163 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "mouth"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M118 174 Q128 168 138 174 Q138 188 128 188 Q118 188 118 174 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "blush"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "presentation": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "neutral": {
+          "elements": [],
+          "weight": 4
+        },
+        "androgynous": {
+          "elements": [],
+          "weight": 3
+        },
+        "masculine": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M96 177 Q128 188 160 177 Q157 202 128 207 Q99 202 96 177 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "hair"
+                },
+                "opacity": "0.06"
+              }
+            }
+          ]
+        },
+        "feminine": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M84 128 Q91 118 99 128",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "3",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M157 128 Q165 118 172 128",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "features"
+                },
+                "stroke-width": "3",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "blush": {
+      "width": 256,
+      "height": 256,
+      "probability": 45,
+      "variants": {
+        "soft": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "81",
+                "cy": "157",
+                "rx": "13",
+                "ry": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "blush"
+                },
+                "opacity": "0.42"
+              }
+            },
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "175",
+                "cy": "157",
+                "rx": "13",
+                "ry": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "blush"
+                },
+                "opacity": "0.42"
+              }
+            }
+          ]
+        },
+        "warm": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "82",
+                "cy": "157",
+                "r": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "blush"
+                },
+                "opacity": "0.32"
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "174",
+                "cy": "157",
+                "r": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "blush"
+                },
+                "opacity": "0.32"
+              }
+            }
+          ]
+        },
+        "cinemaGlow": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "80",
+                "cy": "156",
+                "rx": "15",
+                "ry": "9",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "opacity": "0.25"
+              }
+            },
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "176",
+                "cy": "156",
+                "rx": "15",
+                "ry": "9",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "opacity": "0.25"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "hair": {
+      "width": 256,
+      "height": 256,
+      "probability": 60,
+      "variants": {
+        "fluffy": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M71 83 Q75 56 96 54 Q103 34 117 50 Q128 30 139 50 Q153 34 160 54 Q181 56 185 83 Q162 69 128 69 Q94 69 71 83 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "hair"
+                }
+              }
+            }
+          ]
+        },
+        "fringe": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M72 83 Q78 50 112 48 Q129 46 146 48 Q174 52 184 80 Q160 69 146 73 Q131 82 120 69 Q108 80 94 73 Q81 69 72 83 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "hair"
+                }
+              }
+            }
+          ]
+        },
+        "sideTuft": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M70 84 Q76 49 115 46 Q151 42 179 62 Q162 63 146 74 Q119 91 70 84 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "hair"
+                }
+              }
+            }
+          ]
+        },
+        "tinyTuft": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M109 54 Q115 30 128 51 Q139 29 147 55 Q134 65 109 54 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "hair"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "outfit": {
+      "width": 256,
+      "height": 256,
+      "variants": {
+        "cozyHoodie": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M73 256 L76 220 Q86 205 104 201 L128 218 L152 201 Q170 205 180 220 L183 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M104 202 Q128 230 152 202",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "8"
+              }
+            }
+          ]
+        },
+        "sweater": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M69 256 L75 217 Q91 204 103 202 L128 220 L153 202 Q165 204 181 217 L187 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "96",
+                "y1": "239",
+                "x2": "160",
+                "y2": "239",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "6"
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "96",
+                "y1": "251",
+                "x2": "160",
+                "y2": "251",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "6"
+              }
+            }
+          ]
+        },
+        "oversizedSweatshirt": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M62 256 L69 214 Q88 200 108 199 L128 214 L148 199 Q168 200 187 214 L194 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M108 199 Q128 218 148 199",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "6"
+              }
+            }
+          ]
+        },
+        "tshirt": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M70 256 L75 218 Q91 204 105 203 L128 220 L151 203 Q165 204 181 218 L186 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "128",
+                "cy": "238",
+                "r": "9",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "pajamas": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M69 256 L75 217 Q91 204 105 203 L128 220 L151 203 Q165 204 181 217 L187 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "108",
+                "cy": "236",
+                "r": "5",
+                "fill": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "148",
+                "cy": "236",
+                "r": "5",
+                "fill": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "128",
+                "cy": "249",
+                "r": "5",
+                "fill": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                }
+              }
+            }
+          ]
+        },
+        "varsity": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M65 256 L74 216 Q91 204 104 202 L128 220 L152 202 Q165 204 182 216 L191 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "128",
+                "y1": "221",
+                "x2": "128",
+                "y2": "256",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "7"
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M98 238 L98 252 M98 238 Q106 238 106 244 Q106 250 98 250 M98 244 L104 244",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "stroke-width": "3",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "directorJacket": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M65 256 L73 214 Q90 202 105 200 L128 220 L151 200 Q166 202 183 214 L191 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessoryDark"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M105 200 L128 220 L151 200 L128 206 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "128",
+                "y1": "220",
+                "x2": "128",
+                "y2": "256",
+                "stroke": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "stroke-width": "4"
+              }
+            }
+          ]
+        },
+        "cinemaTee": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M70 256 L75 218 Q91 204 105 203 L128 220 L151 203 Q165 204 181 218 L186 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "114",
+                "y": "230",
+                "width": "28",
+                "height": "17",
+                "rx": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "128",
+                "cy": "238",
+                "r": "4",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "movieNightHoodie": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M71 256 L74 219 Q85 204 104 200 L128 217 L152 200 Q171 204 182 219 L185 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "118",
+                "y1": "217",
+                "x2": "118",
+                "y2": "242",
+                "stroke": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "stroke-width": "3",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "138",
+                "y1": "217",
+                "x2": "138",
+                "y2": "242",
+                "stroke": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "stroke-width": "3",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "retroPopcornShirt": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M68 256 L74 217 Q90 204 104 202 L128 220 L152 202 Q166 204 182 217 L188 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "100",
+                "y1": "215",
+                "x2": "100",
+                "y2": "256",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfit"
+                },
+                "stroke-width": "4"
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "156",
+                "y1": "215",
+                "x2": "156",
+                "y2": "256",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfit"
+                },
+                "stroke-width": "4"
+              }
+            }
+          ]
+        },
+        "streamingSweater": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M67 256 L74 216 Q90 203 104 201 L128 219 L152 201 Q166 203 182 216 L189 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M128 221 L128 256",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "4",
+                "stroke-dasharray": "6 4"
+              }
+            }
+          ]
+        },
+        "casualJacket": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M66 256 L75 216 Q90 204 105 202 L128 220 L151 202 Q166 204 181 216 L190 256 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "outfit"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "108",
+                "y1": "208",
+                "x2": "108",
+                "y2": "256",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "5"
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "148",
+                "y1": "208",
+                "x2": "148",
+                "y2": "256",
+                "stroke": {
+                  "type": "color",
+                  "name": "outfitAccent"
+                },
+                "stroke-width": "5"
+              }
+            }
+          ]
+        },
+        "none": {
+          "elements": [],
+          "weight": 1
+        }
+      }
+    },
+    "accessory": {
+      "width": 256,
+      "height": 256,
+      "probability": 75,
+      "variants": {
+        "roundGlasses": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "95",
+                "cy": "126",
+                "r": "20",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "accessory"
+                },
+                "stroke-width": "4"
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "161",
+                "cy": "126",
+                "r": "20",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "accessory"
+                },
+                "stroke-width": "4"
+              }
+            },
+            {
+              "type": "element",
+              "name": "line",
+              "attributes": {
+                "x1": "115",
+                "y1": "126",
+                "x2": "141",
+                "y2": "126",
+                "stroke": {
+                  "type": "color",
+                  "name": "accessory"
+                },
+                "stroke-width": "4"
+              }
+            }
+          ]
+        },
+        "headphones": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M64 118 C64 67 192 67 192 118",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "accessory"
+                },
+                "stroke-width": "10",
+                "stroke-linecap": "round"
+              }
+            },
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "54",
+                "y": "111",
+                "width": "25",
+                "height": "37",
+                "rx": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "177",
+                "y": "111",
+                "width": "25",
+                "height": "37",
+                "rx": "10",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            }
+          ]
+        },
+        "wirelessEarbuds": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "64",
+                "cy": "132",
+                "rx": "5",
+                "ry": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "ellipse",
+              "attributes": {
+                "cx": "192",
+                "cy": "132",
+                "rx": "5",
+                "ry": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "beanie": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M69 89 Q72 44 128 40 Q184 44 187 89 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "70",
+                "y": "79",
+                "width": "116",
+                "height": "18",
+                "rx": "9",
+                "fill": {
+                  "type": "color",
+                  "name": "accessoryDark"
+                }
+              }
+            }
+          ]
+        },
+        "cap": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M67 92 Q72 48 128 48 Q170 48 190 79 Q150 72 105 78 Q82 81 67 92 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M140 75 Q181 76 198 89 Q184 98 147 89 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessoryDark"
+                }
+              }
+            }
+          ]
+        },
+        "scarf": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M87 193 Q128 207 169 193 L165 217 Q128 230 91 217 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M149 211 L166 214 L166 244 L147 237 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            }
+          ]
+        },
+        "cinemaPin": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "117",
+                "y": "211",
+                "width": "22",
+                "height": "14",
+                "rx": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M125 214 L131 218 L125 222 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "popcornPin": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M121 214 L123 226 L133 226 L135 214 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessoryLight"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "125",
+                "cy": "212",
+                "r": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "131",
+                "cy": "212",
+                "r": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "filmStripPin": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "118",
+                "y": "210",
+                "width": "20",
+                "height": "16",
+                "rx": "2",
+                "fill": {
+                  "type": "color",
+                  "name": "accessoryDark"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "122",
+                "y": "213",
+                "width": "12",
+                "height": "10",
+                "rx": "1",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "cozyMug": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "180",
+                "y": "216",
+                "width": "16",
+                "height": "18",
+                "rx": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M196 220 Q201 225 196 230",
+                "fill": "none",
+                "stroke": {
+                  "type": "color",
+                  "name": "brand"
+                },
+                "stroke-width": "3",
+                "stroke-linecap": "round"
+              }
+            }
+          ]
+        },
+        "earring": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "72",
+                "cy": "90",
+                "r": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "184",
+                "cy": "90",
+                "r": "7",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "bow": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M120 81 L95 68 Q84 64 84 76 Q84 92 101 94 L120 86 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M136 81 L161 68 Q172 64 172 76 Q172 92 155 94 L136 86 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "accessory"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "128",
+                "cy": "84",
+                "r": "8",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "partyBadge": {
+      "width": 256,
+      "height": 256,
+      "probability": 35,
+      "variants": {
+        "paw": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "194",
+                "cy": "205",
+                "r": "16",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "185",
+                "cy": "193",
+                "r": "5",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "194",
+                "cy": "189",
+                "r": "5",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "203",
+                "cy": "193",
+                "r": "5",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "star": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M194 186 L198 198 L211 198 L201 206 L205 219 L194 211 L183 219 L187 206 L177 198 L190 198 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            }
+          ]
+        },
+        "play": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "194",
+                "cy": "204",
+                "r": "16",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "path",
+              "attributes": {
+                "d": "M189 196 L202 204 L189 212 Z",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        },
+        "ticket": {
+          "elements": [
+            {
+              "type": "element",
+              "name": "rect",
+              "attributes": {
+                "x": "182",
+                "y": "194",
+                "width": "24",
+                "height": "18",
+                "rx": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "brand"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "182",
+                "cy": "203",
+                "r": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            },
+            {
+              "type": "element",
+              "name": "circle",
+              "attributes": {
+                "cx": "206",
+                "cy": "203",
+                "r": "3",
+                "fill": {
+                  "type": "color",
+                  "name": "features"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "colors": {
+    "fur": {
+      "values": [
+        "#4A2E1B",
+        "#6B4327",
+        "#7D5030",
+        "#96613A",
+        "#B97A3D",
+        "#C58A4A",
+        "#D6A05B",
+        "#E3BB82",
+        "#E8D0AA",
+        "#F1E3CA",
+        "#F7F4EE",
+        "#B85D3A"
+      ]
+    },
+    "furLight": {
+      "values": [
+        "#D6A974",
+        "#E5C08F",
+        "#EACFA9",
+        "#F2DEC1",
+        "#FBF5EA"
+      ]
+    },
+    "muzzle": {
+      "values": [
+        "#C7925E",
+        "#D6A874",
+        "#E3BE94",
+        "#EBCFAF",
+        "#F3E1C7",
+        "#FFF8EE"
+      ],
+      "notEqualTo": [
+        "fur"
+      ]
+    },
+    "earInner": {
+      "values": [
+        "#7D4738",
+        "#955A44",
+        "#B27455",
+        "#D18A6E",
+        "#E0A98A",
+        "#EDC2AB"
+      ]
+    },
+    "hair": {
+      "values": [
+        "#2A211D",
+        "#352822",
+        "#4A3327",
+        "#6A452E",
+        "#8D5B38",
+        "#B07A46",
+        "#D6A05B",
+        "#E8D0AA"
+      ]
+    },
+    "features": {
+      "values": [
+        "#1E1613",
+        "#241B18",
+        "#2E211C",
+        "#38271F"
+      ]
+    },
+    "mouth": {
+      "values": [
+        "#3D201A",
+        "#4D2821",
+        "#5E3129",
+        "#733D33"
+      ]
+    },
+    "blush": {
+      "values": [
+        "#D76A63",
+        "#E28773",
+        "#C95E69",
+        "#E89B88",
+        "#F5A623"
+      ]
+    },
+    "brand": {
+      "values": [
+        "#F5A623",
+        "#FFB52E",
+        "#E99A17",
+        "#FFC24A",
+        "#FFA012"
+      ]
+    },
+    "accessory": {
+      "values": [
+        "#F5A623",
+        "#FFB52E",
+        "#6C4727",
+        "#8C5D31",
+        "#3A2A1E",
+        "#C18A42",
+        "#D8B07A",
+        "#2B2521",
+        "#4A5568"
+      ]
+    },
+    "accessoryDark": {
+      "values": [
+        "#221A15",
+        "#35261D",
+        "#4C321E",
+        "#5A3D25",
+        "#704A29"
+      ]
+    },
+    "accessoryLight": {
+      "values": [
+        "#FFD270",
+        "#FFE0A3",
+        "#F7C76A",
+        "#F2DFBB",
+        "#FFF5E0"
+      ]
+    },
+    "outfit": {
+      "values": [
+        "#1E1A17",
+        "#2B2521",
+        "#3A3029",
+        "#4A382B",
+        "#5B432F",
+        "#6A4B30",
+        "#8B623B",
+        "#222B36",
+        "#2D3748",
+        "#C18A42",
+        "#D3A15A",
+        "#423229"
+      ]
+    },
+    "outfitAccent": {
+      "values": [
+        "#F5A623",
+        "#FFB52E",
+        "#E7C68A",
+        "#D9A55A",
+        "#F0D7AE",
+        "#E06D53",
+        "#8B623B"
+      ]
+    }
+  },
+  "attributes": {
+    "shape-rendering": "geometricPrecision",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  }
+}

@@ -1,19 +1,27 @@
-/**
- * Onboarding — first-launch welcome flow (Stitch "Welcome to Bearoom"). A
- * three-slide horizontal carousel: welcome → watch-in-sync → set your name.
- * Cozy cinema-lounge: honey-ring emblems, page dots, a glowing Get Started pill,
- * and a Skip. Sets the onboarded flag (utils/prefs) and enters the app.
- */
-import { setDisplayName, getDisplayName } from "@/services/party/identity";
+import BearAvatar from "@/components/avatar/BearAvatar";
+import BearAvatarCustomizer from "@/components/avatar/BearAvatarCustomizer";
+import {
+  BearAvatarConfig,
+  GenderPreference,
+  generateRandomBearConfig,
+} from "@/services/avatar/bearAvatar";
+import {
+  getAvatarConfig,
+  getDisplayName,
+  getGender,
+  setAvatarConfig,
+  setDisplayName,
+  setGender,
+} from "@/services/party/identity";
+import { finishOnboarding } from "@/src/navigation/actions";
 import { Button, Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
-import { pressedStyle } from "@/theme/styles/interaction";
 import { setOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { finishOnboarding } from "@/src/navigation/actions";
 import React, { useRef, useState } from "react";
 import {
   Dimensions,
@@ -24,6 +32,7 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,7 +41,7 @@ const { width } = Dimensions.get("window");
 
 type Slide = {
   key: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
   titleTop?: string;
   titleAccent?: string;
   title?: string;
@@ -55,10 +64,15 @@ const SLIDES: Slide[] = [
   },
   {
     key: "name",
-    icon: "person",
-    title: "Make it yours",
-    body: "Pick a display name so your pack recognizes you in a party.",
+    title: "Create your Bear",
+    body: "Choose your gender and pick a look for your watch-party pack.",
   },
+];
+
+const GENDERS: { id: GenderPreference; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: "masculine", label: "Masculine", icon: "male-outline" },
+  { id: "feminine", label: "Feminine", icon: "female-outline" },
+  { id: "neutral", label: "Neutral", icon: "sparkles-outline" },
 ];
 
 export default function Onboarding() {
@@ -69,6 +83,13 @@ export default function Onboarding() {
     const n = getDisplayName();
     return n && n !== "Guest" ? n : "";
   });
+  const [gender, setGenderPref] = useState<GenderPreference>(() => getGender());
+  const [avatarConfig, setAvatarConfigState] = useState<BearAvatarConfig>(() => {
+    const existing = getAvatarConfig();
+    return existing || generateRandomBearConfig(getGender());
+  });
+  const [customizerVisible, setCustomizerVisible] = useState(false);
+
   const last = SLIDES.length - 1;
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -76,9 +97,24 @@ export default function Onboarding() {
     if (p !== page) setPage(p);
   };
 
+  const handleGenderSelect = (g: GenderPreference) => {
+    void Haptics.selectionAsync();
+    setGenderPref(g);
+    const newConfig = generateRandomBearConfig(g);
+    setAvatarConfigState(newConfig);
+  };
+
+  const handleShuffleAvatar = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const newConfig = generateRandomBearConfig(gender);
+    setAvatarConfigState(newConfig);
+  };
+
   const finish = () => {
     const n = name.trim();
     if (n) setDisplayName(n);
+    setGender(gender);
+    setAvatarConfig(avatarConfig);
     setOnboarded();
     finishOnboarding();
   };
@@ -114,45 +150,98 @@ export default function Onboarding() {
       >
         {SLIDES.map((s) => (
           <View key={s.key} style={[styles.slide, { width }]}>
-            <View style={styles.heroWrap}>
-              <View style={styles.heroGlow} />
-              <View style={styles.heroRing}>
-                <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />
-              </View>
-            </View>
-
-            {s.titleAccent ? (
-              <Text variant="display" style={styles.title}>
-                {s.titleTop}
-                {"\n"}
-                <Text honey>{s.titleAccent}</Text>
-              </Text>
-            ) : (
-              <Text variant="display" style={styles.title}>
-                {s.title}
-              </Text>
-            )}
-
-            <Text variant="bodyDim" style={styles.body}>
-              {s.body}
-            </Text>
-
             {s.key === "name" ? (
-              <View style={styles.nameField}>
-                <Ionicons name="happy-outline" size={ms(18)} color={colors.textDim} />
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Your display name"
-                  placeholderTextColor={colors.textFaint}
-                  style={styles.nameInput}
-                  selectionColor={colors.honey}
-                  maxLength={32}
-                  returnKeyType="done"
-                  onSubmitEditing={finish}
-                />
+              <View style={styles.avatarSlideWrap}>
+                {/* Bear Avatar Ring with Shuffle */}
+                <View style={styles.avatarHeroWrap}>
+                  <BearAvatar config={avatarConfig} size={ms(108)} showGlow />
+
+                  <TouchableOpacity style={styles.shuffleFloatingBtn} onPress={handleShuffleAvatar} activeOpacity={0.8}>
+                    <Ionicons name="dice-outline" size={ms(16)} color={colors.onHoney} />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.customizeHintBtn}
+                  onPress={() => setCustomizerVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="color-palette-outline" size={ms(14)} color={colors.honey} />
+                  <Text style={styles.customizeHintText}>Customize details</Text>
+                </TouchableOpacity>
+
+                <Text variant="display" style={[styles.title, { marginTop: ms(12) }]}>
+                  {s.title}
+                </Text>
+
+                <Text variant="bodyDim" style={[styles.body, { marginTop: ms(6), marginBottom: ms(16) }]}>
+                  {s.body}
+                </Text>
+
+                {/* Gender Selector */}
+                <View style={styles.genderRow}>
+                  {GENDERS.map((g) => {
+                    const active = g.id === gender;
+                    return (
+                      <Pressable
+                        key={g.id}
+                        style={[styles.genderPill, active && styles.genderPillActive]}
+                        onPress={() => handleGenderSelect(g.id)}
+                      >
+                        <Ionicons
+                          name={g.icon}
+                          size={ms(14)}
+                          color={active ? colors.onHoney : colors.textDim}
+                          style={{ marginRight: ms(4) }}
+                        />
+                        <Text style={[styles.genderText, active && styles.genderTextActive]}>{g.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {/* Display Name Input */}
+                <View style={styles.nameField}>
+                  <Ionicons name="happy-outline" size={ms(18)} color={colors.textDim} />
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Your display name"
+                    placeholderTextColor={colors.textFaint}
+                    style={styles.nameInput}
+                    selectionColor={colors.honey}
+                    maxLength={32}
+                    returnKeyType="done"
+                    onSubmitEditing={finish}
+                  />
+                </View>
               </View>
-            ) : null}
+            ) : (
+              <View style={styles.slideContent}>
+                <View style={styles.heroWrap}>
+                  <View style={styles.heroGlow} />
+                  <View style={styles.heroRing}>
+                    {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
+                  </View>
+                </View>
+
+                {s.titleAccent ? (
+                  <Text variant="display" style={styles.title}>
+                    {s.titleTop}
+                    {"\n"}
+                    <Text honey>{s.titleAccent}</Text>
+                  </Text>
+                ) : (
+                  <Text variant="display" style={styles.title}>
+                    {s.title}
+                  </Text>
+                )}
+
+                <Text variant="bodyDim" style={styles.body}>
+                  {s.body}
+                </Text>
+              </View>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -170,6 +259,18 @@ export default function Onboarding() {
           full
         />
       </View>
+
+      {/* Avatar Customizer Sheet */}
+      <BearAvatarCustomizer
+        visible={customizerVisible}
+        initialName={name}
+        initialConfig={avatarConfig}
+        onClose={() => setCustomizerVisible(false)}
+        onSaved={(newConfig, newName) => {
+          setAvatarConfigState(newConfig);
+          setName(newName);
+        }}
+      />
     </View>
   );
 }
@@ -194,6 +295,45 @@ const styles = StyleSheet.create({
 
   pager: { flex: 1 },
   slide: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xxxl - 8 },
+  slideContent: { alignItems: "center", justifyContent: "center" },
+
+  avatarSlideWrap: { alignItems: "center", justifyContent: "center", width: "100%" },
+  avatarHeroWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: ms(8),
+  },
+  shuffleFloatingBtn: {
+    position: "absolute",
+    right: -ms(8),
+    bottom: ms(4),
+    width: ms(34),
+    height: ms(34),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.bg,
+    ...glow.honey,
+  },
+  customizeHintBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(5),
+    borderRadius: radius.pill,
+    marginTop: ms(4),
+  },
+  customizeHintText: {
+    color: colors.honey,
+    fontFamily: font.label,
+    fontSize: ms(12),
+  },
 
   heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: spacing.xxl },
   heroGlow: {
@@ -216,21 +356,52 @@ const styles = StyleSheet.create({
     ...glow.honey,
   },
 
-  title: { fontSize: ms(30), lineHeight: ms(36), textAlign: "center" },
-  body: { textAlign: "center", marginTop: ms(14), maxWidth: ms(320), fontSize: ms(15), lineHeight: ms(22) },
+  title: { fontSize: ms(28), lineHeight: ms(34), textAlign: "center" },
+  body: { textAlign: "center", marginTop: ms(12), maxWidth: ms(320), fontSize: ms(14), lineHeight: ms(20) },
+
+  genderRow: {
+    flexDirection: "row",
+    gap: ms(8),
+    width: "100%",
+    marginBottom: ms(12),
+  },
+  genderPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: ms(38),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  genderPillActive: {
+    backgroundColor: colors.honey,
+    borderColor: colors.honey,
+    ...glow.honey,
+  },
+  genderText: {
+    color: colors.textDim,
+    fontFamily: font.label,
+    fontSize: ms(12),
+  },
+  genderTextActive: {
+    color: colors.onHoney,
+    fontFamily: font.headline,
+  },
 
   nameField: {
     flexDirection: "row",
     alignItems: "center",
     gap: ms(10),
     alignSelf: "stretch",
-    marginTop: ms(26),
     backgroundColor: colors.surfaceStrong,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     borderRadius: radius.md,
     paddingHorizontal: ms(16),
-    height: ms(52),
+    height: ms(50),
   },
   nameInput: { flex: 1, color: colors.text, fontFamily: font.bodySemi, fontSize: ms(16) },
 

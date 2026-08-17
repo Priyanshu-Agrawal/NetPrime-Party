@@ -8,6 +8,7 @@
  *
  * Cozy cinema-lounge skin (Stitch "Bearoom Watch Party").
  */
+import BearAvatar from "@/components/avatar/BearAvatar";
 import { GifPicker } from "@/components/party/GifPicker";
 import { RoomSettingsSheet } from "@/components/party/RoomSettingsSheet";
 import {
@@ -27,6 +28,7 @@ import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import GlassButton from "@/components/ui/GlassButton";
 import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
+import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { getDisplayName } from "@/services/party/identity";
 import type { Member, PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
@@ -796,22 +798,23 @@ function AvatarStack({
     <View style={styles.avatarStack}>
       {shown.map((m, i) => {
         const isHost = m.userId === hostId;
-        const label = (m.displayName || (m.userId === selfId ? "You" : "G")).trim();
         return (
           <View
             key={m.userId}
             style={[
-              styles.avatar,
-              { marginLeft: i === 0 ? 0 : -10, zIndex: i + 1 },
-              isHost && styles.avatarHost,
+              { marginLeft: i === 0 ? 0 : -8, zIndex: i + 1 },
             ]}
           >
-            <Text style={styles.avatarText}>{label.charAt(0).toUpperCase()}</Text>
+            <BearAvatar
+              size={ms(26)}
+              hostRing={isHost}
+              config={generateRandomBearConfig("neutral", m.userId)}
+            />
           </View>
         );
       })}
       {extra > 0 ? (
-        <View style={[styles.avatar, styles.avatarMore, { marginLeft: -10 }]}>
+        <View style={[styles.avatar, styles.avatarMore, { marginLeft: -8, zIndex: 10 }]}>
           <Text style={styles.avatarText}>+{extra}</Text>
         </View>
       ) : null}
@@ -828,9 +831,9 @@ function GifBubble({ msg }: { msg: ChatMessage }) {
     <View style={[msg.sticker ? styles.stickerBubble : styles.gifBubble, { width: w, height: h }]}>
       <Image
         source={{ uri: msg.gifUrl }}
-        style={styles.gifBubbleImg}
-        contentFit={msg.sticker ? "contain" : "cover"}
-        transition={150}
+        style={{ width: w, height: h }}
+        contentFit="contain"
+        cachePolicy="memory-disk"
       />
     </View>
   );
@@ -882,11 +885,10 @@ function Bubble({
     <View style={[styles.bubbleRow, gap]}>
       <View style={styles.avatarCol}>
         {lastOfGroup ? (
-          <View style={[styles.bubbleAvatar, { backgroundColor: color + "2E", borderColor: color + "66" }]}>
-            <Text style={[styles.bubbleAvatarText, { color }]}>
-              {(msg.name || "G").charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          <BearAvatar
+            size={ms(26)}
+            config={generateRandomBearConfig("neutral", msg.userId)}
+          />
         ) : null}
       </View>
       <View style={styles.bubbleCol}>
