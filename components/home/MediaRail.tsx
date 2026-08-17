@@ -7,7 +7,7 @@ import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { getCachedList, loadList } from "@/src/features/home/tmdbCache";
 import { openDetails as openDetailsAction } from "@/src/navigation/actions";
-import { PosterCard, SectionHeader } from "@/src/ui";
+import { PosterCard, PosterSkeleton, SectionHeader } from "@/src/ui";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
@@ -47,7 +47,7 @@ export function MediaRail({
       {items === null ? (
         <View style={styles.skeletonRow}>
           {[0, 1, 2, 3].map((i) => (
-            <View key={i} style={[styles.skeleton, { width: POSTER_W, height: POSTER_W * layout.posterAspect }]} />
+            <PosterSkeleton key={i} width={POSTER_W} />
           ))}
         </View>
       ) : (

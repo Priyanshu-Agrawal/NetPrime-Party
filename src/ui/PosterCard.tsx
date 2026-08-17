@@ -28,7 +28,7 @@ export function PosterCard({
   width = ms(116),
   onPress,
   onLongPress,
-  imageTransition = 0,
+  imageTransition = 300,
 }: Props) {
   const height = width * layoutTokens.posterAspect;
   return (

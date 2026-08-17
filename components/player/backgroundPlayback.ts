@@ -24,21 +24,12 @@ export function isBackgroundPlaybackAvailable(): boolean {
   return Platform.OS === "android" && Native != null;
 }
 
-export async function startBackgroundPlaybackSession(
+export function startBackgroundPlaybackSession(
   title: string,
   artworkUrl: string | null,
-): Promise<void> {
+): void {
   if (!isBackgroundPlaybackAvailable() || !Native) return;
   Native.start(title, artworkUrl ?? "");
-  if (Platform.OS === "android" && Platform.Version >= 33) {
-    try {
-      await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-      );
-    } catch {
-      /* session already started; notification may stay hidden if denied */
-    }
-  }
 }
 
 export function updateBackgroundPlaybackState(

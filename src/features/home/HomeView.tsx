@@ -5,25 +5,43 @@ import AppHeader from "@/components/ui/AppHeader";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { openJoinParty, openLibrary } from "@/src/navigation/actions";
 import { GlassCard, Text } from "@/src/ui";
-import { colors, ms, radius, spacing } from "@/theme/bearoom";
+import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import React, { useState } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type CategoryFilter = "all" | "movies" | "series" | "trending" | "topRated";
+
+const CATEGORIES: { id: CategoryFilter; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: "all", label: "All", icon: "sparkles" },
+  { id: "movies", label: "Movies", icon: "film-outline" },
+  { id: "series", label: "Series", icon: "tv-outline" },
+  { id: "trending", label: "Trending", icon: "flame-outline" },
+  { id: "topRated", label: "Top Rated", icon: "star-outline" },
+];
 
 export default React.memo(function HomePage() {
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
+  const [filter, setFilter] = useState<CategoryFilter>("all");
+
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
   const headerBlurStyle = useFadeInStyle(scrollY, 24, 120);
+
+  const handleFilterChange = (id: CategoryFilter) => {
+    void Haptics.selectionAsync();
+    setFilter(id);
+  };
 
   return (
     <View style={styles.root}>
@@ -70,21 +88,74 @@ export default React.memo(function HomePage() {
           </GlassCard>
         </View>
 
+        {/* Quick Category / Mood Filter Pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryPills}
+        >
+          {CATEGORIES.map((cat) => {
+            const active = cat.id === filter;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.categoryPill, active && styles.categoryPillActive]}
+                onPress={() => handleFilterChange(cat.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={cat.icon}
+                  size={ms(13)}
+                  color={active ? colors.onHoney : colors.textDim}
+                  style={{ marginRight: ms(4) }}
+                />
+                <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
         <ContinueWatching />
-        <MediaRail
-          title="Trending Shows"
-          path="trending/tv/week"
-          kind="tv"
-          icon="flame"
-          onSeeAll={() => openLibrary("TrendingShows")}
-        />
-        <MediaRail title="Now Playing" path="movie/now_playing" kind="movie" />
-        <MediaRail title="Popular Movies" path="movie/popular" kind="movie" />
-        <MediaRail title="Top Rated Movies" path="movie/top_rated" kind="movie" icon="star" />
-        <MediaRail title="Upcoming" path="movie/upcoming" kind="movie" />
-        <MediaRail title="Popular Series" path="tv/popular" kind="tv" />
-        <MediaRail title="Top Rated Series" path="tv/top_rated" kind="tv" icon="star" />
-        <MediaRail title="Airing Today" path="tv/airing_today" kind="tv" />
+
+        {(filter === "all" || filter === "trending" || filter === "series") && (
+          <MediaRail
+            title="Trending Shows"
+            path="trending/tv/week"
+            kind="tv"
+            icon="flame"
+            onSeeAll={() => openLibrary("TrendingShows")}
+          />
+        )}
+
+        {(filter === "all" || filter === "movies") && (
+          <MediaRail title="Now Playing" path="movie/now_playing" kind="movie" />
+        )}
+
+        {(filter === "all" || filter === "movies" || filter === "trending") && (
+          <MediaRail title="Popular Movies" path="movie/popular" kind="movie" />
+        )}
+
+        {(filter === "all" || filter === "movies" || filter === "topRated") && (
+          <MediaRail title="Top Rated Movies" path="movie/top_rated" kind="movie" icon="star" />
+        )}
+
+        {(filter === "all" || filter === "movies") && (
+          <MediaRail title="Upcoming" path="movie/upcoming" kind="movie" />
+        )}
+
+        {(filter === "all" || filter === "series" || filter === "trending") && (
+          <MediaRail title="Popular Series" path="tv/popular" kind="tv" />
+        )}
+
+        {(filter === "all" || filter === "series" || filter === "topRated") && (
+          <MediaRail title="Top Rated Series" path="tv/top_rated" kind="tv" icon="star" />
+        )}
+
+        {(filter === "all" || filter === "series") && (
+          <MediaRail title="Airing Today" path="tv/airing_today" kind="tv" />
+        )}
       </Animated.ScrollView>
 
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
@@ -151,4 +222,35 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   ctaBtnText: { fontSize: ms(11) },
+
+  categoryPills: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+    gap: ms(8),
+  },
+  categoryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: ms(14),
+    paddingVertical: ms(7),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  categoryPillActive: {
+    backgroundColor: colors.honey,
+    borderColor: colors.honey,
+    ...glow.honey,
+  },
+  categoryPillText: {
+    color: colors.textDim,
+    fontFamily: font.label,
+    fontSize: ms(12),
+  },
+  categoryPillTextActive: {
+    color: colors.onHoney,
+    fontFamily: font.headline,
+  },
 });

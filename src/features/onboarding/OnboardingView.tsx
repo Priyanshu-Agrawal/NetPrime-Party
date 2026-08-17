@@ -1,5 +1,6 @@
 import BearAvatar from "@/components/avatar/BearAvatar";
 import BearAvatarCustomizer from "@/components/avatar/BearAvatarCustomizer";
+import NotificationPermissionModal from "@/components/ui/NotificationPermissionModal";
 import {
   BearAvatarConfig,
   GenderPreference,
@@ -13,6 +14,10 @@ import {
   setDisplayName,
   setGender,
 } from "@/services/party/identity";
+import {
+  hasPromptedNotification,
+  requestNotificationPermission,
+} from "@/services/permissions/notifications";
 import { finishOnboarding } from "@/src/navigation/actions";
 import { Button, Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
@@ -75,7 +80,7 @@ const GENDERS: { id: GenderPreference; label: string; icon: keyof typeof Ionicon
   { id: "neutral", label: "Neutral", icon: "sparkles-outline" },
 ];
 
-export default function Onboarding() {
+export default function OnboardingView() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
@@ -89,6 +94,7 @@ export default function Onboarding() {
     return existing || generateRandomBearConfig(getGender());
   });
   const [customizerVisible, setCustomizerVisible] = useState(false);
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
 
   const last = SLIDES.length - 1;
 
@@ -110,13 +116,26 @@ export default function Onboarding() {
     setAvatarConfigState(newConfig);
   };
 
-  const finish = () => {
+  const completeOnboarding = () => {
     const n = name.trim();
     if (n) setDisplayName(n);
     setGender(gender);
     setAvatarConfig(avatarConfig);
     setOnboarded();
     finishOnboarding();
+  };
+
+  const finish = () => {
+    if (!hasPromptedNotification()) {
+      setNotifModalVisible(true);
+    } else {
+      completeOnboarding();
+    }
+  };
+
+  const handleNotifModalClose = () => {
+    setNotifModalVisible(false);
+    completeOnboarding();
   };
 
   const next = () => {
@@ -126,7 +145,7 @@ export default function Onboarding() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={[...gradients.onboardingGlow]} style={styles.topGlow} pointerEvents="none" />
+      <LinearGradient colors={gradients.onboardingGlow} style={styles.topGlow} pointerEvents="none" />
 
       <Pressable style={[styles.skip, { top: insets.top + ms(6) }]} onPress={finish} hitSlop={10}>
         <BlurView
@@ -270,6 +289,12 @@ export default function Onboarding() {
           setAvatarConfigState(newConfig);
           setName(newName);
         }}
+      />
+
+      {/* Contextual Notification Permission Sheet */}
+      <NotificationPermissionModal
+        visible={notifModalVisible}
+        onClose={handleNotifModalClose}
       />
     </View>
   );

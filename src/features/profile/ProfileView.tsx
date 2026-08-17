@@ -14,6 +14,11 @@ import { bearAlert } from "@/components/ui/BearAlert";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { BearAvatarConfig } from "@/services/avatar/bearAvatar";
 import { getAvatarConfig, getDisplayName, setDisplayName } from "@/services/party/identity";
+import {
+  checkNotificationPermission,
+  openAppSettings,
+  requestNotificationPermission,
+} from "@/services/permissions/notifications";
 import { openLibrary } from "@/src/navigation/actions";
 import { Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
@@ -89,6 +94,37 @@ export default function MoreScreen() {
   };
 
   const comingSoon = (label: string) => bearAlert(label, "Coming soon.");
+
+  const manageNotifications = async () => {
+    const granted = await checkNotificationPermission();
+    if (granted) {
+      bearAlert(
+        "Notifications active",
+        "You will receive watch party invites, pack updates, and lock screen media controls.",
+        [
+          { text: "Settings", onPress: openAppSettings },
+          { text: "OK" },
+        ]
+      );
+    } else {
+      bearAlert(
+        "Enable notifications",
+        "Allow notifications to receive watch party invites and control playback from your lock screen.",
+        [
+          { text: "Not Now", style: "cancel" },
+          {
+            text: "Allow",
+            onPress: async () => {
+              const res = await requestNotificationPermission();
+              if (!res) {
+                await openAppSettings();
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
 
   const confirmClearHistory = () =>
     bearAlert("Clear watch history", "Remove all watch history?", [
@@ -185,7 +221,7 @@ export default function MoreScreen() {
         {/* Preferences */}
         <Card>
           <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
-          <Row icon="notifications-outline" label="Notifications" onPress={() => comingSoon("Notifications")} />
+          <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
           <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
         </Card>
 
