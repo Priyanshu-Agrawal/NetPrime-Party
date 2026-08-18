@@ -30,7 +30,7 @@ import {
   topCast,
 } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import { Frost } from "@/src/ui/Frost";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { goBack, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
@@ -171,12 +171,7 @@ const MovieDetailsScreen: React.FC = () => {
       {/* Sticky header — always visible; bg + title fade in on scroll (like Home) */}
       <View style={[styles.header, { height: headerH }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBgStyle]}>
-          <BlurView
-            intensity={40}
-            tint="dark"
-            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-            style={StyleSheet.absoluteFill}
-          />
+          <Frost intensity={40} style={StyleSheet.absoluteFill} />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>

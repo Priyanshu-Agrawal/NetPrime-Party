@@ -1,6 +1,6 @@
 import { colors, ms, radius } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
-import { BlurView } from "expo-blur";
+import { Frost } from "./Frost";
 import React from "react";
 import { Platform, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -32,12 +32,7 @@ export function IconButton({
         style,
       ]}
     >
-      <BlurView
-        intensity={intensity}
-        tint="dark"
-        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-        style={StyleSheet.absoluteFill}
-      />
+      <Frost intensity={intensity} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.tint]} />
       {children}
     </Pressable>

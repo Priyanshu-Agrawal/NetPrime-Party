@@ -2,7 +2,7 @@
  * BearAlert — themed replacement for React Native Alert.alert.
  */
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
-import { BlurView } from "expo-blur";
+import { Frost } from "./Frost";
 import React, { useEffect, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -60,12 +60,7 @@ function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton
   const stacked = buttons.length > 2;
   return (
     <View style={styles.card}>
-      <BlurView
-        intensity={40}
-        tint="dark"
-        experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-        style={StyleSheet.absoluteFill}
-      />
+      <Frost intensity={40} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.cardTint]} />
       <View style={styles.cardInner}>
         <Text style={styles.title}>{title}</Text>

@@ -9,7 +9,7 @@ import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import { Frost } from "@/src/ui/Frost";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
@@ -91,12 +91,7 @@ export default React.memo(function HomePage() {
 
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <BlurView
-            intensity={40}
-            tint="dark"
-            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-            style={StyleSheet.absoluteFill}
-          />
+          <Frost intensity={40} style={StyleSheet.absoluteFill} />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <LinearGradient

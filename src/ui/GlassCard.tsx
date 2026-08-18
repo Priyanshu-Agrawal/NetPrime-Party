@@ -5,7 +5,7 @@
  * Perf note: real blur is not free on Android. Use blur={false} for repeated
  * surfaces (e.g. poster cards inside rails) to fall back to a cheap solid tint.
  */
-import { BlurView } from "expo-blur";
+import { Frost } from "./Frost";
 import React from "react";
 import { Platform, StyleSheet, View, type ViewProps } from "react-native";
 import { colors, glass, radius } from "@/theme/bearoom";
@@ -45,12 +45,7 @@ export function GlassCard({
     >
       {blur && (
         <>
-          <BlurView
-            intensity={intensity}
-            tint="dark"
-            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-            style={StyleSheet.absoluteFill}
-          />
+          <Frost intensity={intensity} style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface }]} />
         </>
       )}

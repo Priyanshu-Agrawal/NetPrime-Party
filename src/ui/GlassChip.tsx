@@ -3,7 +3,7 @@
  * blur={true} for hero (few instances); blur={false} for poster grids (perf).
  */
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import { Frost } from "./Frost";
 import React from "react";
 import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
 import { colors, font, glass, ms, radius, spacing } from "@/theme/bearoom";
@@ -38,12 +38,7 @@ export function GlassChip({
     <View style={shell}>
       {blur ? (
         <>
-          <BlurView
-            intensity={glass.intensity}
-            tint="dark"
-            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-            style={StyleSheet.absoluteFill}
-          />
+          <Frost intensity={glass.intensity} style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, styles.blurScrim]} />
           <View style={[StyleSheet.absoluteFill, styles.blurTint]} />
         </>

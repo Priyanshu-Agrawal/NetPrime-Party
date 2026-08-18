@@ -24,7 +24,7 @@ import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { setOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import { Frost } from "@/src/ui/Frost";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
@@ -148,12 +148,7 @@ export default function OnboardingView() {
       <LinearGradient colors={gradients.onboardingGlow} style={styles.topGlow} pointerEvents="none" />
 
       <Pressable style={[styles.skip, { top: insets.top + ms(6) }]} onPress={finish} hitSlop={10}>
-        <BlurView
-          intensity={40}
-          tint="dark"
-          experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-          style={StyleSheet.absoluteFill}
-        />
+        <Frost intensity={40} style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, styles.skipTint]} />
         <Text variant="label">Skip</Text>
       </Pressable>

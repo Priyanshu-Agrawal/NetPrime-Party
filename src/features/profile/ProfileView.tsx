@@ -27,7 +27,7 @@ import { checkGithubRelease } from "@/utils/checkGithubRelease";
 import { clearAppCache, clearWatchHistory, getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { BlurView } from "expo-blur";
+import { Frost } from "@/src/ui/Frost";
 import React, { useCallback, useState } from "react";
 import {
   Linking,
@@ -246,12 +246,7 @@ export default function MoreScreen() {
           scrolls under it, matching Home. */}
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <BlurView
-            intensity={40}
-            tint="dark"
-            experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
-            style={StyleSheet.absoluteFill}
-          />
+          <Frost intensity={40} style={StyleSheet.absoluteFill} />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <AppHeader showSearch={false} />
