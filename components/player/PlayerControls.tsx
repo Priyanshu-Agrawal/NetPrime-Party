@@ -15,7 +15,7 @@
  * (party.tsx) doesn't re-render its chat list on every 1 s tick.
  */
 import GlassCard from "@/components/ui/GlassCard";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { colors, font, ms, radius } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,6 +38,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export interface PlaybackState {
   currentTime: number;
@@ -70,6 +71,20 @@ export interface PlayerControlsProps {
   onOpenSettings?: () => void;
   /** Open the episode picker — provided only for TV shows. */
   onEpisodes?: () => void;
+  /** Back button callback (e.g. exit fullscreen). */
+  onBack?: () => void;
+  /** Title shown in the top overlay header (fullscreen). */
+  title?: string;
+  /** Subtitle (e.g. "S1 · E1") shown under the title. */
+  subtitle?: string;
+  /** Whether the player is fullscreen/immersive (gates the default overlay header). */
+  fullscreen?: boolean;
+  /** Custom top-bar node for the overlay (the party fills this). */
+  topBar?: React.ReactNode;
+  /** Extra overlay children (badges, reaction pills) that fade with the controls. */
+  overlayChildren?: React.ReactNode;
+  /** Notified when the auto-hide visibility flips. */
+  onVisibilityChange?: (visible: boolean) => void;
 }
 
 const AUTO_HIDE_MS = 3800;
@@ -96,9 +111,17 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       onTapSync,
       onOpenSettings,
       onEpisodes,
+      onBack,
+      title,
+      subtitle,
+      fullscreen,
+      topBar,
+      overlayChildren,
+      onVisibilityChange,
     },
     ref,
   ) => {
+    const insets = useSafeAreaInsets();
     const [paused, setPaused] = useState(true);
     // Progress is stepwise (one setState per tick), NOT a 60 fps animation. A JS-driven
     // width/left glide restarts every tick and congests the UI thread the WebView video
@@ -181,9 +204,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
 
     useEffect(() => {
       Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 190, useNativeDriver: true }).start();
+      onVisibilityChange?.(visible);
       if (visible) armHide();
       return clearHide;
-    }, [visible, armHide, clearHide, fade]);
+    }, [visible, armHide, clearHide, fade, onVisibilityChange]);
 
     // Surface the controls whenever playback flips (e.g. host paused remotely).
     useEffect(() => {
@@ -270,6 +294,57 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             pointerEvents="none"
           />
 
+          {/* Top overlay header — custom topBar (party) OR default back + title/episode
+              (solo, fullscreen only). Shares the auto-hide fade + scrim. */}
+          {topBar ? (
+            <View
+              style={[styles.topBarCustom, { top: fullscreen ? ms(10) : Math.max(insets.top, ms(10)) }]}
+              pointerEvents="box-none"
+            >
+              {topBar}
+            </View>
+          ) : onBack || title ? (
+            <View
+              style={[styles.topRow, { top: fullscreen ? ms(14) : Math.max(insets.top, ms(14)) }]}
+              pointerEvents="box-none"
+            >
+              {onBack ? (
+                <Pressable
+                  style={({ pressed }) => [styles.topBackBtn, pressed && styles.pressed]}
+                  onPress={() => {
+                    onBack();
+                    show();
+                  }}
+                  hitSlop={10}
+                >
+                  <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
+                </Pressable>
+              ) : (
+                <View style={styles.topSpacer} />
+              )}
+
+              {title ? (
+                <View style={styles.topTitleCard} pointerEvents="none">
+                  <Text style={styles.topTitle} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  {subtitle ? (
+                    <Text style={styles.topSubtitle} numberOfLines={1}>
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={{ flex: 1 }} />
+              )}
+
+              <View style={styles.topSpacer} />
+            </View>
+          ) : null}
+
+          {/* Overlay children (badges, reaction pills) that fade with the controls. */}
+          {overlayChildren}
+
           {/* Center transport / indicator */}
           <View style={styles.center} pointerEvents="box-none">
             {canControl ? (
@@ -346,7 +421,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               ) : null}
               {onToggleFullscreen ? (
                 <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={onToggleFullscreen} hitSlop={8}>
-                  <Ionicons name="expand" size={ms(17)} color={colors.text} />
+                  <Ionicons name={fullscreen ? "contract" : "expand"} size={ms(17)} color={colors.text} />
                 </Pressable>
               ) : null}
             </View>
@@ -402,9 +477,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.honey,
-    ...glow.honey,
-  },
+    backgroundColor: colors.honey,  },
   indicator: {
     width: ms(60),
     height: ms(60),
@@ -422,9 +495,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.honey,
     paddingHorizontal: ms(18),
     paddingVertical: ms(11),
-    borderRadius: radius.pill,
-    ...glow.honey,
-  },
+    borderRadius: radius.pill,  },
   syncText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
   bottomBar: {
     position: "absolute",
@@ -432,9 +503,7 @@ const styles = StyleSheet.create({
     right: ms(10),
     bottom: ms(10),
     // Solid dark backing (NOT a live blur — see below) so the controls stay readable.
-    backgroundColor: colors.playerCenter,
-    ...glow.soft,
-  },
+    backgroundColor: colors.playerCenter,  },
   bottomRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -467,10 +536,59 @@ const styles = StyleSheet.create({
     marginTop: -ms(7),
     backgroundColor: colors.honeyBright,
     borderWidth: ms(2),
-    borderColor: colors.onHoney,
-    ...glow.honey,
-  },
+    borderColor: colors.onHoney,  },
   fsBtn: { width: ms(32), height: ms(32), alignItems: "center", justifyContent: "center" },
+  topBarCustom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  topRow: {
+    position: "absolute",
+    left: ms(16),
+    right: ms(16),
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: ms(10),
+  },
+  topBackBtn: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.playerCenter,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,  },
+  topTitleCard: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.playerCenter,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.pill,
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(6),
+    minHeight: ms(40),  },
+  topTitle: {
+    color: colors.text,
+    fontFamily: font.headlineSemi,
+    fontSize: ms(14),
+    textAlign: "center",
+  },
+  topSubtitle: {
+    color: colors.honey,
+    fontFamily: font.bodySemi,
+    fontSize: ms(11),
+    textAlign: "center",
+    marginTop: ms(1),
+  },
+  topSpacer: {
+    width: ms(40),
+  },
 });
 
 export default PlayerControls;

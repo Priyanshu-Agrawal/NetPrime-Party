@@ -458,10 +458,10 @@ export default function Party() {
       <View style={styles.flex}>
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-          <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8}>
+          <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </GlassButton>
-          <GlassButton style={styles.codePill} onPress={share}>
+          <GlassButton style={styles.codePill} onPress={share} blur={false}>
             <Text style={styles.codeLabel}>ROOM · </Text>
             <Text style={styles.code}>{roomCode || "—"}</Text>
             <View style={styles.shareBtn}>
@@ -589,7 +589,7 @@ export default function Party() {
               </Text>
             </View>
             <View style={styles.hostActions}>
-              <GlassButton style={styles.settingsBtn} onPress={() => setShowSettings(true)}>
+              <GlassButton style={styles.settingsBtn} onPress={() => setShowSettings(true)} blur={false}>
                 <Ionicons name="settings-outline" size={16} color={colors.text} />
                 {pendingCount > 0 ? <View style={styles.settingsDot} /> : null}
               </GlassButton>
@@ -652,7 +652,7 @@ export default function Party() {
             {canSendChat ? (
               <View style={styles.inputRow}>
                 {reactionsOn ? (
-                  <GlassButton style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6}>
+                  <GlassButton style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6} blur={false}>
                     <Text style={styles.gifBtnText}>GIF</Text>
                   </GlassButton>
                 ) : null}

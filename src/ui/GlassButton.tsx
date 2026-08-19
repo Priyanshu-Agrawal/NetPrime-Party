@@ -13,9 +13,11 @@ interface Props {
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
   hitSlop?: number;
+  /** Real frosted blur (default). false = solid tint — use over/near video: the blur re-samples every frame and stutters playback. */
+  blur?: boolean;
 }
 
-export function GlassButton({ onPress, children, intensity = 42, style, disabled, hitSlop = 6 }: Props) {
+export function GlassButton({ onPress, children, intensity = 42, style, disabled, hitSlop = 6, blur = true }: Props) {
   return (
     <Pressable
       onPress={onPress}
@@ -23,8 +25,8 @@ export function GlassButton({ onPress, children, intensity = 42, style, disabled
       hitSlop={hitSlop}
       style={({ pressed }) => [styles.btn, style, pressed && styles.pressed]}
     >
-      <Frost intensity={intensity} style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, styles.tint]} />
+      {blur ? <Frost intensity={intensity} style={StyleSheet.absoluteFill} /> : null}
+      <View style={[StyleSheet.absoluteFill, blur ? styles.tint : styles.solid]} />
       {children}
     </Pressable>
   );
@@ -41,6 +43,7 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.7 },
   tint: { backgroundColor: colors.overlay },
+  solid: { backgroundColor: colors.surfaceStrong },
 });
 
 export default GlassButton;

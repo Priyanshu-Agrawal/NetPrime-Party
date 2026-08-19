@@ -56,7 +56,7 @@ export const PlayerScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
 
   // Resist accidental exit: hardware back confirms before closing the player.
-  useMediaCloseGuard({
+  const { requestClose } = useMediaCloseGuard({
     title: "Stop watching?",
     message: "This will close the player.",
     confirmLabel: "Close",
@@ -262,6 +262,14 @@ export const PlayerScreen: React.FC = () => {
                   onSeekTo={(sec) => playerRef.current?.seek(sec)}
                   onSeekBy={(d) => playerRef.current?.seek(Math.max(0, posRef.current + d))}
                   onToggleFullscreen={toggleFullscreen}
+                  fullscreen={fullscreen}
+                  title={displayTitle}
+                  subtitle={
+                    media.type === "tv" && media.season && media.episode
+                      ? `S${media.season} · E${media.episode}`
+                      : undefined
+                  }
+                  onBack={() => (fullscreen ? toggleFullscreen() : requestClose())}
                   onOpenSettings={() => {
                     playerRef.current?.readQuality();
                     setTimeout(() => playerRef.current?.readAudio(), 750);
