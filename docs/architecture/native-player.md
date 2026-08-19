@@ -1,13 +1,10 @@
 # Native Player via Hidden Resolver + Dub Picker (design / plan)
 
-> # ⛔ REJECTED as primary playback — DO NOT BUILD THIS.
-> After investigation we rejected native-sniff **playback**: the provider's HLS stream uses a
-> **deterministic, ephemeral, WAF-gated token** (two fresh browser sessions resolve to the *same*
-> token; a URL that plays is dead hours later), so a native player **cannot self-heal on token
-> expiry** and can't reliably play a full movie. **The WebView stays the primary playback engine**;
-> native features (PiP/AirPlay/background/lock-screen) are added *around* it instead — see
-> **[../plans/webview-native-features.md](../plans/webview-native-features.md)**. Everything below
-> (the resolver, the dub reverse-engineering) remains as **research/reference**, not the plan.
+> # 🔄 RE-EVALUATED: Hybrid OMSS Architecture
+> We initially rejected native-sniff playback because CDN tokens expire (HTTP 403) and the native player couldn't self-heal. 
+> **We have solved this using the "Re-Sniff Loop"**: when `expo-video` throws an HTTP 403, we save `currentTime`, remount the hidden `SnifferWebView` to snatch a fresh `.m3u8` token, pass it back, and seek to the saved time (~1-2s invisible buffering). 
+> 
+> Furthermore, all sniffer outputs will now be formatted to the **CinePro OMSS Standard** (`SourceResponse` -> `StreamSource`). This completely decouples our UI from the scraping mechanics, giving us the 100% WAF-bypassing reliability of the WebView, with the clean, standardized data models of an OMSS API.
 
 > Direction for replacing the party's WebView playback with a native `expo-video`
 > player, fed by an `.m3u8` **sniffed from a hidden resolver WebView**. Read with
@@ -56,8 +53,54 @@ Quality→`availableVideoTracks`/`videoTrack` · Speed→`playbackRate`(+`preser
 - **v1 (POC, party-only):** hidden resolver → sniff videasy `master.m3u8` (**Hindi/Fade default → Original fallback**) → native playback + native controls (play/pause/seek/±10s/scrub/quality/speed) + **dub picker** + WebView fallback on ~8s sniff-fail.
 - **v2:** subtitles (sniff/Wyzie + wrapper manifest) · PiP/background/cast/lock-screen (runtime + maybe rebuild) · thumbnail scrubbing · extend to solo player · group-pause-on-buffer.
 
-## Caveats
-- Token short-lived → resolve per play; no caching. Sniff is **videasy-specific** (dub-select DOM); native playback layer is universal. Dub availability is per-title (Hindi often absent) → Original fallback essential. PiP/background/cast may need a native rebuild. Legal/ToS unchanged.
+## Scope & Implementation details (Updated Hybrid OMSS Strategy)
 
-## Verification (established workflow)
-On `emulator-5554`: `adb forward tcp:9222 localabstract:webview_devtools_remote_$(adb shell pidof com.cody669.Uott)` → CDP over Node `ws` → `Runtime.evaluate`. Confirm `expo-video` plays the sniffed master (`player.currentTime`/`paused`), a dub switch swaps audio via `replaceAsync`, quality/speed via APIs, and WebView fallback on ~8s sniff timeout. `screencap` is black once a video surface binds — trust CDP/fiber. execbro MCP currently disconnected → drive via adb+CDP.
+### 1. The "Snatch and Kill" Logic
+To prevent the hidden `SnifferWebView` and the Native ExoPlayer from double-buffering or playing overlapping audio, the injected JavaScript MUST kill the DOM video element immediately upon URL extraction:
+
+```javascript
+window.fetch = function (input, init) {
+  var u = typeof input === 'string' ? input : input.url;
+  if (/\.m3u8|\.mpd/i.test(u)) {
+     // 1. Send URL to React Native
+     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'media', url: u }));
+     
+     // 2. Kill the video to stop hls.js / MSE buffering
+     document.querySelectorAll('video').forEach(function(v) {
+        v.pause();
+        v.removeAttribute('src');
+        v.load();
+        v.remove();
+     });
+  }
+  return originalFetch.apply(this, arguments);
+};
+```
+
+### 2. The Re-Sniff Loop (Token Self-Healing)
+If a token expires during long watch parties, `expo-video` will throw an HTTP 403 error on the next segment.
+- Listen to `expo-video` errors.
+- On HTTP 403, cache `currentTime`.
+- Unmount and remount `StreamResolverWebView` to trigger a fresh page load.
+- Catch the new `.m3u8` with the new token.
+- Pass to `expo-video` and call `seek(currentTime)`.
+
+### 3. The OMSS Standard Output
+The React Native side of the Sniffer will map all outputs to the CinePro OMSS standard before handing them to the player/UI:
+
+```typescript
+export interface OMSSStreamSource {
+  url: string;
+  type: "hls" | "mp4";
+  quality: "1080p" | "720p" | "Auto";
+  audioTracks: {
+    language: string;    // e.g., "hi"
+    label: string;       // e.g., "Hindi"
+  }[];
+  provider: {
+    id: string;          // e.g., "videasy"
+    name: string;        // e.g., "NetPrime"
+  }
+}
+```
+*Result: The UI components and player state strictly consume OMSS objects, entirely decoupled from the sniffing mechanics.*
