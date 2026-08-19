@@ -1,0 +1,9 @@
+name = "netprime-worker"
+main = "src/index.ts"
+compatibility_date = "2024-03-20"
+
+# Environment variables that don't contain secrets can be added here.
+# For secrets (like Supabase Anon Key), we will use .dev.vars locally 
+# and `npx wrangler secret put` for production.
+[vars]
+# SUPABASE_URL = "https://your-project-id.supabase.co"

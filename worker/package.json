@@ -1,0 +1,23 @@
+{
+  "name": "netprime-worker",
+  "version": "1.0.0",
+  "description": "Tier 1 Edge Scraper and Config Server for NetPrime",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/swagger-ui": "^0.5.0",
+    "@hono/zod-openapi": "^0.19.0",
+    "hono": "^4.6.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240320.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^4.86.0"
+  }
+}

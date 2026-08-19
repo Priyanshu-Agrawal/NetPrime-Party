@@ -1,0 +1,122 @@
+[
+  {
+    "id": "videasy",
+    "name": "NetPrime (Videasy)",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://player.videasy.to/movie/${id}",
+    "requires_client_sniff": true,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 1,
+    "user_description": "The absolute best choice for multiple Audio Dubs (Hindi, Tamil, etc.) and Anime.",
+    "dev_description": "Tier 2 Fallback. Strict IP-locked tokens. Must use React Native WebView 'Snatch and Kill' to execute JS locally."
+  },
+  {
+    "id": "vidsrc_to",
+    "name": "VidSrc (Original)",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://vidsrc.to/embed/movie/${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 2,
+    "user_description": "Lightning fast load times with a massive library of HD movies and TV shows.",
+    "dev_description": "Standard HTML DOM. No IP-locking. Perfect for 200ms Cloudflare Worker server-side scraping."
+  },
+  {
+    "id": "vsembed",
+    "name": "VSEmbed",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://vsembed.ru/embed/movie?tmdb=${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 3,
+    "user_description": "Highly reliable backup server with excellent global speeds.",
+    "dev_description": "Russian mirror wrapper of VidSrc. Bypasses a lot of standard rate-limiting. Fast server-side scrape."
+  },
+  {
+    "id": "embed_su",
+    "name": "Embed.su",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://www.embed.su/embed/movie/${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 4,
+    "user_description": "Clean, ad-free video player with quick buffering.",
+    "dev_description": "Very clean DOM structure. Easy to parse AES payloads on the server."
+  },
+  {
+    "id": "vidlink",
+    "name": "VidLink",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://vidlink.pro/movie/${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 5,
+    "user_description": "Solid overall performance for both classic and new releases.",
+    "dev_description": "JSON responses often require an API key handshake, but easily spoofed via Edge Worker."
+  },
+  {
+    "id": "vidfast",
+    "name": "VidFast",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://vidfast.vc/movie/${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 6,
+    "user_description": "Next-generation video player optimized for fast seeking.",
+    "dev_description": "Built on Next.js. M3U8 links can be extracted directly from HTML props server-side."
+  },
+  {
+    "id": "moviesapi",
+    "name": "MoviesAPI",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://moviesapi.to/movie/${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": true, "pip": true },
+    "priority": 7,
+    "user_description": "Standard high-definition fallback source.",
+    "dev_description": "Shares a codebase with VidSpark. Clean /movie/{id} routing."
+  },
+  {
+    "id": "vidcore",
+    "name": "VidCore",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://www.vidcore.net/embed/movie/${id}",
+    "requires_client_sniff": true,
+    "capabilities": { "watchParty": false, "pip": true },
+    "priority": 8,
+    "user_description": "High-quality source, but may require a brief loading screen.",
+    "dev_description": "Tier 2 Fallback. Uses a JS 'One moment please' gate that blocks server-side scraping. WebView execution required."
+  },
+  {
+    "id": "multiembed",
+    "name": "SuperEmbed",
+    "enabled": true,
+    "unstable": false,
+    "url_template": "https://multiembed.mov/?video_id=${id}&tmdb=1",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": false, "pip": true },
+    "priority": 9,
+    "user_description": "A massive aggregator that searches 5+ servers to find your movie as a last resort.",
+    "dev_description": "High latency (takes 2-3s to aggregate upstream). Set watchParty to false as it can switch CDNs and cause seek desyncs."
+  },
+  {
+    "id": "2embed",
+    "name": "2Embed",
+    "enabled": true,
+    "unstable": true,
+    "url_template": "https://www.2embed.cc/embed/${id}",
+    "requires_client_sniff": false,
+    "capabilities": { "watchParty": false, "pip": true },
+    "priority": 10,
+    "user_description": "Legacy backup server. May occasionally fail to load.",
+    "dev_description": "Historically reliable but recently prone to Cloudflare 522 errors. Marked as unstable."
+  }
+]

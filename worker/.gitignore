@@ -1,0 +1,8 @@
+# Wrangler local dev secrets — symlinked to the repo-root .env.local (never commit)
+.dev.vars
+.env
+.env*.local
+
+# Wrangler build/cache
+.wrangler/
+node_modules/
