@@ -34,6 +34,8 @@ import type { Member, PartyMedia } from "@/services/party/protocol";
 import { useParty } from "@/services/party/useParty";
 import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/services/party/usePartyChat";
 import { colors, chat, font, glow, ms, radius } from "@/theme/bearoom";
+import ReanimatedAnimated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from "react-native-reanimated";
+import { useResponsive } from "@/hooks/useResponsive";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { exitMedia } from "@/src/navigation/actions";
@@ -149,6 +151,7 @@ function MessageText({ text, onSeek }: { text: string; onSeek: (sec: number) => 
 export default function Party() {
   const route = useRoute<RouteProp<RootStackParamList, "Party">>();
   const insets = useSafeAreaInsets();
+  const { isWide, isLandscapeMobile, width } = useResponsive();
   const params = route.params ?? {};
   const isHostParam = params.role === "host";
   const room = (params.room ?? "").toUpperCase();
@@ -188,6 +191,8 @@ export default function Party() {
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
+  const [landscapeChatOpen, setLandscapeChatOpen] = useState(false);
+  const isImmersive = fullscreen || isLandscapeMobile;
   // Latest known playback position (seconds) from the player — read when inserting.
   const posRef = useRef(0);
   // Live mm:ss shown on the in-field timestamp button; ticks only while composing.
@@ -297,9 +302,11 @@ export default function Party() {
       );
     }, 560);
   };
+  // This screen may rotate freely; snap everything back to portrait on leave.
   useEffect(() => {
+    ScreenOrientation.unlockAsync().catch(() => {});
     return () => {
-      ScreenOrientation.unlockAsync().catch(() => {});
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
       if (maskTimer.current) clearTimeout(maskTimer.current);
       maskTimer.current = null;
       maskFade.stopAnimation();
@@ -453,26 +460,89 @@ export default function Party() {
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden={fullscreen} style="light" />
+      <StatusBar hidden={isImmersive} style="light" />
 
       <View style={styles.flex}>
-        {/* Top bar */}
-        <View style={[styles.topBar, { paddingTop: insets.top + 6 }]}>
-          <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
-          </GlassButton>
-          <GlassButton style={styles.codePill} onPress={share} blur={false}>
-            <Text style={styles.codeLabel}>ROOM · </Text>
-            <Text style={styles.code}>{roomCode || "—"}</Text>
-            <View style={styles.shareBtn}>
-              <Ionicons name="share-social" size={13} color={colors.text} />
+        {/* Top bar — static in portrait/tablet; a pre-bind fallback in immersive
+            (once bound, the immersive header lives in the PlayerControls overlay). */}
+        {!isImmersive || !playerBound ? (
+          <View
+            style={[
+              styles.topBar,
+              {
+                paddingTop: isImmersive ? ms(6) : insets.top + 6,
+                paddingLeft: Math.max(insets.left, ms(12)),
+                paddingRight: Math.max(insets.right, ms(12)),
+              },
+            ]}
+          >
+            <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </GlassButton>
+            <GlassButton style={styles.codePill} onPress={share} blur={false}>
+              <Text style={styles.codeLabel}>ROOM · </Text>
+              <Text style={styles.code}>{roomCode || "—"}</Text>
+              <View style={styles.shareBtn}>
+                <Ionicons name="share-social" size={13} color={colors.text} />
+              </View>
+            </GlassButton>
+            <View style={styles.topRightActions}>
+              {isLandscapeMobile ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.chatToggleBtn,
+                    landscapeChatOpen && styles.chatToggleBtnActive,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => setLandscapeChatOpen((v) => !v)}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={landscapeChatOpen ? "chatbubbles" : "chatbubbles-outline"}
+                    size={ms(15)}
+                    color={landscapeChatOpen ? colors.onHoney : colors.text}
+                  />
+                  <Text style={[styles.chatToggleText, landscapeChatOpen && styles.chatToggleTextActive]}>Chat</Text>
+                  {chat.messages.length > 0 ? (
+                    <View style={[styles.chatBadge, landscapeChatOpen && styles.chatBadgeActive]}>
+                      <Text style={[styles.chatBadgeText, landscapeChatOpen && styles.chatBadgeTextActive]}>
+                        {chat.messages.length > 99 ? "99+" : chat.messages.length}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              ) : null}
+              <AvatarStack members={members} hostId={hostId} selfId={party.userId} />
             </View>
-          </GlassButton>
-          <AvatarStack members={members} hostId={hostId} selfId={party.userId} />
-        </View>
+          </View>
+        ) : null}
 
-        {/* Player */}
-        <View style={fullscreen ? styles.playerFs : styles.player}>
+        {/* Player + chat as a side-by-side row in landscape / on wide screens. */}
+        <View
+          style={[
+            styles.flex,
+            isWide && styles.desktopLayout,
+            isLandscapeMobile && styles.landscapeMobileLayout,
+            isLandscapeMobile && {
+              paddingLeft: Math.max(insets.left, ms(8)),
+              paddingRight: Math.max(insets.right, ms(8)),
+            },
+          ]}
+        >
+          {/* Left / theater column */}
+          <View style={[isWide && styles.desktopLeftCol, isLandscapeMobile && styles.landscapeMobilePlayerCol]}>
+            {/* Player */}
+            <View
+              style={
+                fullscreen
+                  ? styles.playerFs
+                  : isWide
+                  ? styles.desktopPlayer
+                  : isLandscapeMobile
+                  ? styles.landscapeMobilePlayer
+                  : styles.player
+              }
+            >
           {party.error && /password/i.test(party.error) ? (
             <View style={styles.waiting}>
               <Ionicons name="lock-closed-outline" size={30} color={colors.honey} />
@@ -517,7 +587,7 @@ export default function Party() {
                   onPause={party.pause}
                   onSeekTo={party.seekTo}
                   onSeekBy={party.seekBy}
-                  onToggleFullscreen={toggleFullscreen}
+                  onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
                   onTapSync={party.jumpToLive}
                   onOpenSettings={() => {
                     // Both reads drive videasy's ONE settings tab, so stagger them —
@@ -527,6 +597,91 @@ export default function Party() {
                     setTimeout(() => playerRef.current?.readAudio(), 750);
                     setShowPlayerSettings(true);
                   }}
+                  fullscreen={fullscreen}
+                  topBar={
+                    isImmersive ? (
+                      <View
+                        style={[
+                          styles.topBar,
+                          {
+                            paddingLeft: Math.max(insets.left, ms(12)),
+                            paddingRight: Math.max(insets.right, ms(12)),
+                            paddingTop: ms(2),
+                          },
+                        ]}
+                      >
+                        <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
+                          <Ionicons name="chevron-back" size={22} color={colors.text} />
+                        </GlassButton>
+                        <GlassButton style={styles.codePill} onPress={share} blur={false}>
+                          <Text style={styles.codeLabel}>ROOM · </Text>
+                          <Text style={styles.code}>{roomCode || "—"}</Text>
+                          <View style={styles.shareBtn}>
+                            <Ionicons name="share-social" size={13} color={colors.text} />
+                          </View>
+                        </GlassButton>
+                        <View style={styles.topRightActions}>
+                          {isLandscapeMobile ? (
+                            <Pressable
+                              style={({ pressed }) => [
+                                styles.chatToggleBtn,
+                                landscapeChatOpen && styles.chatToggleBtnActive,
+                                pressed && styles.pressed,
+                              ]}
+                              onPress={() => setLandscapeChatOpen((v) => !v)}
+                              hitSlop={8}
+                            >
+                              <Ionicons
+                                name={landscapeChatOpen ? "chatbubbles" : "chatbubbles-outline"}
+                                size={ms(15)}
+                                color={landscapeChatOpen ? colors.onHoney : colors.text}
+                              />
+                              <Text style={[styles.chatToggleText, landscapeChatOpen && styles.chatToggleTextActive]}>Chat</Text>
+                              {chat.messages.length > 0 ? (
+                                <View style={[styles.chatBadge, landscapeChatOpen && styles.chatBadgeActive]}>
+                                  <Text style={[styles.chatBadgeText, landscapeChatOpen && styles.chatBadgeTextActive]}>
+                                    {chat.messages.length > 99 ? "99+" : chat.messages.length}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </Pressable>
+                          ) : null}
+                          <AvatarStack members={members} hostId={hostId} selfId={party.userId} />
+                        </View>
+                      </View>
+                    ) : undefined
+                  }
+                  overlayChildren={
+                    isImmersive ? (
+                      <>
+                        <View style={[styles.livePillLandscape, { left: Math.max(insets.left, ms(12)) }]}>
+                          <View style={[styles.liveDot, party.detached && styles.liveDotOff]} />
+                          <Text style={styles.liveText}>
+                            {party.detached ? "Paused · Detached" : "Live · In Sync"}
+                          </Text>
+                        </View>
+                        {!landscapeChatOpen && reactionsOn && canParticipate ? (
+                          <ReanimatedAnimated.View
+                            entering={FadeIn.duration(200)}
+                            exiting={FadeOut.duration(150)}
+                            style={[styles.landscapeQuickReactions, { right: Math.max(insets.right, ms(16)), bottom: ms(66) }]}
+                            pointerEvents="box-none"
+                          >
+                            {QUICK_REACTIONS.map((e) => (
+                              <Pressable
+                                key={e}
+                                style={({ pressed }) => [styles.landscapeEmojiChip, pressed && styles.pressed]}
+                                onPress={() => chat.sendReaction(e)}
+                                hitSlop={6}
+                              >
+                                <Text style={styles.landscapeEmojiText}>{e}</Text>
+                              </Pressable>
+                            ))}
+                          </ReanimatedAnimated.View>
+                        ) : null}
+                      </>
+                    ) : undefined
+                  }
                 />
               ) : null}
             </>
@@ -539,8 +694,8 @@ export default function Party() {
             </View>
           )}
 
-          {/* LIVE · In Sync pill */}
-          {providerId && media ? (
+          {/* LIVE · In Sync pill (portrait / tablet only; immersive uses overlayChildren). */}
+          {providerId && media && !isImmersive ? (
             <View style={styles.livePill}>
               <View style={[styles.liveDot, party.detached && styles.liveDotOff]} />
               <Text style={styles.liveText}>
@@ -576,9 +731,8 @@ export default function Party() {
 
         </View>
 
-        {/* Host status bar — playback is driven by the web player's own controls
-            (they emit events that sync to everyone); no redundant buttons here. */}
-        {party.isHost ? (
+          {/* Host status bar (portrait / tablet only). */}
+          {party.isHost && !isLandscapeMobile ? (
           <View style={styles.hostBar}>
             <View style={styles.hostHintRow}>
               <Ionicons name="ellipse" size={8} color={colors.honey} />
@@ -601,16 +755,47 @@ export default function Party() {
               ) : null}
             </View>
           </View>
-        ) : null}
+          ) : null}
+          </View>
+          {/* Right / chat column — a slide-in drawer in landscape (a SOLID panel, not
+              blurred: a blur on the video screen re-captures the video every frame). */}
+          {!isLandscapeMobile || landscapeChatOpen ? (
+            <ReanimatedAnimated.View
+              entering={isLandscapeMobile ? SlideInRight.duration(240) : undefined}
+              exiting={isLandscapeMobile ? SlideOutRight.duration(180) : undefined}
+              style={
+                isWide
+                  ? styles.desktopRightCol
+                  : isLandscapeMobile
+                  ? [styles.landscapeChatDrawer, { width: Math.min(width * 0.42, ms(310)) }]
+                  : styles.flex
+              }
+            >
+              {isLandscapeMobile ? (
+                <View style={styles.landscapeDrawerHeader}>
+                  <View style={styles.landscapeDrawerTitleRow}>
+                    <Ionicons name="chatbubbles" size={ms(14)} color={colors.honey} />
+                    <Text style={styles.landscapeDrawerTitle}>Party Chat</Text>
+                    <Text style={styles.landscapeDrawerCount}>({members.length})</Text>
+                  </View>
+                  <Pressable
+                    style={({ pressed }) => [styles.landscapeDrawerClose, pressed && styles.pressed]}
+                    onPress={() => setLandscapeChatOpen(false)}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={ms(18)} color={colors.textDim} />
+                  </Pressable>
+                </View>
+              ) : null}
 
-        {/* Chat — keeps its flex height when the keyboard opens (not resized).
-            The sticky composer translates over the bottom of the list. */}
-        <FlatList
-          ref={listRef}
-          style={styles.flex}
-          data={chat.messages}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.chatContent}
+          {/* Chat — keeps its flex height when the keyboard opens (not resized).
+              The sticky composer translates over the bottom of the list. */}
+          <FlatList
+            ref={listRef}
+            style={styles.flex}
+            data={chat.messages}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={[styles.chatContent, isLandscapeMobile && styles.landscapeChatContent]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -636,64 +821,76 @@ export default function Party() {
           }
         />
 
-        {/* Reaction bar + composer: one sticky toolbar. Translate only — never
-            resize the FlatList / player / header above. */}
-        <KeyboardStickyView offset={{ closed: 0, opened: bottomPad }}>
-          <View style={[styles.inputArea, { paddingBottom: bottomPad }]}>
-            {reactionsOn && canParticipate ? (
-              <View style={styles.quickRow}>
-                {QUICK_REACTIONS.map((e) => (
-                  <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
-                    <Text style={styles.quickEmoji}>{e}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-            {canSendChat ? (
-              <View style={styles.inputRow}>
-                {reactionsOn ? (
-                  <GlassButton style={styles.gifBtn} onPress={() => setShowGif(true)} hitSlop={6} blur={false}>
-                    <Text style={styles.gifBtnText}>GIF</Text>
-                  </GlassButton>
-                ) : null}
-                <View style={styles.inputBox}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Say something to the pack…"
-                    placeholderTextColor={colors.textDim}
-                    value={draft}
-                    onChangeText={setDraft}
-                    onFocus={() => {
-                      setLivePos(Math.floor(posRef.current));
-                      setInputFocused(true);
-                    }}
-                    onBlur={() => setInputFocused(false)}
-                    selectionColor={colors.honey}
-                    returnKeyType="send"
-                    onSubmitEditing={send}
-                    blurOnSubmit={false}
-                  />
-                  {hasMedia ? (
-                    <Pressable style={styles.stampBtn} onPress={insertTimestamp} hitSlop={6}>
-                      <Ionicons name="time-outline" size={ms(13)} color={colors.honey} />
-                      <Text style={styles.stampBtnText}>{fmtMedia(livePos)}</Text>
+          {/* Reaction bar + composer: one sticky toolbar. Translate only — never
+              resize the FlatList / player / header above. */}
+          <KeyboardStickyView offset={{ closed: 0, opened: isLandscapeMobile ? ms(6) : bottomPad }}>
+            <View style={[styles.inputArea, { paddingBottom: isLandscapeMobile ? ms(6) : bottomPad }]}>
+              {reactionsOn && canParticipate && !isLandscapeMobile ? (
+                <View style={styles.quickRow}>
+                  {QUICK_REACTIONS.map((e) => (
+                    <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={6}>
+                      <Text style={styles.quickEmoji}>{e}</Text>
                     </Pressable>
-                  ) : null}
+                  ))}
                 </View>
-                <Pressable style={styles.sendBtn} onPress={send}>
-                  <Ionicons name="send" size={16} color={colors.onHoney} />
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.chatOffRow}>
-                <Ionicons name="lock-closed" size={14} color={colors.textFaint} />
-                <Text style={styles.chatOffText}>
-                  {config?.chatEnabled === false ? "Chat is off for guests" : "You're muted by the host"}
-                </Text>
-              </View>
-            )}
-          </View>
-        </KeyboardStickyView>
+              ) : null}
+              {reactionsOn && canParticipate && isLandscapeMobile ? (
+                <View style={styles.landscapeDrawerQuickRow}>
+                  {QUICK_REACTIONS.map((e) => (
+                    <Pressable key={e} onPress={() => chat.sendReaction(e)} hitSlop={4}>
+                      <Text style={styles.landscapeDrawerEmoji}>{e}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              {canSendChat ? (
+                <View style={[styles.inputRow, isLandscapeMobile && styles.landscapeInputRow]}>
+                  {reactionsOn ? (
+                    <GlassButton style={[styles.gifBtn, isLandscapeMobile && styles.landscapeGifBtn]} onPress={() => setShowGif(true)} hitSlop={6} blur={false}>
+                      <Text style={[styles.gifBtnText, isLandscapeMobile && styles.landscapeGifBtnText]}>GIF</Text>
+                    </GlassButton>
+                  ) : null}
+                  <View style={[styles.inputBox, isLandscapeMobile && styles.landscapeInputBox]}>
+                    <TextInput
+                      style={[styles.input, isLandscapeMobile && styles.landscapeInput]}
+                      placeholder={isLandscapeMobile ? "Chat…" : "Say something to the pack…"}
+                      placeholderTextColor={colors.textDim}
+                      value={draft}
+                      onChangeText={setDraft}
+                      onFocus={() => {
+                        setLivePos(Math.floor(posRef.current));
+                        setInputFocused(true);
+                      }}
+                      onBlur={() => setInputFocused(false)}
+                      selectionColor={colors.honey}
+                      returnKeyType="send"
+                      onSubmitEditing={send}
+                      blurOnSubmit={false}
+                    />
+                    {hasMedia ? (
+                      <Pressable style={[styles.stampBtn, isLandscapeMobile && styles.landscapeStampBtn]} onPress={insertTimestamp} hitSlop={6}>
+                        <Ionicons name="time-outline" size={ms(13)} color={colors.honey} />
+                        <Text style={[styles.stampBtnText, isLandscapeMobile && styles.landscapeStampBtnText]}>{fmtMedia(livePos)}</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <Pressable style={[styles.sendBtn, isLandscapeMobile && styles.landscapeSendBtn]} onPress={send}>
+                    <Ionicons name="send" size={isLandscapeMobile ? ms(13) : 16} color={colors.onHoney} />
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.chatOffRow}>
+                  <Ionicons name="lock-closed" size={14} color={colors.textFaint} />
+                  <Text style={styles.chatOffText}>
+                    {config?.chatEnabled === false ? "Chat is off for guests" : "You're muted by the host"}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </KeyboardStickyView>
+            </ReanimatedAnimated.View>
+          ) : null}
+        </View>
       </View>
 
       {/* Fullscreen-rotation cover — a sibling of the whole app content so it hides the
@@ -947,6 +1144,156 @@ const styles = StyleSheet.create({
     paddingBottom: ms(8),
     gap: ms(10),
   },
+
+  // --- Immersive / responsive party layout (glow/elevation stripped from anything
+  //     that sits over the video — blur/elevation there re-captures every frame). ---
+  topRightActions: { flexDirection: "row", alignItems: "center", gap: ms(8) },
+  chatToggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(5),
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(6),
+    borderRadius: radius.pill,
+  },
+  chatToggleBtnActive: { backgroundColor: colors.honey, borderColor: colors.honey },
+  chatToggleText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(12) },
+  chatToggleTextActive: { color: colors.onHoney },
+  chatBadge: {
+    backgroundColor: colors.honey,
+    paddingHorizontal: ms(5),
+    paddingVertical: ms(1),
+    borderRadius: radius.pill,
+  },
+  chatBadgeActive: { backgroundColor: colors.onHoney },
+  chatBadgeText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(9) },
+  chatBadgeTextActive: { color: colors.honey },
+  desktopLayout: {
+    flex: 1,
+    flexDirection: "row",
+    paddingHorizontal: ms(20),
+    paddingBottom: ms(20),
+    gap: ms(16),
+  },
+  desktopLeftCol: {
+    flex: 7,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    backgroundColor: colors.black,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  desktopPlayer: {
+    width: "100%",
+    flex: 1,
+    minHeight: 400,
+    backgroundColor: colors.black,
+    overflow: "hidden",
+  },
+  desktopRightCol: {
+    flex: 3,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  landscapeMobileLayout: { flex: 1, flexDirection: "row", paddingBottom: ms(6), gap: ms(8) },
+  landscapeMobilePlayerCol: {
+    flex: 1,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    backgroundColor: colors.black,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  landscapeMobilePlayer: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.black,
+    overflow: "hidden",
+  },
+  livePillLandscape: {
+    position: "absolute",
+    top: ms(56),
+    left: ms(12),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honey,
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(4),
+    borderRadius: radius.pill,
+  },
+  landscapeQuickReactions: {
+    position: "absolute",
+    right: ms(16),
+    bottom: ms(68),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    backgroundColor: colors.playerCenter,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(4),
+    borderRadius: radius.pill,
+  },
+  landscapeEmojiChip: { padding: ms(2) },
+  landscapeEmojiText: { fontSize: ms(18) },
+  landscapeChatDrawer: {
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  landscapeDrawerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(7),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  landscapeDrawerTitleRow: { flexDirection: "row", alignItems: "center", gap: ms(6) },
+  landscapeDrawerTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(13) },
+  landscapeDrawerCount: { color: colors.textDim, fontFamily: font.label, fontSize: ms(11) },
+  landscapeDrawerClose: {
+    width: ms(22),
+    height: ms(22),
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bgElevated,
+  },
+  landscapeChatContent: { padding: ms(8) },
+  landscapeDrawerQuickRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(4),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  landscapeDrawerEmoji: { fontSize: ms(16) },
+  landscapeInputRow: { gap: ms(5), paddingHorizontal: ms(6), paddingTop: ms(6) },
+  landscapeGifBtn: { height: ms(36), paddingHorizontal: ms(8) },
+  landscapeGifBtnText: { fontSize: ms(11) },
+  landscapeInputBox: { height: ms(36), paddingLeft: ms(10), paddingRight: ms(4), gap: ms(4) },
+  landscapeInput: { fontSize: ms(12) },
+  landscapeStampBtn: { height: ms(24), paddingHorizontal: ms(6) },
+  landscapeStampBtnText: { fontSize: ms(9) },
+  landscapeSendBtn: { width: ms(36), height: ms(36) },
+  pressed: { opacity: 0.7 },
   glassRound: {
     width: ms(40),
     height: ms(40),
@@ -990,7 +1337,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarHost: { borderColor: colors.honey, ...glow.honey },
+  avatarHost: { borderColor: colors.honey },
   avatarMore: { backgroundColor: colors.surfaceStrong },
   avatarText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(12) },
 
@@ -1037,7 +1384,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(18),
     paddingVertical: ms(10),
     borderRadius: radius.pill,
-    ...glow.honey,
   },
   takeoverBtn: { backgroundColor: colors.surfaceStrong, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, bottom: ms(68) },
   floatText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(14) },

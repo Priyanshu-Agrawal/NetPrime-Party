@@ -23,6 +23,7 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
+import * as ScreenOrientation from "expo-screen-orientation";
 import React, { useCallback, useEffect } from "react";
 import { Appearance, Platform, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -78,6 +79,18 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== "web") {
       void SystemUI.setBackgroundColorAsync(colors.bg);
+      // Lock portrait globally; only the Player / Party (and their alerts) may rotate.
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    }
+  }, []);
+
+  // Re-lock portrait on any non-rotatable screen. Player/Party unlock themselves on
+  // focus, so leaving them snaps everything else back to portrait.
+  const handleNavStateChange = useCallback(() => {
+    if (Platform.OS === "web" || !navigationRef.isReady()) return;
+    const routeName = navigationRef.getCurrentRoute()?.name;
+    if (routeName !== "Player" && routeName !== "Party") {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     }
   }, []);
 
@@ -93,7 +106,7 @@ export default function App() {
       <KeyboardProvider preload={false}>
         <BottomSheetModalProvider>
           <MovieContextProvider>
-            <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme}>
+            <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme} onStateChange={handleNavStateChange}>
               <StatusBar
                 style={colorScheme === "light" ? "dark" : "light"}
                 translucent

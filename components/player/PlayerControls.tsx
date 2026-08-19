@@ -295,7 +295,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           />
 
           {/* Top overlay header — custom topBar (party) OR default back + title/episode
-              (solo, fullscreen only). Shares the auto-hide fade + scrim. */}
+              (solo, portrait + fullscreen). Shares the auto-hide fade + scrim. */}
           {topBar ? (
             <View
               style={[styles.topBarCustom, { top: fullscreen ? ms(10) : Math.max(insets.top, ms(10)) }]}
@@ -304,10 +304,11 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               {topBar}
             </View>
           ) : onBack || title ? (
-            <View
-              style={[styles.topRow, { top: fullscreen ? ms(14) : Math.max(insets.top, ms(14)) }]}
-              pointerEvents="box-none"
-            >
+            // The solo player sits inside a SafeAreaView (already padded by the status-bar
+            // inset), and in landscape the status bar is hidden — so DON'T add insets.top
+            // again here (that double-inset pushed the header too far down). A flat offset
+            // lands it right under the status bar, matching the detail-screen header.
+            <View style={[styles.topRow, { top: ms(14) }]} pointerEvents="box-none">
               {onBack ? (
                 <Pressable
                   style={({ pressed }) => [styles.topBackBtn, pressed && styles.pressed]}
@@ -562,21 +563,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.playerCenter,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,  },
+  // Plain centered title text (no pill card) to match the detail-screen header.
   topTitleCard: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.playerCenter,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.pill,
-    paddingHorizontal: ms(16),
-    paddingVertical: ms(6),
-    minHeight: ms(40),  },
+  },
   topTitle: {
     color: colors.text,
     fontFamily: font.headlineSemi,
-    fontSize: ms(14),
+    fontSize: ms(16),
     textAlign: "center",
   },
   topSubtitle: {

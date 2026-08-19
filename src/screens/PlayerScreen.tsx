@@ -39,6 +39,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useResponsive } from "@/hooks/useResponsive";
 
 /**
  * SOLO playback = the SAME native player as the watch party (HijackPlayer + our
@@ -78,6 +79,8 @@ export const PlayerScreen: React.FC = () => {
   const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const { isLandscapeMobile } = useResponsive();
+  const isImmersive = fullscreen || isLandscapeMobile;
 
   const displayTitle = title || "Bearoom";
   const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
@@ -107,15 +110,16 @@ export const PlayerScreen: React.FC = () => {
   );
 
   // Teardown: stop the background session + release orientation.
-  useEffect(
-    () => () => {
+  // This screen may rotate freely; snap back to portrait when leaving.
+  useEffect(() => {
+    ScreenOrientation.unlockAsync().catch(() => {});
+    return () => {
       sessionStarted.current = false;
       stopBackgroundPlaybackSession();
-      ScreenOrientation.unlockAsync().catch(() => {});
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
       if (maskTimer.current) clearTimeout(maskTimer.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -234,9 +238,9 @@ export const PlayerScreen: React.FC = () => {
 
   return (
     <>
-      <StatusBar style="light" translucent hidden={fullscreen} />
+      <StatusBar style="light" translucent hidden={isImmersive} />
       <SafeAreaView style={styles.container}>
-        <View style={fullscreen ? styles.playerFs : styles.playerArea}>
+        <View style={isImmersive ? styles.playerFs : styles.playerArea}>
           {id ? (
             <>
               <HijackPlayer
@@ -261,8 +265,8 @@ export const PlayerScreen: React.FC = () => {
                   onPause={() => playerRef.current?.pause()}
                   onSeekTo={(sec) => playerRef.current?.seek(sec)}
                   onSeekBy={(d) => playerRef.current?.seek(Math.max(0, posRef.current + d))}
-                  onToggleFullscreen={toggleFullscreen}
-                  fullscreen={fullscreen}
+                  onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
+                  fullscreen={isImmersive}
                   title={displayTitle}
                   subtitle={
                     media.type === "tv" && media.season && media.episode
@@ -353,6 +357,10 @@ export const PlayerScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.black },
   playerArea: { flex: 1, backgroundColor: colors.black },
+  // Portrait: a 16:9 pane pinned to the top, so the overlay header sits ON the video
+  // (not floating in the black margin above a centered video).
+  playerPane: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black, overflow: "hidden" },
+  playerSpacer: { flex: 1 },
   playerFs: {
     position: "absolute",
     top: 0,
