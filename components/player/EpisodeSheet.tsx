@@ -15,9 +15,9 @@
  * Seasons + episodes come from the app's TMDB proxy and are PRELOADED on mount (the
  * parent mounts this only for shows), so the list is ready the instant it opens.
  */
-import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { colors, font, ms, radius } from "@/theme/bearoom";
-import { fetchDetails, img } from "@/utils/tmdbDetails";
+import { img } from "@/utils/tmdbDetails";
+import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
 import { Ionicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
@@ -57,43 +57,30 @@ export interface EpisodeSheetProps {
 
 export const EpisodeSheet = forwardRef<BottomSheetModal, EpisodeSheetProps>(
   ({ tmdbId, season, episode, onSelect }, ref) => {
-    const [seasons, setSeasons] = useState<Season[]>([]);
     const [sel, setSel] = useState<number | null>(season ?? null);
-    const [episodes, setEpisodes] = useState<Episode[] | null>(null);
 
     // Two snap points → the sheet is draggable from a peek to near-full for long seasons.
     const snapPoints = useMemo(() => ["58%", "92%"], []);
 
-    // Preload seasons on mount (the parent mounts this only for shows).
-    useEffect(() => {
-      if (!tmdbId) return;
-      let aborted = false;
-      void fetchDetails("tv", tmdbId)
-        .then((d: { seasons?: Season[] }) => {
-          if (aborted) return;
-          const ss = (d?.seasons ?? []).filter((s) => s.season_number > 0 && s.episode_count > 0);
-          setSeasons(ss);
-          setSel((cur) => cur ?? season ?? ss[0]?.season_number ?? 1);
-        })
-        .catch(() => {});
-      return () => {
-        aborted = true;
-      };
-    }, [tmdbId, season]);
+    // Seasons from cached show details (RTK Query dedupes with the details screen).
+    const { data: d } = useDetailsQuery({ type: "tv", id: tmdbId }, { skip: !tmdbId });
+    const seasons = useMemo<Season[]>(
+      () => (d?.seasons ?? []).filter((s: Season) => s.season_number > 0 && s.episode_count > 0),
+      [d],
+    );
 
-    // Preload episodes for the selected season.
+    // Default the selected season once seasons load (keep an existing pick).
     useEffect(() => {
-      if (!tmdbId || sel == null) return;
-      let aborted = false;
-      setEpisodes(null);
-      fetch(`${API_URL}tv/${tmdbId}/season/${sel}?language=en-US`, { headers: API_HEADERS })
-        .then((r) => r.json())
-        .then((d: { episodes?: Episode[] }) => !aborted && setEpisodes(d?.episodes ?? []))
-        .catch(() => !aborted && setEpisodes([]));
-      return () => {
-        aborted = true;
-      };
-    }, [tmdbId, sel]);
+      if (!seasons.length) return;
+      setSel((cur) => cur ?? season ?? seasons[0]?.season_number ?? 1);
+    }, [seasons, season]);
+
+    // Episodes for the selected season — cached per (tmdbId, sel); null while loading.
+    const { data: seasonData } = useSeasonQuery(
+      { id: tmdbId, season: sel ?? 0 },
+      { skip: !tmdbId || sel == null },
+    );
+    const episodes: Episode[] | null = seasonData ? seasonData.episodes ?? [] : null;
 
     const dismiss = useCallback(() => {
       if (ref && typeof ref !== "function") ref.current?.dismiss();

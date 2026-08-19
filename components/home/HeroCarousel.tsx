@@ -11,7 +11,7 @@ import { Button, GlassChip, Text } from "@/src/ui";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { loadHero } from "@/src/features/home/tmdbCache";
+import { useHeroQuery } from "@/src/store/services/tmdbApi";
 import { openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -80,20 +80,11 @@ export function HeroSkeleton() {
 }
 
 export function HeroCarousel() {
-  const [items, setItems] = useState<MediaItem[]>([]);
+  // Cached hero set (trending, backdrop-only, top 8) — warm across tab focus.
+  const { data: items = [] } = useHeroQuery();
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList<MediaItem>>(null);
   const idxRef = useRef(0);
-
-  useEffect(() => {
-    let aborted = false;
-    loadHero()
-      .then((r) => !aborted && setItems(r))
-      .catch(() => {});
-    return () => {
-      aborted = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (items.length < 2) return;

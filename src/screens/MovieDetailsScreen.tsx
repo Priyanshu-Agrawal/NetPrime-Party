@@ -18,7 +18,6 @@ import { genRoomCode } from "@/utils/roomCode";
 import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import {
   externalLinks,
-  fetchDetails,
   img,
   keyCrew,
   keywords,
@@ -33,6 +32,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Frost } from "@/src/ui/Frost";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { goBack, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
@@ -59,9 +59,9 @@ const MovieDetailsScreen: React.FC = () => {
   const route = useRoute<RouteProp<PlayerStackParamList, "MovieDetails">>();
   const { id } = route.params;
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(true);
-  const [d, setD] = useState<any>(null);
-  const [error, setError] = useState<string>();
+  // RTK Query: cached per movie id (append_to_response bundle).
+  const { data: d, isLoading: loading, error: qErr } = useDetailsQuery({ type: "movie", id: id! });
+  const error = qErr ? ((qErr as any)?.message ?? "Failed to load") : undefined;
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -71,15 +71,7 @@ const MovieDetailsScreen: React.FC = () => {
   const headerBgStyle = useFadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
 
   useEffect(() => {
-    let aborted = false;
-    setLoading(true);
-    fetchDetails("movie", id!)
-      .then((data) => !aborted && (setD(data), setSaved(isInWatchlist(id!, "movie")), setError(undefined)))
-      .catch((e) => !aborted && setError(e.message))
-      .finally(() => !aborted && setLoading(false));
-    return () => {
-      aborted = true;
-    };
+    setSaved(isInWatchlist(id!, "movie"));
   }, [id]);
 
   const toggleSave = () => {

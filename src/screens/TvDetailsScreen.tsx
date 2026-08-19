@@ -11,14 +11,13 @@ import {
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
 import { DetailsSkeleton, EpisodeRowSkeleton } from "@/src/ui";
-import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
+import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import { genRoomCode } from "@/utils/roomCode";
 import {
   externalLinks,
-  fetchDetails,
   img,
   keyCrew,
   keywords,
@@ -60,13 +59,19 @@ const TvDetailsScreen: React.FC = () => {
   const route = useRoute<RouteProp<PlayerStackParamList, "TvDetails">>();
   const { id } = route.params;
 
-  const [loading, setLoading] = useState(true);
-  const [d, setD] = useState<any>(null);
-  const [error, setError] = useState<string>();
+  // RTK Query: cached per show id (append_to_response bundle).
+  const { data: d, isLoading: loading, error: qErr } = useDetailsQuery({ type: "tv", id: id! });
+  const error = qErr ? ((qErr as any)?.message ?? "Failed to load") : undefined;
   const [season, setSeason] = useState<number | null>(null);
-  const [seasonData, setSeasonData] = useState<any>(null);
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Selected season's episodes — cached per (id, season); skipped until a season
+  // is chosen. Previously-viewed seasons render instantly from cache.
+  const { data: seasonData } = useSeasonQuery(
+    { id: id!, season: season ?? 0 },
+    { skip: !id || season === null },
+  );
 
   const headerH = insets.top + ms(52);
   const { scrollHandler, scrollY } = useCollapsingHeader(headerH);
@@ -74,41 +79,19 @@ const TvDetailsScreen: React.FC = () => {
   const headerBgStyle = useFadeInStyle(scrollY, HERO_H * 0.25, HERO_H * 0.6);
 
   useEffect(() => {
-    let aborted = false;
-    setLoading(true);
-    fetchDetails("tv", id!)
-      .then((data) => {
-        if (aborted) return;
-        setD(data);
-        setSaved(isInWatchlist(id!, "tv"));
-        setError(undefined);
-        const first =
-          (data.seasons ?? []).find(
-            (s: any) => s.season_number > 0 && s.episode_count > 0,
-          ) ?? (data.seasons ?? [])[0];
-        if (first) setSeason(first.season_number);
-      })
-      .catch((e) => !aborted && setError(e.message))
-      .finally(() => !aborted && setLoading(false));
-    return () => {
-      aborted = true;
-    };
+    setSaved(isInWatchlist(id!, "tv"));
+    setSeason(null); // reset selection when switching shows
   }, [id]);
 
+  // Default to the first real season once details load (keep user's pick otherwise).
   useEffect(() => {
-    if (!id || season === null) return;
-    let aborted = false;
-    setSeasonData(null);
-    fetch(`${API_URL}tv/${id}/season/${season}?language=en-US`, {
-      headers: API_HEADERS,
-    })
-      .then((r) => r.json())
-      .then((data) => !aborted && setSeasonData(data))
-      .catch(() => !aborted && setSeasonData(null));
-    return () => {
-      aborted = true;
-    };
-  }, [id, season]);
+    if (!d || season !== null) return;
+    const first =
+      (d.seasons ?? []).find(
+        (s: any) => s.season_number > 0 && s.episode_count > 0,
+      ) ?? (d.seasons ?? [])[0];
+    if (first) setSeason(first.season_number);
+  }, [d, season]);
 
   const derived = useMemo(() => {
     if (!d) return null;

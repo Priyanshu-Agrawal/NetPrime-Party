@@ -9,7 +9,8 @@ import {
 } from "@/src/ui";
 import { ms, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
-import { fetchListPage, itemTitle, type MediaItem } from "@/utils/tmdbLists";
+import { itemTitle, type MediaItem } from "@/utils/tmdbLists";
+import { useLazyListPageQuery } from "@/src/store/services/tmdbApi";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 
@@ -33,6 +34,9 @@ export default function TrendingShowsScreen() {
   const pageRef = useRef(1);
   const totalPagesRef = useRef(1);
 
+  // Lazy RTK Query trigger — caches each page so re-entering the screen is instant.
+  const [fetchPage] = useLazyListPageQuery();
+
   const applyPageMeta = useCallback((nextPage: number, nextTotalPages: number) => {
     pageRef.current = nextPage;
     totalPagesRef.current = nextTotalPages;
@@ -44,7 +48,7 @@ export default function TrendingShowsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchListPage(LIST_PATH, 1);
+      const data = await fetchPage({ path: LIST_PATH, page: 1 }).unwrap();
       setItems(data.results.map((item) => ({ ...item, media_type: "tv" as const })));
       applyPageMeta(data.page, data.total_pages);
     } catch (err) {
@@ -54,14 +58,14 @@ export default function TrendingShowsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [applyPageMeta]);
+  }, [applyPageMeta, fetchPage]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || loading || pageRef.current >= totalPagesRef.current) return;
     setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
-      const data = await fetchListPage(LIST_PATH, nextPage);
+      const data = await fetchPage({ path: LIST_PATH, page: nextPage }).unwrap();
       setItems((prev) => {
         const merged = [...prev];
         for (const item of data.results) {
@@ -77,7 +81,7 @@ export default function TrendingShowsScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [applyPageMeta, loading, loadingMore]);
+  }, [applyPageMeta, loading, loadingMore, fetchPage]);
 
   useEffect(() => {
     void fetchInitial();

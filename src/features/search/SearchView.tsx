@@ -4,9 +4,13 @@ import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { textVariant } from "@/theme/styles/typography";
-import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
 import { openDetails, openJoinParty } from "@/src/navigation/actions";
 import { itemTitle, type MediaItem } from "@/utils/tmdbLists";
+import {
+  useLazyDiscoverByProviderQuery,
+  useLazySearchMultiQuery,
+  useLazyTrendingAllDayQuery,
+} from "@/src/store/services/tmdbApi";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -72,8 +76,12 @@ const SearchScreen: React.FC = () => {
 
   const inputRef = useRef<TextInput>(null);
   const latestCallIdRef = useRef<number>(0);
-  const currentAbortControllerRef = useRef<AbortController | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Lazy RTK Query triggers — cache each (path/provider, page) and dedupe.
+  const [fetchTrending] = useLazyTrendingAllDayQuery();
+  const [fetchDiscover] = useLazyDiscoverByProviderQuery();
+  const [fetchSearch] = useLazySearchMultiQuery();
   const pageRef = useRef(1);
   const totalPagesRef = useRef(1);
   const queryRef = useRef("");
@@ -91,31 +99,17 @@ const SearchScreen: React.FC = () => {
   const fetchBrowse = useCallback(
     async (providerId: number | null, pageNum: number, append: boolean): Promise<void> => {
       if (!providerId) {
-        const response = await fetch(
-          `${API_URL}trending/all/day?language=en-US&page=${pageNum}`,
-          { headers: API_HEADERS },
-        );
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
+        const data = await fetchTrending({ page: pageNum }).unwrap();
         const batch = filterResults(data.results ?? []);
         setSearchResults((prev) => (append ? [...prev, ...batch] : batch));
         applyPageMeta(data.page ?? pageNum, data.total_pages ?? 1);
         return;
       }
 
-      const [tvRes, movieRes] = await Promise.all([
-        fetch(
-          `${API_URL}discover/tv?language=en-US&sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}&page=${pageNum}`,
-          { headers: API_HEADERS },
-        ),
-        fetch(
-          `${API_URL}discover/movie?language=en-US&sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}&page=${pageNum}`,
-          { headers: API_HEADERS },
-        ),
-      ]);
-      if (!tvRes.ok || !movieRes.ok) throw new Error("HTTP error");
-      const tvData = await tvRes.json();
-      const movieData = await movieRes.json();
+      const { tv: tvData, movie: movieData } = await fetchDiscover({
+        providerId,
+        page: pageNum,
+      }).unwrap();
       const batch = mergeProviderResults(tvData, movieData);
       setSearchResults((prev) => (append ? [...prev, ...batch] : batch));
       applyPageMeta(
@@ -123,22 +117,22 @@ const SearchScreen: React.FC = () => {
         Math.max(tvData.total_pages ?? 1, movieData.total_pages ?? 1),
       );
     },
-    [applyPageMeta],
+    [applyPageMeta, fetchTrending, fetchDiscover],
   );
 
   const fetchSearchPage = useCallback(
-    async (query: string, pageNum: number, append: boolean, signal?: AbortSignal): Promise<void> => {
-      const response = await fetch(
-        `${API_URL}search/multi?query=${encodeURIComponent(query)}&language=en-US&page=${pageNum}`,
-        { headers: API_HEADERS, signal },
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+    async (query: string, pageNum: number, append: boolean): Promise<void> => {
+      // Snapshot the call id; if a newer search supersedes us mid-flight, drop
+      // this (stale) result instead of overwriting the newer one. This replaces
+      // the old AbortController — RTK Query owns request lifecycle now.
+      const callId = latestCallIdRef.current;
+      const data = await fetchSearch({ query, page: pageNum }).unwrap();
+      if (callId !== latestCallIdRef.current) return;
       const batch = filterResults(data.results ?? []);
       setSearchResults((prev) => (append ? [...prev, ...batch] : batch));
       applyPageMeta(data.page ?? pageNum, data.total_pages ?? 1);
     },
-    [applyPageMeta],
+    [applyPageMeta, fetchSearch],
   );
 
   const fetchInitial = useCallback(
@@ -186,10 +180,6 @@ const SearchScreen: React.FC = () => {
         clearTimeout(searchTimeoutRef.current);
         searchTimeoutRef.current = null;
       }
-      if (currentAbortControllerRef.current) {
-        currentAbortControllerRef.current.abort();
-        currentAbortControllerRef.current = null;
-      }
       if (!query) {
         setSearchError(null);
         setSearchLoading(false);
@@ -207,12 +197,9 @@ const SearchScreen: React.FC = () => {
           setSearchLoading(false);
           return;
         }
-        const controller = new AbortController();
-        currentAbortControllerRef.current = controller;
         try {
-          await fetchSearchPage(query, 1, false, controller.signal);
+          await fetchSearchPage(query, 1, false);
         } catch (err) {
-          if (err instanceof DOMException && err.name === "AbortError") return;
           if (thisCallId === latestCallIdRef.current) {
             setSearchError(err instanceof Error ? err.message : "Unknown error");
             setSearchResults([]);
@@ -220,7 +207,6 @@ const SearchScreen: React.FC = () => {
           }
         } finally {
           if (thisCallId === latestCallIdRef.current) setSearchLoading(false);
-          currentAbortControllerRef.current = null;
         }
       }, 450);
     },
@@ -231,7 +217,6 @@ const SearchScreen: React.FC = () => {
     fetchInitial();
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-      if (currentAbortControllerRef.current) currentAbortControllerRef.current.abort();
     };
   }, [fetchInitial]);
 

@@ -6,13 +6,15 @@
  * proxying/caching/reordering results); this component holds no key.
  */
 import {
-  reportMedia,
-  searchMedia,
-  shareTrigger,
   type MediaItem,
   type MediaKind,
   type ReportReason,
 } from "@/services/gifs";
+import {
+  useKlipyReportMutation,
+  useKlipySearchQuery,
+  useKlipyShareMutation,
+} from "@/src/store/services/klipyApi";
 import { bearAlert } from "@/components/ui/BearAlert";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
@@ -77,22 +79,43 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
   const insets = useSafeAreaInsets();
   const [kind, setKind] = useState<MediaKind>("gifs");
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Debounced search term fed to the cached KLIPY query. Default (no input) →
+  // watch-party reactions, not KLIPY's generic trending set.
+  const [searchTerm, setSearchTerm] = useState("reaction");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [shareKlipy] = useKlipyShareMutation();
+  const [reportKlipy] = useKlipyReportMutation();
+
+  // RTK Query: cached per (kind, searchTerm) — reopening the picker or repeating
+  // a search is instant (no skeleton flash), while `skip` pauses when hidden.
+  const { data: items = [], isFetching: loading } = useKlipySearchQuery(
+    { kind, query: searchTerm, customerId },
+    { skip: !visible },
+  );
 
   // Reset on close.
   useEffect(() => {
     if (!visible) {
       setQuery("");
-      setItems([]);
       setKind("gifs");
     }
   }, [visible]);
 
+  // Debounce the text input into `searchTerm` (350ms while typing, instant on clear).
+  useEffect(() => {
+    if (!visible) return;
+    if (debounce.current) clearTimeout(debounce.current);
+    const q = query.trim();
+    debounce.current = setTimeout(() => setSearchTerm(q || "reaction"), q ? 350 : 0);
+    return () => {
+      if (debounce.current) clearTimeout(debounce.current);
+    };
+  }, [query, visible]);
+
   // Send an item: fire KLIPY's Share Trigger (personalization + reporting), then hand it up.
   const pick = (item: MediaItem) => {
-    shareTrigger(kind, item.slug, customerId, query.trim());
+    shareKlipy({ kind, slug: item.slug, customerId, q: query.trim() });
     onPick(item, kind);
     onClose();
   };
@@ -100,7 +123,7 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
   // Long-press → report. KLIPY accepts a short reason; keep the common few.
   const report = (item: MediaItem) => {
     const send = (reason: ReportReason) => {
-      reportMedia(kind, item.slug, customerId, reason);
+      reportKlipy({ kind, slug: item.slug, customerId, reason });
       bearAlert("Reported", "Thanks — KLIPY will review it.");
     };
     bearAlert("Report this GIF?", "Help keep the pack's chat clean.", [
@@ -110,31 +133,6 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
       { text: "Cancel", style: "cancel" },
     ]);
   };
-
-  // Load (trending or search) whenever open + kind/query change (debounced).
-  useEffect(() => {
-    if (!visible) return;
-    if (debounce.current) clearTimeout(debounce.current);
-    let alive = true;
-    setLoading(true);
-    setItems([]);
-    debounce.current = setTimeout(
-      () => {
-        // Default (no search) → watch-party reactions, not KLIPY's generic trending.
-        searchMedia(kind, query.trim() || "reaction", customerId).then((r) => {
-          if (alive) {
-            setItems(r);
-            setLoading(false);
-          }
-        });
-      },
-      query.trim() ? 350 : 0,
-    );
-    return () => {
-      alive = false;
-      if (debounce.current) clearTimeout(debounce.current);
-    };
-  }, [query, kind, visible, customerId]);
 
   const sticker = kind === "stickers";
 
