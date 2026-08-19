@@ -35,6 +35,20 @@ import {
 } from "./schemas";
 
 /**
+ * Client-facing app version. Keep in sync with `app.json` -> expo.version.
+ * Single source for both the /config payload and the OpenAPI `info.version`.
+ */
+const APP_VERSION = "2.1.0";
+
+/**
+ * Global maintenance flag. Currently a hardcoded placeholder — it will be
+ * driven by a dedicated store-review "listing mode" flag later: during App
+ * Store / Play review we flip this on so the app shows info only until the
+ * review clears. Not wired to a remote source yet, so it stays false.
+ */
+const MAINTENANCE_MODE = false;
+
+/**
  * App instance typed with our Worker bindings. `defaultHook` gives every
  * schema-validated route a consistent 400 body when input fails validation,
  * instead of Hono's default error shape.
@@ -100,7 +114,7 @@ const configRoute = createRoute({
 app.openapi(configRoute, async (c) => {
   const providers = await getProviders(c.env, c.executionCtx);
   return c.json(
-    { appVersion: "2.0.0", maintenanceMode: false, providers },
+    { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, providers },
     200,
   );
 });
@@ -218,7 +232,7 @@ app.openapi(purgeRoute, async (c) => {
 app.doc("/openapi.json", {
   openapi: "3.0.0",
   info: {
-    version: "2.1.0",
+    version: APP_VERSION,
     title: "NetPrime Edge Worker API",
     description:
       "Config + streaming-provider aggregator for the Bearoom app. Docs are generated from Zod schemas — see /docs.",

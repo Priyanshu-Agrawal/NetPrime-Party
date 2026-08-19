@@ -70,13 +70,21 @@ export async function getProviders(
     }
 
     const endpoint = `${url}/rest/v1/providers?select=*&order=priority.asc`;
-    const res = await fetch(endpoint, {
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        // Never let a hung Supabase call hang the worker.
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (err) {
+      console.error("Supabase request failed or timed out:", err);
+      return [];
+    }
 
     if (!res.ok) {
       console.error(`Supabase responded ${res.status} for providers.`);

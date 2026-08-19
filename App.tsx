@@ -18,6 +18,9 @@ import {
   Outfit_800ExtraBold,
 } from "@expo-google-fonts/outfit";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { Provider as ReduxProvider } from "react-redux";
+import { store } from "@/src/store";
+import ConfigBootstrap from "@/src/store/ConfigBootstrap";
 import { DarkTheme, NavigationContainer } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
@@ -99,24 +102,27 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      onLayout={onLayoutRootView}
-    >
-      <KeyboardProvider preload={false}>
-        <BottomSheetModalProvider>
-          <MovieContextProvider>
-            <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme} onStateChange={handleNavStateChange}>
-              <StatusBar
-                style={colorScheme === "light" ? "dark" : "light"}
-                translucent
-              />
-              <RootNavigator />
-            </NavigationContainer>
-            <AlertHost />
-          </MovieContextProvider>
-        </BottomSheetModalProvider>
-      </KeyboardProvider>
-    </GestureHandlerRootView>
+    <ReduxProvider store={store}>
+      <GestureHandlerRootView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        onLayout={onLayoutRootView}
+      >
+        <KeyboardProvider preload={false}>
+          <BottomSheetModalProvider>
+            <MovieContextProvider>
+              <ConfigBootstrap />
+              <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme} onStateChange={handleNavStateChange}>
+                <StatusBar
+                  style={colorScheme === "light" ? "dark" : "light"}
+                  translucent
+                />
+                <RootNavigator />
+              </NavigationContainer>
+              <AlertHost />
+            </MovieContextProvider>
+          </BottomSheetModalProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
+    </ReduxProvider>
   );
 }
