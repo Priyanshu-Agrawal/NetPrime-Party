@@ -19,6 +19,8 @@ export interface RawProvider {
 
 export interface Provider extends RawProvider {
   hijack: HijackCapability;
+  /** Version tag of this provider's served injection script (or null). */
+  scriptVersion?: string | null;
 }
 
 export interface MediaRef {

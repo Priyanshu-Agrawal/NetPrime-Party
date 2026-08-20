@@ -263,6 +263,7 @@ export const PlayerScreen: React.FC = () => {
         tmdbId: media.tmdbId,
         mediaType: media.type,
         outcome,
+        scriptVersion: selected.scriptVersion ?? undefined, // which served bridge was live
         platform: Platform.OS as ReportArgs["platform"],
         appVersion: Constants.expoConfig?.version,
         ...extra,
@@ -424,6 +425,7 @@ export const PlayerScreen: React.FC = () => {
           mediaType: media.type,
           outcome: "manual_switch",
           timeToFailMs: Date.now() - mountTsRef.current,
+          scriptVersion: selected.scriptVersion ?? undefined,
           platform: Platform.OS as ReportArgs["platform"],
           appVersion: Constants.expoConfig?.version,
         });

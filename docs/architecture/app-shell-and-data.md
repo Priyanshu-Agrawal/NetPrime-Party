@@ -37,6 +37,16 @@
   failure rate). See [../project-board.md](../project-board.md) Phase 7.
 - **Playback prefs** ("silent memory"): `utils/prefs.ts` (MMKV) + `utils/trackMatch.ts`
   fuzzy matcher; `PlayerScreen` auto-applies saved audio/quality.
+- **Provider telemetry**: `POST /report` → RLS-locked `provider_reports` (service-role
+  write) → `provider_health` view (distinct-client failure rate). RTK Query
+  `reportOutcome`; `PlayerScreen` + the Phase-8 fallback report outcomes.
+- **OTA injection scripts (Phase 6)**: the WebView hijack script is served, not
+  bundled. `providers.bridge_script` + `script_version` in Supabase; worker
+  `GET /scripts` serves bodies; `src/scripts/bridgeCache.ts` boot-diffs versions
+  and caches in MMKV; `HijackPlayer` injects the cached script. Uploaded via the
+  validation-gated `scripts/upload-bridge.ts`. Currently ships the proven legacy
+  bridge verbatim (`src/scripts/legacy-videasy.ts`); the `universal-core` +
+  `*.delta` split is the future clean refactor. NO bundled fallback (by design).
 
 ## Navigation (expo-router, file-based)
 ```

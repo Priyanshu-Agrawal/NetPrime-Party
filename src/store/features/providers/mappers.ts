@@ -13,6 +13,7 @@ export function remoteToProvider(row: RemoteProviderRow): Provider {
         urls: { movie: row.url_movie, tv: row.url_tv ?? row.url_movie },
         allowedDomain: row.allowed_domain,
         hijack: row.hijack ?? { supported: false },
+        scriptVersion: row.script_version ?? null,
     };
 }
 

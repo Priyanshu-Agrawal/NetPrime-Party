@@ -16,12 +16,18 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { UNIVERSAL_CORE } from "../src/scripts/universal-core";
-import { VIDEASY_DELTA, VIDEASY_DELTA_ID } from "../src/scripts/videasy.delta";
+import { LEGACY_VIDEASY_BRIDGE, LEGACY_VIDEASY_ID } from "../src/scripts/legacy-videasy";
 
-/** providerId → delta string. Add new providers here as their deltas land. */
-const DELTAS: Record<string, string> = {
-  [VIDEASY_DELTA_ID]: VIDEASY_DELTA,
+/**
+ * providerId → the FULL injection script to serve.
+ *
+ * Phase-6 Option 1: we ship the PROVEN legacy BRIDGE_JS verbatim (zero behaviour
+ * change; only delivery moves OTA). The clean universal-core + <provider>.delta
+ * split stays in the repo as the future refactor target — when a provider is
+ * ported, its entry becomes `UNIVERSAL_CORE + "\\n" + <delta>`.
+ */
+const SCRIPTS: Record<string, string> = {
+  [LEGACY_VIDEASY_ID]: LEGACY_VIDEASY_BRIDGE,
 };
 
 const ROOT = resolve(__dirname, "..");
@@ -42,9 +48,8 @@ function fail(msg: string): never {
 }
 
 function buildAndValidate(id: string): { script: string; version: string } {
-  const delta = DELTAS[id];
-  if (!delta) fail(`No delta registered for "${id}". Known: ${Object.keys(DELTAS).join(", ")}`);
-  const script = `${UNIVERSAL_CORE}\n${delta}`;
+  const script = SCRIPTS[id];
+  if (!script) fail(`No script registered for "${id}". Known: ${Object.keys(SCRIPTS).join(", ")}`);
   // THE GATE: must parse as valid JS, or it never leaves this machine.
   try {
     // eslint-disable-next-line no-new-func
@@ -78,7 +83,7 @@ async function main(): Promise<void> {
   const target = args.find((a) => !a.startsWith("-"));
   if (!target) fail("Usage: upload-bridge.ts <providerId|all> [--dry-run]");
 
-  const ids = target === "all" ? Object.keys(DELTAS) : [target];
+  const ids = target === "all" ? Object.keys(SCRIPTS) : [target];
 
   if (dryRun) {
     for (const id of ids) {

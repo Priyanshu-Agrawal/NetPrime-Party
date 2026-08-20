@@ -21,6 +21,8 @@ export interface RemoteProviderRow {
     url_tv: string | null;
     allowed_domain: string;
     hijack: HijackCapability;
+    /** Version tag of the served injection script (body fetched from /scripts). */
+    script_version: string | null;
 }
 
 /** `GET /config` — app bootstrap config + provider registry. */

@@ -67,13 +67,36 @@ Implemented a perfectly silent, zero-UI preference memory system.
 
 ---
 
-## `[ ]` Phase 6: Cloudflare-Served Injection Scripts (The Bridge)
-**Status:** PENDING
+## `[/]` Phase 6: Cloudflare-Served Injection Scripts (The Bridge)
+**Status:** **ACTIVE** — cutover code complete + typecheck clean; PENDING device QA.
 **Objective:** Decouple DOM-hijack logic from the app binary for instant cat-and-mouse updates.
+
+**Strategy pivot — Option 1 (serve the PROVEN bridge verbatim).** A red-team of the
+legacy `BRIDGE_JS` found it does **8 subsystems** the clean `universal-core` skeleton
+lacks (watch-party echo-suppression, background `keepAlive`, lock-screen `__soloCmd`,
+guest `__vlSetGuest`, `nativeControls`, iframe-walking finder, fullscreen, videasy
+control-bar CSS fix). Rewriting execution logic *while* changing deployment architecture
+would have silently regressed party sync + background audio. So we ship the existing
+`BRIDGE_JS` **byte-for-byte** over-the-air today (ZERO behaviour change, only delivery
+moves), and keep the clean core+delta as a **later, incremental refactor**.
+
 **Details:**
-* **Shared-Core Architecture:** Structure scripts as a shared-core (video finder, event wiring) + per-provider deltas. Keep typed references in-repo.
-* **Validation:** Scripts must be linted/smoke-tested before uploading to Supabase to prevent massive blast radius.
-* **Execution:** App caches scripts in MMKV on boot. `HijackPlayer.tsx` loads them instantly.
+* `[x]` **Worker:** lean `/config` (`script_version` only — bodies never sent here) +
+  new `GET /scripts` (heavy bodies, own edge cache); `/cache/purge` clears both.
+* `[x]` **Validation Gate:** `scripts/upload-bridge.ts` — concat → strict `new Function()`
+  smoke-test → content-hash version → service-role PATCH → purge. A bad script can't ship.
+* `[x]` **Legacy bridge extracted:** `src/scripts/legacy-videasy.ts` = `BRIDGE_JS` verbatim
+  (not bundled — only the CLI reads it). CLI serves it as `videasy@<hash>`.
+* `[x]` **App cutover:** `src/scripts/bridgeCache.ts` (MMKV boot-diff vs `/config`
+  `script_version`, fetch `/scripts` only when changed); `ConfigBootstrap` triggers the
+  sync; `HijackPlayer` injects `getCachedScript(providerId)`; `BRIDGE_JS` deleted from the
+  binary; `scriptVersion` plumbed → Phase-7 telemetry field lit.
+* `[x]` **Future baseline kept:** `universal-core.ts` + `videasy.delta.ts` remain in-repo
+  as the clean-refactor target. The deferred **event-rename** (`timeupdate`/`state`) and
+  **echo-suppression into `np.cmd`** belong to THAT refactor — not needed for Option 1
+  (the legacy bridge already has them).
+* `[ ]` **Device QA:** re-upload the legacy bridge first, then verify none of the 8
+  subsystems regressed. See `docs/qa/phase6-cutover-qa.md`.
 
 ---
 
