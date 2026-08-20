@@ -1,6 +1,7 @@
 import { HijackHint } from "@/components/player/HijackHint";
 import {
   HijackPlayer,
+  type FatalError,
   type PlayerEvent,
   type PlayerHandle,
   type QualityLevel,
@@ -83,8 +84,21 @@ export const PlayerScreen: React.FC = () => {
   const sessionStarted = useRef(false);
   const focusedRef = useRef(true);
   const [reportOutcome] = useReportOutcomeMutation();
-  const reportedRef = useRef(false); // one terminal outcome reported per provider session
+  // Two independent telemetry locks per provider session:
+  //  • initialOutcomeRef — success XOR a startup failure XOR manual_switch (once).
+  //  • stallReportedRef   — a mid-stream death (playback_stall), which MUST be able
+  //    to fire even after a success (a stream that played 30s then died at 20min on
+  //    token expiry is the most important cat-and-mouse signal). Phase 8 fires it.
+  const initialOutcomeRef = useRef(false);
+  const stallReportedRef = useRef(false);
   const mountTsRef = useRef(0); // Date.now() at provider mount, for timeToFailMs
+  // Phase 8 fallback signals.
+  const userGesturedRef = useRef(false); // first WebView interaction = play-intent
+  const anyPlaybackRef = useRef(false); // did the video ever actually play?
+  const lastProgressTsRef = useRef(0); // last time currentTime advanced (stall detection)
+  const pausedRef = useRef(true);
+  const [fallbackBanner, setFallbackBanner] = useState(false); // actionable "try another source"
+  const [excludedIds, setExcludedIds] = useState<string[]>([]); // providers that failed this session
   const providers = useProviders();
   const [selected, setSelected] = useState<Provider | undefined>(
     () => providers.find((p) => p.id === providerId) ?? providers[0],
@@ -119,8 +133,14 @@ export const PlayerScreen: React.FC = () => {
     setQualities([]);
     setAudios([]);
     sessionStarted.current = false;
-    reportedRef.current = false; // new provider session → allow one terminal report
+    initialOutcomeRef.current = false; // new provider session → allow one initial report
+    stallReportedRef.current = false; // ...and one independent mid-stream stall report
     mountTsRef.current = Date.now(); // baseline for timeToFailMs
+    userGesturedRef.current = false;
+    anyPlaybackRef.current = false;
+    lastProgressTsRef.current = Date.now();
+    pausedRef.current = true;
+    setFallbackBanner(false);
     stopBackgroundPlaybackSession();
   }, [selected?.id, season, ep]);
 
@@ -136,6 +156,54 @@ export const PlayerScreen: React.FC = () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
+  }, [playerBound, selected?.id, season, ep]);
+
+  // Phase 8 no-bind safety net. Timers count from provider mount; once bound they
+  // clear and the banner hides. 10s → actionable banner (user chooses). 25s →
+  // hard fallback, but ONLY if the user gestured (play-intent) and NO playback
+  // ever started, and the app is focused — so an idle pre-play gate never pops.
+  useEffect(() => {
+    if (playerBound || !id || !selected) {
+      setFallbackBanner(false);
+      return;
+    }
+    const soft = setTimeout(() => {
+      if (!playerBound) setFallbackBanner(true);
+    }, 10000);
+    const hard = setTimeout(() => {
+      if (playerBound || !focusedRef.current) return;
+      if (!userGesturedRef.current || anyPlaybackRef.current) return; // idle gate / already playing
+      if (!initialOutcomeRef.current) {
+        initialOutcomeRef.current = true;
+        report("no_bind", { timeToFailMs: 25000 });
+      }
+      triggerFallback();
+    }, 25000);
+    return () => {
+      clearTimeout(soft);
+      clearTimeout(hard);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerBound, selected?.id, season, ep]);
+
+  // Phase 8 mid-stream stall detector. While bound and playing, if currentTime
+  // stops advancing for >20s (token expiry / dead segment), report playback_stall
+  // ONCE — independent of `success`, since a stream that plays then dies is the
+  // key cat-and-mouse signal — and surface the fallback banner.
+  useEffect(() => {
+    if (!playerBound) return;
+    lastProgressTsRef.current = Date.now();
+    const iv = setInterval(() => {
+      if (stallReportedRef.current || !focusedRef.current) return;
+      if (!anyPlaybackRef.current || pausedRef.current) return;
+      if (Date.now() - lastProgressTsRef.current > 20000) {
+        stallReportedRef.current = true;
+        report("playback_stall", { timeToFailMs: Date.now() - mountTsRef.current });
+        setFallbackBanner(true);
+      }
+    }, 5000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerBound, selected?.id, season, ep]);
 
   // Leaving the screen (e.g. tapping "Watch Party", which PUSHES the party on top so
@@ -203,7 +271,37 @@ export const PlayerScreen: React.FC = () => {
     [reportOutcome, selected, id, media],
   );
 
+  // Fallback: open the source picker, excluding the provider that just failed so
+  // we never loop back to a corpse.
+  const triggerFallback = useCallback(() => {
+    if (selected) {
+      setExcludedIds((prev) => (prev.includes(selected.id) ? prev : [...prev, selected.id]));
+    }
+    setFallbackBanner(false);
+    sheetRef.current?.present();
+  }, [selected]);
+
+  // Hard error (main-frame HTTP/DNS/crash) → report once + auto-open the fallback.
+  const onFatalError = useCallback(
+    (info: FatalError) => {
+      if (!initialOutcomeRef.current) {
+        initialOutcomeRef.current = true;
+        report(info.kind, {
+          errorMessage:
+            info.description ?? (info.statusCode ? `HTTP ${info.statusCode}` : undefined),
+          timeToFailMs: Date.now() - mountTsRef.current,
+        });
+      }
+      triggerFallback();
+    },
+    [report, triggerFallback],
+  );
+
   const onEvent = (e: PlayerEvent) => {
+    if (e.event === "gesture") {
+      userGesturedRef.current = true; // play-intent — gates the no-bind hard-timeout
+      return;
+    }
     if (e.event === "quality") {
       const q = e.qualities ?? [];
       setQualities(q);
@@ -221,11 +319,16 @@ export const PlayerScreen: React.FC = () => {
       if (al && !a.find((t) => t.label === al)?.active) playerRef.current?.setAudio(al);
       return;
     }
+    // Track real playback progress for stall detection + play-intent.
+    const t = Number(e.currentTime) || 0;
+    if (t > posRef.current + 0.25) lastProgressTsRef.current = Date.now();
     if (Number.isFinite(e.currentTime)) posRef.current = e.currentTime;
+    pausedRef.current = !!e.paused;
+    if (e.event === "play" || e.event === "playing" || t > 0) anyPlaybackRef.current = true;
     // Telemetry: report a one-time 'success' once playback sustains past 30s —
     // the denominator that makes provider_health a failure RATE, not a raw count.
-    if (!reportedRef.current && (Number(e.currentTime) || 0) >= 30) {
-      reportedRef.current = true;
+    if (!initialOutcomeRef.current && (Number(e.currentTime) || 0) >= 30) {
+      initialOutcomeRef.current = true;
       report("success");
     }
     controlsRef.current?.setPlayback({
@@ -313,8 +416,8 @@ export const PlayerScreen: React.FC = () => {
       // Telemetry: leaving a bound provider for another is a weak negative signal
       // about the OLD one (buffering / wrong title / bad dub). Report it for the
       // provider being left, not the new pick.
-      if (selected && p.id !== selected.id && playerBound && !reportedRef.current) {
-        reportedRef.current = true;
+      if (selected && p.id !== selected.id && playerBound && !initialOutcomeRef.current) {
+        initialOutcomeRef.current = true;
         reportOutcome({
           providerId: selected.id,
           tmdbId: media.tmdbId,
@@ -347,6 +450,7 @@ export const PlayerScreen: React.FC = () => {
                 episode={media.episode}
                 onPlayerEvent={onEvent}
                 onBound={() => setPlayerBound(true)}
+                onFatalError={onFatalError}
                 nativeControls={playerBound}
                 party={false}
               />
@@ -379,6 +483,26 @@ export const PlayerScreen: React.FC = () => {
             </>
           ) : null}
         </View>
+
+        {/* Phase 8: actionable no-bind / stall banner — never auto-pops; the user
+            chooses. Opening the sheet lands them on their alternatives. */}
+        {fallbackBanner ? (
+          <View style={styles.fallbackBanner}>
+            <Text style={styles.fallbackText} numberOfLines={1}>
+              Taking too long? Try another source.
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setFallbackBanner(false);
+                sheetRef.current?.present();
+              }}
+              style={styles.fallbackBtn}
+              hitSlop={8}
+            >
+              <Text style={styles.fallbackBtnText}>Sources</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* Kept mounted in fullscreen (the absolute player covers it) to avoid an
             extra layout reflow during the rotation. */}
@@ -449,7 +573,12 @@ export const PlayerScreen: React.FC = () => {
         />
       ) : null}
 
-      <ProviderSheet ref={sheetRef} selectedId={selected?.id ?? ""} onSelect={onSelectProvider} />
+      <ProviderSheet
+        ref={sheetRef}
+        selectedId={selected?.id ?? ""}
+        onSelect={onSelectProvider}
+        excludeIds={excludedIds}
+      />
     </>
   );
 };
@@ -481,6 +610,28 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     backgroundColor: colors.bg,
   },
+  fallbackBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginHorizontal: 12,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
+  fallbackText: { flex: 1, color: colors.text, fontFamily: font.body, fontSize: ms(12) },
+  fallbackBtn: {
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(6),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+  },
+  fallbackBtnText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(12) },
   serverBtn: {
     flex: 1,
     flexDirection: "row",

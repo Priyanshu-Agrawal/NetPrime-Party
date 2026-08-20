@@ -64,6 +64,8 @@ export interface ProviderSheetProps {
   selectedId: string;
   /** Parent updates selection; sheet dismisses itself after. */
   onSelect: (id: string) => void;
+  /** Providers that failed this session — hidden so the fallback never re-offers them. */
+  excludeIds?: string[];
 }
 
 /** Strip the protocol so the domain reads as a compact subtitle. */
@@ -72,7 +74,7 @@ function prettyDomain(allowedDomain: string): string {
 }
 
 export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
-  ({ selectedId, onSelect }, ref) => {
+  ({ selectedId, onSelect, excludeIds }, ref) => {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<FilterKey>("all");
     const providers = useProviders();
@@ -81,12 +83,14 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
 
     const data = useMemo(() => {
       const q = search.trim().toLowerCase();
+      const excluded = new Set(excludeIds ?? []);
       return providers.filter((p) => {
+        if (excluded.has(p.id)) return false; // failed this session — don't re-offer
         if (filter === "party" && !isHijackable(p)) return false;
         if (q && !p.name.toLowerCase().includes(q)) return false;
         return true;
       });
-    }, [search, filter, providers]);
+    }, [search, filter, providers, excludeIds]);
 
     const dismiss = useCallback(() => {
       if (ref && typeof ref !== "function") {

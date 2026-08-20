@@ -43,7 +43,15 @@ export type PlayerEventType =
   | "enterfullscreen"
   | "exitfullscreen"
   | "quality"
-  | "audio";
+  | "audio"
+  | "gesture"; // first user interaction inside the WebView (play-intent signal)
+
+/** A fatal, main-frame playback failure surfaced to the host for fallback. */
+export interface FatalError {
+  kind: "http_error" | "render_crash";
+  statusCode?: number;
+  description?: string;
+}
 
 export interface QualityLevel {
   /** Clean label — "1080p"/"Auto" for quality, "Hindi"/"Original" for audio/dub. */
@@ -91,6 +99,9 @@ interface Props extends MediaRef {
   onBound?: () => void;
   /** Fires if the bridge never bound a <video> (provider not controllable here). */
   onBindFailed?: () => void;
+  /** Fires on a fatal MAIN-FRAME failure (HTTP 4xx/5xx, DNS, render crash) — the
+   *  host surfaces the fallback. Sub-resource (ad/tracker) errors are filtered out. */
+  onFatalError?: (info: FatalError) => void;
   /** Non-controlling guest → hide the provider's seek bar / ±10s / play-pause
    *  (the host drives the timeline). Reactively toggled. */
   hideTransportControls?: boolean;
@@ -125,6 +136,20 @@ const BRIDGE_JS = `
       var a = ev.target && ev.target.closest && ev.target.closest('a[target=_blank]');
       if (a){ ev.preventDefault(); ev.stopPropagation(); }
     }, true);
+  } catch(e){}
+  // First user interaction = play-intent. Lets the host distinguish a real
+  // DOM-break (gestured but never bound) from someone idling on the pre-play
+  // gate. Passive, fires once, then removes itself.
+  try {
+    var __g = function(){
+      post({ event: 'gesture' });
+      document.removeEventListener('pointerdown', __g, true);
+      document.removeEventListener('touchstart', __g, true);
+      document.removeEventListener('click', __g, true);
+    };
+    document.addEventListener('pointerdown', __g, true);
+    document.addEventListener('touchstart', __g, true);
+    document.addEventListener('click', __g, true);
   } catch(e){}
   // Some embed players (videasy) use a FIXED-height bottom control bar
   // (absolute bottom-0 h-44 = 176px). In the short inline/collapsed viewport that
@@ -354,6 +379,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       onPlayerEvent,
       onBound,
       onBindFailed,
+      onFatalError,
       hideTransportControls,
       nativeControls,
       party = true,
@@ -491,6 +517,23 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           onShouldStartLoadWithRequest={(req) => isAllowedTopNav(hosts, req)}
           injectedJavaScriptBeforeContentLoaded={BRIDGE_JS}
           onMessage={(ev) => handleMessage(ev.nativeEvent.data)}
+          // MAIN-FRAME failures only. Provider pages throw constant sub-resource
+          // 404s (ads/trackers); we compare the errored URL to the embed URL so
+          // those never trigger a fallback.
+          onError={(ev) => {
+            const n = ev.nativeEvent;
+            if (!n.url || n.url === uri) {
+              onFatalError?.({ kind: "http_error", description: n.description });
+            }
+          }}
+          onHttpError={(ev) => {
+            const n = ev.nativeEvent;
+            if (n.url === uri && n.statusCode >= 400) {
+              onFatalError?.({ kind: "http_error", statusCode: n.statusCode });
+            }
+          }}
+          onRenderProcessGone={() => onFatalError?.({ kind: "render_crash" })}
+          onContentProcessDidTerminate={() => onFatalError?.({ kind: "render_crash" })}
         />
         {/* Slow to bind — keep the WebView mounted (finder keeps polling), just warn. */}
         {!bound && slow && (

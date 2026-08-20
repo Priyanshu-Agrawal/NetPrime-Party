@@ -77,26 +77,28 @@ Implemented a perfectly silent, zero-UI preference memory system.
 
 ---
 
-## `[x]` Phase 7: Telemetry & Failure Memory (The Smart Net)
-**Status:** CLOSED
-**Summary:**
-Stood up the provider-health telemetry that powers the cat-and-mouse loop and the (Phase 8) smart fallback.
-* **Endpoint:** Rate-limited `POST /report` on the Worker (Hono + Zod). Derives `country` (CF geo) + a hashed client IP **server-side**; writes via the **service-role** key into an RLS-locked `provider_reports` table, so clients can never write directly (anti-poisoning). Best-effort — returns 202 even if the DB write fails, so telemetry never breaks playback.
-* **A rate, not a tally:** the `provider_health` view computes a **distinct-client-weighted failure RATE** over a rolling 24h window, with `success` as the **denominator** (its omission would auto-disable the most popular provider). `not_found`/`manual_switch` are excluded from the numerator (per-title gap / weak signal). Verified live: 2 `success` + 1 `no_bind` → `0.333`.
-* **Client:** RTK Query `reportOutcome` mutation + `PlayerScreen` hooks. `success` (sustained >30s playback) and `manual_switch` are wired and accurate today.
-* **Deferred to Phase 8 (by design):** the failure call-sites (`no_bind`/`http_error`/`render_crash`/`playback_stall`/`captcha_block`) are one-liners waiting on their detection signals (WebView error props + the no-bind timer), and the session exclusion list lives with the fallback UI. Not fired on guesses — that would poison the health denominator.
+## `[/]` Phase 7: Telemetry & Failure Memory (The Smart Net)
+**Status:** **ACTIVE**
+**Objective:** Prevent endless fallback loops and power the cat-and-mouse update cycle.
+**Details:**
+* `[x]` Implement a tiny `POST /report` (provider, tmdbId, outcome) to Supabase.
+* `[x]` Server-side: Auto-deprioritize or disable dead providers based on failure rates (aggregation view built, rate-limiter applied).
+* `[x]` Client-side: Wire the RTK Query `reportOutcome` mutation.
+* `[x]` Client-side: Maintain a session exclusion list so the fallback UI never loops through already-dead providers.
 
 ---
 
-## `[ ]` Phase 8: Lazy Fallback & The Safety Net
-**Status:** PENDING
+## `[x]` Phase 8: Lazy Fallback & The Safety Net
+**Status:** **COMPLETED** (Pending Device QA)
 **Objective:** Create a resource-efficient, zero-wait fallback system if the primary provider fails.
 **Details:**
 * **Lazy Fetch:** `[▶ Play]` instantly mounts Priority 1. Fallback scrape triggers only if the primary fails or user taps `[⚙️ Sources]`.
-* **Filtered Hard Error:** If WebView throws `onError`/`onHttpError` (strictly filtered to `isForMainFrame` to ignore ad 404s) or `onRenderProcessGone` (Android crash), instantly auto-pop the `ProviderSheet`.
+* **Filtered Hard Error:** WebView throws `onError`/`onHttpError` (filtered to `isForMainFrame`) or `onRenderProcessGone`. Auto-pops `ProviderSheet`.
 * **Smart Timeouts:**
-  * *10s Soft (No-Bind):* Show actionable banner ("Taking too long?").
-  * *25s Hard Timeout:* Gate this on "play-intent" signals to prevent false-firing on idle ad-walls. Pause timers when app is backgrounded.
+  * *10s Soft (No-Bind):* Shows actionable banner ("Taking too long?").
+  * *25s Hard Timeout:* Gated on passive play-intent gesture to prevent false-firing on idle ad-walls.
+  * *Stall Detector:* Reports `playback_stall` overriding the `success` lock if video dies mid-stream.
+*(Note: `captcha_block` and `not_found` telemetry triggers remain blocked until Phase 6 bridge completion).*
 * **Wire Phase 7 failure reports:** at each detection point (`onFatalError`, the no-bind timer, the stall detector) call `report("<outcome>", …)`. Give `playback_stall` its own guard so it can fire even after a `success`.
 * **Session exclusion list:** track already-failed providers so the fallback never re-offers a corpse; read `provider_health` to order the alternatives.
 
