@@ -11,6 +11,9 @@ export type PlayerStackParamList = {
     title?: string;
     poster_path?: string;
     year?: string;
+    /** Explicit provider to mount (e.g. priority-1 for zero-wait Play, or a
+     *  Sources pick). Falls back to the top provider when absent. */
+    providerId?: string;
   };
 };
 

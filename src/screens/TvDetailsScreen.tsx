@@ -9,6 +9,7 @@ import {
   Section,
 } from "@/components/details/sections";
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
+import { useProviders } from "@/src/store/features/providers/hooks";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
 import { DetailsSkeleton, EpisodeRowSkeleton } from "@/src/ui";
 import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
@@ -128,6 +129,8 @@ const TvDetailsScreen: React.FC = () => {
     );
   }
 
+  const providers = useProviders();
+
   const playEpisode = (ep: number, sea = season) => {
     void addToWatchHistory({
       id: id?.toString(),
@@ -137,6 +140,7 @@ const TvDetailsScreen: React.FC = () => {
       episode: ep,
       poster_path: d.poster_path,
     });
+    // Zero-wait: mount the top (priority-1) provider's WebView directly.
     openPlayer({
       id: id!.toString(),
       type: "tv",
@@ -145,6 +149,7 @@ const TvDetailsScreen: React.FC = () => {
       title: d.name,
       poster_path: d.poster_path || "",
       year: d.first_air_date?.slice(0, 4) || "",
+      providerId: providers[0]?.id,
     });
   };
 

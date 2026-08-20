@@ -52,7 +52,7 @@ export const PlayerScreen: React.FC = () => {
   useKeepAwake();
 
   const route = useRoute<RouteProp<PlayerStackParamList, "Player">>();
-  const { id, type, season, ep, title, poster_path } = route.params;
+  const { id, type, season, ep, title, poster_path, providerId } = route.params;
 
   const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
 
@@ -72,7 +72,9 @@ export const PlayerScreen: React.FC = () => {
   const sessionStarted = useRef(false);
   const focusedRef = useRef(true);
   const providers = useProviders();
-  const [selected, setSelected] = useState<Provider | undefined>(() => providers[0]);
+  const [selected, setSelected] = useState<Provider | undefined>(
+    () => providers.find((p) => p.id === providerId) ?? providers[0],
+  );
   // Our overlay mounts once the bridge binds a <video> (past the pre-play gate).
   const [playerBound, setPlayerBound] = useState(false);
   const [rate, setRate] = useState(1);
@@ -87,11 +89,14 @@ export const PlayerScreen: React.FC = () => {
   const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
   const canParty = isHijackable(selected);
 
-  // Providers load async from /config (no baked-in fallback), so adopt the first
-  // one once it arrives if nothing is selected yet. Empty stays unselected.
+  // Providers load async from /config (no baked-in fallback), so adopt the
+  // requested provider (or the top one) once the list arrives if nothing is
+  // selected yet. Empty stays unselected.
   useEffect(() => {
-    if (!selected && providers.length) setSelected(providers[0]);
-  }, [providers, selected]);
+    if (!selected && providers.length) {
+      setSelected(providers.find((p) => p.id === providerId) ?? providers[0]);
+    }
+  }, [providers, selected, providerId]);
 
   // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {

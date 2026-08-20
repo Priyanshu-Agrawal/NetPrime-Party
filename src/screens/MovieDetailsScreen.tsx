@@ -9,6 +9,7 @@ import {
   Section,
 } from "@/components/details/sections";
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
+import { useProviders } from "@/src/store/features/providers/hooks";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
 import { DetailsSkeleton } from "@/src/ui";
 import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
@@ -118,6 +119,8 @@ const MovieDetailsScreen: React.FC = () => {
     );
   }
 
+  const providers = useProviders();
+
   const handlePlay = () => {
     void addToWatchHistory({
       id: id?.toString(),
@@ -125,12 +128,15 @@ const MovieDetailsScreen: React.FC = () => {
       type: "movie",
       poster_path: d.poster_path,
     });
+    // Zero-wait: hand the player the top (priority-1) provider explicitly so it
+    // mounts that WebView immediately — no scrape roundtrip.
     openPlayer({
       id: id!.toString(),
       type: "movie",
       title: d.title,
       poster_path: d.poster_path || "",
       year: d.release_date?.slice(0, 4) || "",
+      providerId: providers[0]?.id,
     });
   };
 
