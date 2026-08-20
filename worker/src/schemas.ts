@@ -53,8 +53,19 @@ export const ProviderSchema = z
       .openapi({ example: "https://player.videasy.to/tv/${id}/${season}/${episode}" }),
     allowed_domain: z.string().openapi({ example: "https://player.videasy.to" }),
     hijack: HijackSchema,
+    /** Version tag of the served injection script; the heavy body is at /scripts. */
+    script_version: z.string().nullable().optional().openapi({ example: "videasy@1a2b3c4d" }),
   })
   .openapi("Provider");
+
+/** One served injection script (compiled core+delta) — from GET /scripts. */
+export const ProviderScriptSchema = z
+  .object({
+    id: z.string().openapi({ example: "videasy" }),
+    version: z.string().nullable().openapi({ example: "videasy@1a2b3c4d" }),
+    script: z.string().openapi({ example: "(function(){/* core+delta */})();" }),
+  })
+  .openapi("ProviderScript");
 
 /** Inferred TypeScript type for a provider row. */
 export type Provider = z.infer<typeof ProviderSchema>;

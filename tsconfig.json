@@ -15,6 +15,7 @@
   "exclude": [
     "**/*.old.ts",
     "**/*.old.tsx",
-    "worker"
+    "worker",
+    "scripts"
   ]
 }

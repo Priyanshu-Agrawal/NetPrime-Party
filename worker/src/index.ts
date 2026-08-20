@@ -23,11 +23,12 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from "hono/cors";
 
 import type { Bindings } from "./supabase";
-import { getProviders, hashIp, insertReport, purgeProviders } from "./supabase";
+import { getProviders, getScripts, hashIp, insertReport, purgeProviders } from "./supabase";
 import {
   AppConfigSchema,
   ErrorSchema,
   HealthSchema,
+  ProviderScriptSchema,
   PurgeResponseSchema,
   ReportAcceptedSchema,
   ReportRequestSchema,
@@ -35,6 +36,7 @@ import {
   ScrapeResponseSchema,
   type ScrapeResult,
 } from "./schemas";
+import { z } from "@hono/zod-openapi";
 
 /**
  * Client-facing app version. Keep in sync with `app.json` -> expo.version.
@@ -224,6 +226,30 @@ app.openapi(purgeRoute, async (c) => {
     },
     200,
   );
+});
+
+/* -------------------------------------------------------------------------- */
+/*  GET /scripts — served injection bridges (compiled core+delta)             */
+/* -------------------------------------------------------------------------- */
+
+const scriptsRoute = createRoute({
+  method: "get",
+  path: "/scripts",
+  tags: ["App"],
+  summary: "Injection scripts for enabled providers (Phase 6 dynamic bridge)",
+  description:
+    "Heavy payload kept out of /config. The app caches these in MMKV keyed by version and refetches only when /config reports a changed script_version.",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(ProviderScriptSchema) } },
+      description: "Injection scripts for enabled providers that have one.",
+    },
+  },
+});
+
+app.openapi(scriptsRoute, async (c) => {
+  const scripts = await getScripts(c.env, c.executionCtx);
+  return c.json(scripts, 200);
 });
 
 /* -------------------------------------------------------------------------- */

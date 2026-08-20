@@ -38,6 +38,7 @@ export type Bindings = {
  * a valid https GET Request for the Cache API to key on it.
  */
 const PROVIDERS_CACHE_KEY = new Request("https://internal.cache/providers");
+const SCRIPTS_CACHE_KEY = new Request("https://internal.cache/scripts");
 
 /** Resolve the Supabase URL + key from either naming convention. */
 function resolveCredentials(env: Bindings): { url?: string; key?: string } {
@@ -80,7 +81,11 @@ export async function getProviders(
     // Only enabled providers leave the edge. Clearing/disabling rows in Supabase
     // makes /config genuinely empty over the wire — the app has no baked-in
     // fallback, so it goes "dumb" (nothing observable) during store review.
-    const endpoint = `${url}/rest/v1/providers?select=*&enabled=eq.true&order=priority.asc`;
+    // Explicit columns: /config stays lean — the heavy `bridge_script` body is
+    // NEVER sent here (served separately via /scripts); only its version tag.
+    const cols =
+      "id,name,enabled,priority,url_movie,url_tv,allowed_domain,hijack,script_version";
+    const endpoint = `${url}/rest/v1/providers?select=${cols}&enabled=eq.true&order=priority.asc`;
     let res: Response;
     try {
       res = await fetch(endpoint, {
@@ -118,13 +123,75 @@ export async function getProviders(
 }
 
 /**
- * Drop the cached provider list so the next read hits Supabase fresh.
- * Call after editing rows in the dashboard instead of waiting out the TTL.
- *
- * @returns `true` if an entry existed and was removed.
+ * A served injection script (compiled core+delta) for one provider.
+ * `script` is the raw JS string HijackPlayer injects; `version` is the CLI tag.
  */
-export function purgeProviders(): Promise<boolean> {
-  return caches.default.delete(PROVIDERS_CACHE_KEY);
+export interface ProviderScript {
+  id: string;
+  version: string | null;
+  script: string;
+}
+
+/**
+ * Fetch the injection scripts for enabled providers that have one, edge-cached.
+ * Heavy payload → its own cache key, served only from /scripts (never /config).
+ */
+export async function getScripts(env: Bindings, ctx: Waitable): Promise<ProviderScript[]> {
+  const cache = caches.default;
+  let response = await cache.match(SCRIPTS_CACHE_KEY);
+
+  if (!response) {
+    const { url, key } = resolveCredentials(env);
+    if (!url || !key) {
+      console.error("Missing Supabase environment variables.");
+      return [];
+    }
+    const endpoint =
+      `${url}/rest/v1/providers?select=id,script_version,bridge_script` +
+      `&enabled=eq.true&bridge_script=not.is.null&order=priority.asc`;
+    let res: Response;
+    try {
+      res = await fetch(endpoint, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (err) {
+      console.error("Supabase /scripts request failed or timed out:", err);
+      return [];
+    }
+    if (!res.ok) {
+      console.error(`Supabase responded ${res.status} for scripts.`);
+      return [];
+    }
+    const rows = (await res.json()) as {
+      id: string;
+      script_version: string | null;
+      bridge_script: string | null;
+    }[];
+    const scripts: ProviderScript[] = rows
+      .filter((r) => r.bridge_script)
+      .map((r) => ({ id: r.id, version: r.script_version, script: r.bridge_script as string }));
+    response = new Response(JSON.stringify(scripts), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "s-maxage=60" },
+    });
+    ctx.waitUntil(cache.put(SCRIPTS_CACHE_KEY, response.clone()));
+  }
+
+  return response.json();
+}
+
+/**
+ * Drop the cached provider list + scripts so the next read hits Supabase fresh.
+ * Call after editing rows (or uploading a script) instead of waiting out the TTL.
+ *
+ * @returns `true` if either cache entry existed and was removed.
+ */
+export async function purgeProviders(): Promise<boolean> {
+  const [a, b] = await Promise.all([
+    caches.default.delete(PROVIDERS_CACHE_KEY),
+    caches.default.delete(SCRIPTS_CACHE_KEY),
+  ]);
+  return a || b;
 }
 
 /** A provider_reports row (server-derived fields added by the /report route). */
