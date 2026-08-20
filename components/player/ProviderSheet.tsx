@@ -66,6 +66,12 @@ export interface ProviderSheetProps {
   onSelect: (id: string) => void;
   /** Providers that failed this session — hidden so the fallback never re-offers them. */
   excludeIds?: string[];
+  /** Sheet fully closed. Lets the parent flush a present() that was swallowed by
+   *  this dismiss animation (pick → instant-fail race). */
+  onDismiss?: () => void;
+  /** Snap index changed (-1 = closed). Lets the parent clear pending-present state
+   *  once the sheet is actually open. */
+  onChange?: (index: number) => void;
 }
 
 /** Strip the protocol so the domain reads as a compact subtitle. */
@@ -74,7 +80,7 @@ function prettyDomain(allowedDomain: string): string {
 }
 
 export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
-  ({ selectedId, onSelect, excludeIds }, ref) => {
+  ({ selectedId, onSelect, excludeIds, onDismiss, onChange }, ref) => {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<FilterKey>("all");
     const providers = useProviders();
@@ -179,6 +185,8 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
         backgroundComponent={SheetBackground}
         handleIndicatorStyle={styles.handleIndicator}
         backdropComponent={renderBackdrop}
+        onDismiss={onDismiss}
+        onChange={onChange}
       >
         {/* Header */}
         <View style={styles.header}>

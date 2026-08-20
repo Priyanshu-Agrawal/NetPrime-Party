@@ -1,0 +1,71 @@
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
+index 973d05c..31c91ee 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/hooks/useAnimatedLayout.js
+@@ -86,16 +86,17 @@ function useAnimatedLayout(containerLayoutState, topInset, bottomInset, modal, s
+     });
+   }, [state, verticalInset, modal]);
+   (0, _react.useEffect)(() => {
+-    _reactNative.Dimensions.addEventListener('change', ({
+-      window
++    const subscription = _reactNative.Dimensions.addEventListener('change', ({
++      window: win
+     }) => {
+       state.modify(_state => {
+         'worklet';
+ 
+-        _state.window = window;
++        _state.window = win;
+         return _state;
+       });
+     });
++    return () => subscription.remove();
+   }, [state]);
+   //#endregion
+ 
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js b/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
+index b0eec93..8e4a9ed 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/hooks/useAnimatedLayout.js
+@@ -82,16 +82,17 @@ export function useAnimatedLayout(containerLayoutState, topInset, bottomInset, m
+     });
+   }, [state, verticalInset, modal]);
+   useEffect(() => {
+-    Dimensions.addEventListener('change', ({
+-      window
++    const subscription = Dimensions.addEventListener('change', ({
++      window: win
+     }) => {
+       state.modify(_state => {
+         'worklet';
+ 
+-        _state.window = window;
++        _state.window = win;
+         return _state;
+       });
+     });
++    return () => subscription.remove();
+   }, [state]);
+   //#endregion
+ 
+diff --git a/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts b/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
+index 68c674d..9f0466f 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/hooks/useAnimatedLayout.ts
+@@ -106,13 +106,14 @@ export function useAnimatedLayout(
+     [state, verticalInset, modal]
+   );
+   useEffect(() => {
+-    Dimensions.addEventListener('change', ({ window }) => {
++    const subscription = Dimensions.addEventListener('change', ({ window: win }) => {
+       state.modify(_state => {
+         'worklet';
+-        _state.window = window;
++        _state.window = win;
+         return _state;
+       });
+     });
++    return () => subscription.remove();
+   }, [state]);
+   //#endregion
+ 

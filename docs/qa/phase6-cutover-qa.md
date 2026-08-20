@@ -232,17 +232,64 @@ CLI, and the fix ships OTA. Flag it as the top finding.
 
 | Suite | Pass? | Notes / failures (👉) |
 |---|---|---|
-| A0-A Served script in device WebView (CDP/chrome://inspect) | ☐ | |
-| A0-B Served script vs public DOM (Playwright) | ☐ | |
-| A OTA cutover (8 subsystems, OTA, telemetry) | ☐ | |
-| B Dynamic providers | ☐ | |
-| C Zero-wait Play | ☐ | |
-| D Silent memory | ☐ | |
-| E Phase 8 fallback | ☐ | |
-| F TMDB/KLIPY | ☐ | |
-| G Regression | ☐ | |
+| A0-A Served script in device WebView (CDP/chrome://inspect) | ✅ | 2026-08-20 dev-build pass. `__vlBridge`/`__vlCmd`/`__soloCmd`/`__vlSetGuest`/`__vlChromeOff` all live; `<video>` bound; `trigger-Quality`/`trigger-Servers` selectors still match; pause/play/readAudio/readQuality/setGuest verified via CDP. 👉 first `readAudio` after tab-activate can return `audios:[]` (360 ms panel-render race, pre-existing; a re-read returns 5 dubs). |
+| A0-B Served script vs public DOM (Playwright) | ➖ | Skipped — superseded this pass by A0-A on the real device runtime (strictly stronger signal). Keep for CI/rot-watch. |
+| A OTA cutover (8 subsystems, OTA, telemetry) | ⚠️ | On **videasy**: all 8 subsystems pass (echo-stability host-side, background audio, lock-screen keys, chrome-off, quality+dub switching, fullscreen in/out, collapsed-player buttons; guest CSS verified at DOM level only — no 2nd device). A3 not run (no service key). A4 network-level ✅ (`success` + `scriptVersion` in body, 202) — DB row unverified (no Supabase access). 👉 **CRITICAL: only videasy has a served script — the other 8 hijack-capable providers now inject NOTHING** (pre-cutover `BRIDGE_JS` was injected unconditionally; see Findings). |
+| B Dynamic providers | ✅ | 14 providers hydrate slice via ConfigBootstrap (note: doc step "redux `providers.providers`" is valid again post-hydration; RTK `getConfig` is the source). Sheet lists all 14, party badges correct. 👉 Live-edit + dumb-app killswitch NOT run (Supabase MCP unauthenticated, no service key this session). |
+| C Zero-wait Play | ✅ | Instant WebView mount on Play (movie + TV S1E1 URL substitution correct); provider switch remounts & the videasy→vidfast path rebinds only videasy-side (see critical finding); episode flow OK. |
+| D Silent memory | ✅ | Hindi dub + 720p auto-applied silently on a different title after being picked once (verified via CDP active-states, no sheet opened). Data-Saver cap not exercised this pass. |
+| E Phase 8 fallback | ⚠️ | Soft banner ✅ (also shows at idle pre-play gate — by design, "user chooses"); 25 s hard-fallback correctly suppressed while idle ✅; hard error → auto-open sheet + provider exclusion ✅ (observed organically on a videasy timeout). 👉 BUG: when the fatal error lands while the ProviderSheet is still dismissing (pick → instant fail), `present()` is swallowed — exclusion happens but the sheet never auto-opens. 👉 raw white "Error loading page" WebView error page shown (unbranded). 👉 no auto-retry after connectivity returns; excluded provider unavailable until player remount. |
+| F TMDB/KLIPY | ✅ | Hero/rails cold + cached return (no skeleton flash), details screens OK (hooks fix holding), search stale-guard OK (gibberish→"Interstellar" settles on last query), GIF picker trending/search/send OK. |
+| G Regression | ⚠️ | Party host flow, chat text+GIF+timestamp chip, reactions, watchlist add, Continue Watching, player rotation + Home portrait all ✅. 👉 Release-build stutter NOT tested (installed build is debug); guest-side + 2-device echo untested (single device). 👉 Back in fullscreen opens "Stop watching?" instead of exiting fullscreen first. |
 
 **Escalate immediately if any of Suite A #1–#5 fail** — those are the party/background/
 guest subsystems the whole cutover was designed to preserve. A failure there means the
 served script is not the full legacy bridge (check `/scripts` version+size vs the CLI's
 `--dry-run` output, and the MMKV `bridge.scripts.v1` cache).
+
+---
+
+## Findings — 2026-08-20 pass (Claude, execbro + CDP + adb; debug build, Metro @ HEAD 7123d67)
+
+**F1 · CRITICAL — bridge injection lost on every hijackable provider except videasy.**
+Pre-cutover, `BRIDGE_JS` was injected unconditionally (`8e0412f:HijackPlayer.tsx:518`).
+Post-cutover, `HijackPlayer` injects `getCachedScript(providerId) ?? ""` and `/scripts`
+serves only `videasy@7ed78cf9` — so VidFast, VixSrc, VidLink, VidCore, 111Movies,
+VidNest, VidPhantom, MyCineBy get **no script at all**: no bind, no native controls, no
+party sync, no background/lock-screen, no chrome-off — while the sheet still shows their
+🐾 Party badge. Verified live: vidfast.vc mount → `__vlBridge` undefined, provider's own
+chrome visible, Phase-8 no-bind banner fires (graceful but degraded). Corollary: gesture/
+`no_bind` telemetry can never fire on script-less providers (gesture detection lives in
+the bridge). Decision needed: upload the legacy bridge under each hijackable provider id
+(its bind/tick/cmd core is provider-agnostic) vs. wait for the core+delta refactor —
+until then videasy is the only party-capable provider in practice.
+
+**F2 · BUG (narrow) — fallback sheet lost to a dismiss race.** Picking a provider from
+the sheet that fails instantly (offline test): exclusion + banner-clear ran, but
+`sheetRef.present()` fired while the sheet was still dismissing and was swallowed —
+user is left on the raw error page with no auto-opened sheet. Organic errors with no
+sheet animation in flight auto-open correctly (verified).
+
+**F3 · UX gaps around WebView hard errors.** Raw white "Error loading page /
+net::ERR_…" chrome error page is shown unbranded; no auto-reload when connectivity
+returns; the failed provider stays excluded until player remount (no path back if it
+was a transient network blip — the user must close and reopen).
+
+**F4 · Pre-existing quirk — first `readAudio` can be empty.** The Servers panel renders
+lazily; the 360 ms timeout in `__vlReadAudio` can fire before buttons exist → `audios:[]`.
+The app's sheet recovered in practice; a bounded retry-on-empty in the bridge (or in the
+sheet) would remove the race. Byte-identical legacy behavior, NOT a cutover regression.
+
+**Also observed (questions, not defects):** dub/server switch restarts the stream from
+0:00 (legacy videasy behavior — resume-seek after switch?); soft "Taking too long?"
+banner shows while idling at the pre-play gate (by design per code comment — intended?);
+leaving a party pops all the way to Home, killing the solo player beneath; Back in
+fullscreen asks "Stop watching?" instead of exiting fullscreen first.
+
+**Blocked this session (no `SUPABASE_SERVICE_ROLE_KEY` in env, Supabase MCP
+unauthenticated, debug build only):** A3 OTA re-upload loop (partially evidenced: the
+boot diff fetched & cached the re-uploaded `7ed78cf9` and injected it with no rebuild;
+warm relaunch injected from cache), A4 DB-row verification, Suite B live-edit +
+dumb-app killswitch, Suite E dead-domain row edit, A5 cache-wipe first-launch,
+Suite G release-build stutter, and all true 2-device party checks (guest transport
+hiding verified at CSS/DOM level only).

@@ -23,10 +23,16 @@ export function useMediaCloseGuard(opts: {
   onConfirm: () => void;
   /** Guard only while true (e.g. media actually loaded). Defaults to true. */
   enabled?: boolean;
+  /** Contextual back interceptor for the HARDWARE back only. Return true if the
+   *  press was already handled (e.g. exit fullscreen first) — the confirm is then
+   *  skipped. Read live on each press; keep it cheap and side-effect-light. */
+  beforeClose?: () => boolean;
 }): { requestClose: () => void } {
-  const { title, message, confirmLabel, onConfirm, enabled = true } = opts;
+  const { title, message, confirmLabel, onConfirm, enabled = true, beforeClose } = opts;
   const onConfirmRef = useRef(onConfirm);
   onConfirmRef.current = onConfirm;
+  const beforeCloseRef = useRef(beforeClose);
+  beforeCloseRef.current = beforeClose;
   const lastShownRef = useRef(0);
 
   const requestClose = useCallback(() => {
@@ -42,6 +48,7 @@ export function useMediaCloseGuard(opts: {
   useEffect(() => {
     if (!enabled) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (beforeCloseRef.current?.()) return true; // handled (e.g. exited fullscreen) — no confirm
       requestClose();
       return true; // resist: block the default back, show the confirm instead
     });

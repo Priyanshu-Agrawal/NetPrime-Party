@@ -68,15 +68,23 @@ export const PlayerScreen: React.FC = () => {
 
   const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
 
+  // Hardware back is handled contextually first (exit fullscreen before prompting
+  // "Stop watching?"), mirroring the overlay back button. Assigned live below, once
+  // fullscreen state + toggleFullscreen exist.
+  const backInterceptRef = useRef<() => boolean>(() => false);
   // Resist accidental exit: hardware back confirms before closing the player.
   const { requestClose } = useMediaCloseGuard({
     title: "Stop watching?",
     message: "This will close the player.",
     confirmLabel: "Close",
     onConfirm: exitMedia,
+    beforeClose: () => backInterceptRef.current(),
   });
 
   const sheetRef = useRef<BottomSheetModal>(null);
+  // A present() issued while the sheet is mid-dismiss (pick → instant-fail) is
+  // swallowed by @gorhom. Arm this and flush it in the sheet's onDismiss.
+  const pendingPresentRef = useRef(false);
   const episodeSheetRef = useRef<BottomSheetModal>(null);
   const playerRef = useRef<PlayerHandle>(null);
   const controlsRef = useRef<PlayerControlsHandle>(null);
@@ -168,7 +176,10 @@ export const PlayerScreen: React.FC = () => {
       return;
     }
     const soft = setTimeout(() => {
-      if (!playerBound) setFallbackBanner(true);
+      // Only nudge once the user actually expressed play-intent (a gesture inside
+      // the WebView) but nothing bound — never while idling at the provider's
+      // pre-play / ad gate. Same gate as the 25s hard timeout below.
+      if (!playerBound && userGesturedRef.current) setFallbackBanner(true);
     }, 10000);
     const hard = setTimeout(() => {
       if (playerBound || !focusedRef.current) return;
@@ -272,6 +283,13 @@ export const PlayerScreen: React.FC = () => {
     [reportOutcome, selected, id, media],
   );
 
+  // Present the source picker, surviving the case where a present() is fired while
+  // the sheet is still animating closed (see pendingPresentRef).
+  const presentSheet = useCallback(() => {
+    pendingPresentRef.current = true;
+    sheetRef.current?.present();
+  }, []);
+
   // Fallback: open the source picker, excluding the provider that just failed so
   // we never loop back to a corpse.
   const triggerFallback = useCallback(() => {
@@ -279,8 +297,8 @@ export const PlayerScreen: React.FC = () => {
       setExcludedIds((prev) => (prev.includes(selected.id) ? prev : [...prev, selected.id]));
     }
     setFallbackBanner(false);
-    sheetRef.current?.present();
-  }, [selected]);
+    presentSheet();
+  }, [selected, presentSheet]);
 
   // Hard error (main-frame HTTP/DNS/crash) → report once + auto-open the fallback.
   const onFatalError = useCallback(
@@ -298,6 +316,27 @@ export const PlayerScreen: React.FC = () => {
     [report, triggerFallback],
   );
 
+  // Resume-after-switch. A dub/quality/provider switch makes the provider reload
+  // the stream from 0:00. We snapshot the position whenever WE trigger a switch,
+  // then (in onEvent) seek back once the reloaded stream is playable and has
+  // visibly restarted (currentTime dropped well below the snapshot). Guarded by a
+  // start threshold (ignore near-0) + a short expiry, so it can NEVER fire on an
+  // ordinary buffer or a switch that preserved position. App-layer only — the OTA
+  // legacy bridge is untouched.
+  const resumeSeekRef = useRef<{ at: number; until: number } | null>(null);
+  const armResume = useCallback(() => {
+    const at = posRef.current;
+    if (at > 8) resumeSeekRef.current = { at, until: Date.now() + 12000 };
+  }, []);
+  const applyAudio = useCallback((label: string) => {
+    armResume();
+    playerRef.current?.setAudio(label);
+  }, [armResume]);
+  const applyQuality = useCallback((label: string) => {
+    armResume();
+    playerRef.current?.setQuality(label);
+  }, [armResume]);
+
   const onEvent = (e: PlayerEvent) => {
     if (e.event === "gesture") {
       userGesturedRef.current = true; // play-intent — gates the no-bind hard-timeout
@@ -309,7 +348,7 @@ export const PlayerScreen: React.FC = () => {
       // Silent memory: apply the saved quality (or data-saver cap) if this
       // provider carries a matching rung that isn't already active.
       const ql = matchQuality(getPreferredQuality(), q, { dataSaver: getDataSaver() });
-      if (ql && !q.find((t) => t.label === ql)?.active) playerRef.current?.setQuality(ql);
+      if (ql && !q.find((t) => t.label === ql)?.active) applyQuality(ql);
       return;
     }
     if (e.event === "audio") {
@@ -317,8 +356,21 @@ export const PlayerScreen: React.FC = () => {
       setAudios(a);
       // Silent memory: apply the saved dub/language if available & not active.
       const al = matchAudio(getPreferredAudio(), a);
-      if (al && !a.find((t) => t.label === al)?.active) playerRef.current?.setAudio(al);
+      if (al && !a.find((t) => t.label === al)?.active) applyAudio(al);
       return;
+    }
+    // Resume the pre-switch position once the reloaded stream restarts from ~0.
+    const rs = resumeSeekRef.current;
+    if (rs) {
+      if (Date.now() > rs.until) {
+        resumeSeekRef.current = null;
+      } else if (
+        (e.event === "playing" || e.event === "canplay" || (e.readyState ?? 0) >= 3) &&
+        (Number(e.currentTime) || 0) < rs.at - 2
+      ) {
+        resumeSeekRef.current = null;
+        playerRef.current?.seek(rs.at);
+      }
     }
     // Track real playback progress for stall detection + play-intent.
     const t = Number(e.currentTime) || 0;
@@ -396,6 +448,16 @@ export const PlayerScreen: React.FC = () => {
     }, 560);
   };
 
+  // Hardware back exits fullscreen first (like the overlay back button) before it
+  // ever prompts "Stop watching?". Live-assigned each render so the guard's
+  // interceptor always sees the current fullscreen state.
+  backInterceptRef.current = fullscreen
+    ? () => {
+        toggleFullscreen();
+        return true;
+      }
+    : () => false;
+
   const startWatchParty = useCallback(() => {
     if (!selected || !isHijackable(selected) || !id) return;
     openPartyHost({
@@ -430,9 +492,11 @@ export const PlayerScreen: React.FC = () => {
           appVersion: Constants.expoConfig?.version,
         });
       }
+      // Same title, new source — resume where we were once the new provider binds.
+      armResume();
       setSelected(p);
     },
-    [selected, playerBound, media, reportOutcome],
+    [selected, playerBound, media, reportOutcome, armResume],
   );
 
   return (
@@ -496,7 +560,7 @@ export const PlayerScreen: React.FC = () => {
             <TouchableOpacity
               onPress={() => {
                 setFallbackBanner(false);
-                sheetRef.current?.present();
+                presentSheet();
               }}
               style={styles.fallbackBtn}
               hitSlop={8}
@@ -509,7 +573,7 @@ export const PlayerScreen: React.FC = () => {
         {/* Kept mounted in fullscreen (the absolute player covers it) to avoid an
             extra layout reflow during the rotation. */}
         <View style={styles.controlBar}>
-          <TouchableOpacity style={styles.serverBtn} onPress={() => sheetRef.current?.present()}>
+          <TouchableOpacity style={styles.serverBtn} onPress={presentSheet}>
             <Ionicons name="server-outline" size={15} color={colors.textDim} />
             <Text style={styles.serverBtnText} numberOfLines={1}>
               {selected?.name ?? "No sources"}
@@ -556,12 +620,12 @@ export const PlayerScreen: React.FC = () => {
         qualities={qualities}
         onSetQuality={(label) => {
           setPreferredQuality(label); // silent memory: remember the manual pick
-          playerRef.current?.setQuality(label);
+          applyQuality(label);
         }}
         audios={audios}
         onSetAudio={(label) => {
           setPreferredAudio(label);
-          playerRef.current?.setAudio(label);
+          applyAudio(label);
         }}
       />
 
@@ -580,6 +644,17 @@ export const PlayerScreen: React.FC = () => {
         selectedId={selected?.id ?? ""}
         onSelect={onSelectProvider}
         excludeIds={excludedIds}
+        onChange={(index) => {
+          if (index >= 0) pendingPresentRef.current = false; // opened — nothing pending
+        }}
+        onDismiss={() => {
+          // A fatal error requested the sheet while it was closing (pick → instant
+          // fail) and present() was swallowed — retry now that it's fully closed.
+          if (pendingPresentRef.current) {
+            pendingPresentRef.current = false;
+            sheetRef.current?.present();
+          }
+        }}
       />
     </>
   );
