@@ -1,11 +1,42 @@
 # App Shell, Navigation, Data & Storage
 
-> The scaffolding around the players: **expo-router navigation**, the **root
-> provider stack**, **TMDB data** (via a Cloudflare Worker proxy), **local MMKV
-> storage**, **theming**, the **Supabase client**, and **dev tooling**. Verified
-> against current code. Read [README.md](./README.md) for the map and
+> ⚠️ **STATUS 2026-08-20 (`ui-rework` branch):** the **data layer below is
+> superseded** — see "Data & backend layer (current)" immediately under this
+> note. The navigation/data-fetch prose further down predates this branch (it
+> still describes expo-router + direct `fetchDetails()`); the app now uses React
+> Navigation stacks (`src/navigation`, `src/screens`) and RTK Query. Treat the
+> older sections as historical until refreshed. The living roadmap is
+> [../project-board.md](../project-board.md).
+>
+> The scaffolding around the players: navigation, the **root provider stack**,
+> **TMDB data**, **local MMKV storage**, **theming**, the **Supabase client**,
+> and **dev tooling**. Read [README.md](./README.md) for the map and
 > [player-and-injection.md](./player-and-injection.md) / [watch-party-sync.md](./watch-party-sync.md)
 > for the two subsystems this shell hosts.
+
+## Data & backend layer (current — 2026-08-20)
+
+- **Edge worker** (`worker/`, Hono + Zod, deployed at
+  `netprime-worker.spiderfan-no1.workers.dev`): `GET /config` (app config +
+  Supabase-backed provider registry, `enabled`-filtered server-side), `GET
+  /scrape` (mock aggregator), `POST /cache/purge`, `POST /report` (provider
+  telemetry), `GET /docs` + `/openapi.json` (auto-generated). Local dev via
+  `wrangler dev` with `worker/.dev.vars` symlinked to the repo-root `.env.local`.
+- **RTK Query is the app's data layer** (`src/store`): `workerApi` (config /
+  scrape / purge / reportOutcome), `tmdbApi` (list / hero / details / season /
+  search / discover — wraps the existing TMDB helpers), `klipyApi` (GIF/sticker).
+  Store mounted in `App.tsx` (`<ReduxProvider>` + headless `<ConfigBootstrap/>`).
+- **Providers are 100% dynamic** from Supabase `public.providers` via `/config`
+  → `providersSlice` → `providerRegistry` (reads the store directly). **No
+  baked-in fallback** — empty means empty (store-review killswitch). The player's
+  embed URLs + WebView nav-security (`allowed_domain`/`hijack.navHosts`) live in
+  Supabase. `EXPO_PUBLIC_WORKER_URL` (inlined at build time — rebuild `--clear`
+  after changing it).
+- **Provider telemetry**: `POST /report` → RLS-locked `provider_reports`
+  (service-role write only) → `provider_health` view (distinct-client-weighted
+  failure rate). See [../project-board.md](../project-board.md) Phase 7.
+- **Playback prefs** ("silent memory"): `utils/prefs.ts` (MMKV) + `utils/trackMatch.ts`
+  fuzzy matcher; `PlayerScreen` auto-applies saved audio/quality.
 
 ## Navigation (expo-router, file-based)
 ```

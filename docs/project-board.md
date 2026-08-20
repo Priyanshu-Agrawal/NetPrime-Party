@@ -57,34 +57,64 @@ Locked in the UX for title details to maximize speed and remove redundancy.
 
 ---
 
-## `[/]` Phase 5.5: User Preferences (Silent Memory & Matching)
-**Status:** **ACTIVE**
-**Objective:** Persist user choices for Language and Quality without intrusive onboarding.
-**Details:**
-* **Lean Architecture:** Use the existing `utils/prefs.ts` synchronous MMKV store. Do not overengineer with Redux slices for local scalars.
-* **Fuzzy Matcher:** The real feature is cross-provider matching. Build `matchAudio(pref, available)` and `matchQuality(pref, available)` to gracefully handle varying provider labels (e.g., falling back if Hindi isn't available).
-* **Data Saver Reconciliation:** Merge the `preferredQuality` concept with the existing `dataSaver` toggle. If `dataSaver` is ON, cap quality $\le$ 480p, while still honoring manual explicit picks.
-
----
-
-## `[x]` Phase 6: The `SnifferWebView` (Native Sniffing)
-**Status:** **REJECTED / DEPRECATED**
+## `[x]` Phase 5.5: User Preferences (Silent Memory & Matching)
+**Status:** CLOSED
 **Summary:** 
-*Architectural Pivot:* We explicitly rejected extracting `.m3u8` URLs for native playback (`expo-video`). Deterministic WAF/AES token expiration (HTTP 403s mid-stream) made the "snatch and kill" native player impossible to keep stable.
-*The Final Standard:* The **`HijackPlayer`** (driving the provider's native web player invisibly via JS bridge) is the sole production standard.
+Implemented a perfectly silent, zero-UI preference memory system.
+* **Lean Architecture:** Hooked directly into `utils/prefs.ts` (MMKV). No Redux overhead for local scalars.
+* **Fuzzy Matcher:** Built `utils/trackMatch.ts` to seamlessly handle provider label variances (e.g., resolving "Fade" or "hin" to Hindi). Successfully bypassed the Levenshtein distance trap for short ISO codes.
+* **Auto-Apply:** `PlayerScreen` quietly intercepts `onEvent` track loads and applies the user's saved preferences on the fly without causing re-buffers.
 
 ---
 
-## `[x]` Phase 7: The Native Video Player (`expo-video`)
-**Status:** **REJECTED / DEPRECATED**
-**Summary:** Abandoned for the reasons listed in Phase 6. All Watch Party sync and playback control is routed through the `HijackPlayer` DOM bridge.
-
----
-
-## `[ ]` Phase 8: Scrape Results Caching (Supabase)
+## `[ ]` Phase 6: Cloudflare-Served Injection Scripts (The Bridge)
 **Status:** PENDING
-**Objective:** Dramatically reduce Edge Worker execution time by caching metadata.
+**Objective:** Decouple DOM-hijack logic from the app binary for instant cat-and-mouse updates.
 **Details:**
-* Create a `title_provider_cache` table in Supabase.
-* Cloudflare Worker checks this table before scraping (valid for a few hours).
-* Cache *only* the metadata (dubs, qualities, statuses).
+* **Shared-Core Architecture:** Structure scripts as a shared-core (video finder, event wiring) + per-provider deltas. Keep typed references in-repo.
+* **Validation:** Scripts must be linted/smoke-tested before uploading to Supabase to prevent massive blast radius.
+* **Execution:** App caches scripts in MMKV on boot. `HijackPlayer.tsx` loads them instantly.
+
+---
+
+## `[x]` Phase 7: Telemetry & Failure Memory (The Smart Net)
+**Status:** CLOSED
+**Summary:**
+Stood up the provider-health telemetry that powers the cat-and-mouse loop and the (Phase 8) smart fallback.
+* **Endpoint:** Rate-limited `POST /report` on the Worker (Hono + Zod). Derives `country` (CF geo) + a hashed client IP **server-side**; writes via the **service-role** key into an RLS-locked `provider_reports` table, so clients can never write directly (anti-poisoning). Best-effort — returns 202 even if the DB write fails, so telemetry never breaks playback.
+* **A rate, not a tally:** the `provider_health` view computes a **distinct-client-weighted failure RATE** over a rolling 24h window, with `success` as the **denominator** (its omission would auto-disable the most popular provider). `not_found`/`manual_switch` are excluded from the numerator (per-title gap / weak signal). Verified live: 2 `success` + 1 `no_bind` → `0.333`.
+* **Client:** RTK Query `reportOutcome` mutation + `PlayerScreen` hooks. `success` (sustained >30s playback) and `manual_switch` are wired and accurate today.
+* **Deferred to Phase 8 (by design):** the failure call-sites (`no_bind`/`http_error`/`render_crash`/`playback_stall`/`captcha_block`) are one-liners waiting on their detection signals (WebView error props + the no-bind timer), and the session exclusion list lives with the fallback UI. Not fired on guesses — that would poison the health denominator.
+
+---
+
+## `[ ]` Phase 8: Lazy Fallback & The Safety Net
+**Status:** PENDING
+**Objective:** Create a resource-efficient, zero-wait fallback system if the primary provider fails.
+**Details:**
+* **Lazy Fetch:** `[▶ Play]` instantly mounts Priority 1. Fallback scrape triggers only if the primary fails or user taps `[⚙️ Sources]`.
+* **Filtered Hard Error:** If WebView throws `onError`/`onHttpError` (strictly filtered to `isForMainFrame` to ignore ad 404s) or `onRenderProcessGone` (Android crash), instantly auto-pop the `ProviderSheet`.
+* **Smart Timeouts:**
+  * *10s Soft (No-Bind):* Show actionable banner ("Taking too long?").
+  * *25s Hard Timeout:* Gate this on "play-intent" signals to prevent false-firing on idle ad-walls. Pause timers when app is backgrounded.
+* **Wire Phase 7 failure reports:** at each detection point (`onFatalError`, the no-bind timer, the stall detector) call `report("<outcome>", …)`. Give `playback_stall` its own guard so it can fire even after a `success`.
+* **Session exclusion list:** track already-failed providers so the fallback never re-offers a corpse; read `provider_health` to order the alternatives.
+
+---
+
+## `[ ]` Phase 9: Server-Side Scrape Caching (Supabase)
+**Status:** PENDING
+**Objective:** Cache lazy fallback scrapes to protect the Cloudflare Worker from rate limits.
+**Details:**
+* Create a `title_provider_cache` table.
+* **Rule 1:** Cache *only* metadata (dubs, qualities). NEVER cache `.m3u8` URLs for IP-locked providers.
+* **Rule 2:** Do not negative-cache failures for 4h (avoids poisoning a title due to a transient API hiccup).
+
+---
+
+## `[ ]` Phase 10: App Store Review & Web Parity
+**Status:** PENDING
+**Objective:** Pass Apple/Google review and ensure Web platform degradation.
+**Details:**
+* **Review Mode:** Wire the Supabase `enabledProviders: []` state to show a fully benign "Listing Only" UI.
+* **Web Parity:** Acknowledge cross-origin iframe limits. Provide a simplified Web-only fallback story.

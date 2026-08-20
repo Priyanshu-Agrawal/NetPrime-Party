@@ -23,6 +23,9 @@ import {
   setPreferredQuality,
 } from "@/utils/prefs";
 import { matchAudio, matchQuality } from "@/utils/trackMatch";
+import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
+import type { ReportArgs, ReportOutcome } from "@/src/types/worker.types";
+import Constants from "expo-constants";
 import {
   isBackgroundPlaybackAvailable,
   startBackgroundPlaybackSession,
@@ -45,7 +48,7 @@ import type { PlayerStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useResponsive } from "@/hooks/useResponsive";
 
@@ -79,6 +82,9 @@ export const PlayerScreen: React.FC = () => {
   const posRef = useRef(0);
   const sessionStarted = useRef(false);
   const focusedRef = useRef(true);
+  const [reportOutcome] = useReportOutcomeMutation();
+  const reportedRef = useRef(false); // one terminal outcome reported per provider session
+  const mountTsRef = useRef(0); // Date.now() at provider mount, for timeToFailMs
   const providers = useProviders();
   const [selected, setSelected] = useState<Provider | undefined>(
     () => providers.find((p) => p.id === providerId) ?? providers[0],
@@ -113,6 +119,8 @@ export const PlayerScreen: React.FC = () => {
     setQualities([]);
     setAudios([]);
     sessionStarted.current = false;
+    reportedRef.current = false; // new provider session → allow one terminal report
+    mountTsRef.current = Date.now(); // baseline for timeToFailMs
     stopBackgroundPlaybackSession();
   }, [selected?.id, season, ep]);
 
@@ -177,6 +185,24 @@ export const PlayerScreen: React.FC = () => {
     [id, type, season, ep],
   );
 
+  // Phase 7 telemetry — fire-and-forget provider health report. `providerId` is
+  // explicit so failure hooks can report the OLD provider (e.g. manual_switch).
+  const report = useCallback(
+    (outcome: ReportOutcome, extra?: Partial<ReportArgs>) => {
+      if (!selected || !id) return;
+      reportOutcome({
+        providerId: selected.id,
+        tmdbId: media.tmdbId,
+        mediaType: media.type,
+        outcome,
+        platform: Platform.OS as ReportArgs["platform"],
+        appVersion: Constants.expoConfig?.version,
+        ...extra,
+      });
+    },
+    [reportOutcome, selected, id, media],
+  );
+
   const onEvent = (e: PlayerEvent) => {
     if (e.event === "quality") {
       const q = e.qualities ?? [];
@@ -196,6 +222,12 @@ export const PlayerScreen: React.FC = () => {
       return;
     }
     if (Number.isFinite(e.currentTime)) posRef.current = e.currentTime;
+    // Telemetry: report a one-time 'success' once playback sustains past 30s —
+    // the denominator that makes provider_health a failure RATE, not a raw count.
+    if (!reportedRef.current && (Number(e.currentTime) || 0) >= 30) {
+      reportedRef.current = true;
+      report("success");
+    }
     controlsRef.current?.setPlayback({
       currentTime: e.currentTime || 0,
       duration: e.duration || 0,
@@ -274,10 +306,29 @@ export const PlayerScreen: React.FC = () => {
     });
   }, [selected, id, media, title]);
 
-  const onSelectProvider = useCallback((pid: string) => {
-    const p = getProvider(pid);
-    if (p) setSelected(p);
-  }, []);
+  const onSelectProvider = useCallback(
+    (pid: string) => {
+      const p = getProvider(pid);
+      if (!p) return;
+      // Telemetry: leaving a bound provider for another is a weak negative signal
+      // about the OLD one (buffering / wrong title / bad dub). Report it for the
+      // provider being left, not the new pick.
+      if (selected && p.id !== selected.id && playerBound && !reportedRef.current) {
+        reportedRef.current = true;
+        reportOutcome({
+          providerId: selected.id,
+          tmdbId: media.tmdbId,
+          mediaType: media.type,
+          outcome: "manual_switch",
+          timeToFailMs: Date.now() - mountTsRef.current,
+          platform: Platform.OS as ReportArgs["platform"],
+          appVersion: Constants.expoConfig?.version,
+        });
+      }
+      setSelected(p);
+    },
+    [selected, playerBound, media, reportOutcome],
+  );
 
   return (
     <>

@@ -7,3 +7,10 @@ compatibility_date = "2024-03-20"
 # and `npx wrangler secret put` for production.
 [vars]
 # SUPABASE_URL = "https://your-project-id.supabase.co"
+
+# Per-IP rate limit for POST /report (anti-poisoning first gate). The route
+# degrades gracefully if this binding is absent, so it's safe to remove.
+[[ratelimits]]
+name = "REPORT_LIMITER"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }

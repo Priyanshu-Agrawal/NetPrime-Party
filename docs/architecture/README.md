@@ -2,6 +2,14 @@
 
 > Handoff doc for humans + AI agents. Start here, then follow the links.
 > Kept current as the app evolves — update it when you change these subsystems.
+>
+> ⚠️ **STATUS 2026-08-20 (`ui-rework`):** the data/nav prose in these files
+> predates this branch. Current reality: **React Navigation** stacks
+> (`src/navigation`/`src/screens`), **RTK Query** data layer (`workerApi` /
+> `tmdbApi` / `klipyApi`), **full-dynamic Supabase providers** (no fallback) +
+> **provider-health telemetry** via the deployed edge worker. The living roadmap
+> and current-state summary is [../project-board.md](../project-board.md) and
+> [app-shell-and-data.md](./app-shell-and-data.md) → "Data & backend layer (current)".
 
 Bearoom is a React Native (Expo) **streaming + synchronized watch-party** app.
 Android package `com.scriptingbear.bearoom`. Cozy cinema skin (honey `#F0A93C`,

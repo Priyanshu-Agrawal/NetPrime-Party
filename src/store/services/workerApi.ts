@@ -1,6 +1,7 @@
 import type {
     AppConfig,
     PurgeResponse,
+    ReportArgs,
     ScrapeArgs,
     ScrapeResponse,
 } from "@/src/types/worker.types";
@@ -58,6 +59,15 @@ export const workerApi = createApi({
             query: () => ({ url: "/cache/purge", method: "POST" }),
             invalidatesTags: ["Config"],
         }),
+
+        /**
+         * Provider health telemetry (Phase 7). Fire-and-forget — the worker
+         * returns 202 regardless, so failures never affect playback. No cache
+         * tags. `country` + client id are added server-side.
+         */
+        reportOutcome: build.mutation<{ accepted: boolean }, ReportArgs>({
+            query: (body) => ({ url: "/report", method: "POST", body }),
+        }),
     }),
 });
 
@@ -67,4 +77,5 @@ export const {
     useScrapeTitleQuery,
     useLazyScrapeTitleQuery,
     usePurgeCacheMutation,
+    useReportOutcomeMutation,
 } = workerApi;

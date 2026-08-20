@@ -170,3 +170,47 @@ export const ErrorSchema = z
     issues: z.array(z.any()).optional(),
   })
   .openapi("Error");
+
+/* -------------------------------------------------------------------------- */
+/*  POST /report — provider failure/success telemetry                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Playback outcome for a (provider, title) attempt. `success` is REQUIRED as the
+ * denominator — a failure count without successes would auto-disable the most
+ * popular provider. `not_found` is a per-title catalog gap, not provider ill
+ * health. `playback_stall` = bound then died mid-stream (WAF token rotation).
+ */
+export const ReportOutcome = z.enum([
+  "success",
+  "no_bind",
+  "http_error",
+  "render_crash",
+  "captcha_block",
+  "playback_stall",
+  "not_found",
+  "manual_switch",
+]);
+
+export const ReportRequestSchema = z
+  .object({
+    providerId: z.string().min(1).openapi({ example: "videasy" }),
+    tmdbId: z.string().min(1).openapi({ example: "550" }),
+    mediaType: z.enum(["movie", "tv"]).openapi({ example: "movie" }),
+    outcome: ReportOutcome.openapi({ example: "no_bind" }),
+    /** 0ms (never bound) vs 20min (mid-stream stall) → very different weight. */
+    timeToFailMs: z.number().int().nonnegative().optional().openapi({ example: 10000 }),
+    /** Which Phase-6 injection script was live — separates old-script failures from post-fix. */
+    scriptVersion: z.string().optional().openapi({ example: "videasy@3" }),
+    platform: z.enum(["ios", "android", "web"]).openapi({ example: "android" }),
+    appVersion: z.string().optional().openapi({ example: "2.1.0" }),
+    /** Untrusted free text — capped, stored as-is, never rendered or executed. */
+    errorMessage: z.string().max(300).optional(),
+  })
+  .openapi("ReportRequest");
+// NOTE: country + client id are DERIVED server-side (CF geo + hashed IP) and are
+// deliberately NOT accepted from the client.
+
+export const ReportAcceptedSchema = z
+  .object({ accepted: z.boolean().openapi({ example: true }) })
+  .openapi("ReportAccepted");

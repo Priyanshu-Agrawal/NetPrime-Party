@@ -67,3 +67,31 @@ export interface PurgeResponse {
     purged: boolean;
     message: string;
 }
+
+/**
+ * Playback outcome reported to `POST /report` (provider health telemetry).
+ * `success` is the denominator; `not_found` is a per-title catalog gap, not
+ * provider ill-health; `playback_stall` = bound then died mid-stream.
+ */
+export type ReportOutcome =
+    | "success"
+    | "no_bind"
+    | "http_error"
+    | "render_crash"
+    | "captcha_block"
+    | "playback_stall"
+    | "not_found"
+    | "manual_switch";
+
+/** Client args for `POST /report`. `country` + client id are derived server-side. */
+export interface ReportArgs {
+    providerId: string;
+    tmdbId: string;
+    mediaType: "movie" | "tv";
+    outcome: ReportOutcome;
+    timeToFailMs?: number;
+    scriptVersion?: string;
+    platform: "ios" | "android" | "web";
+    appVersion?: string;
+    errorMessage?: string;
+}

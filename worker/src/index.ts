@@ -23,12 +23,14 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from "hono/cors";
 
 import type { Bindings } from "./supabase";
-import { getProviders, purgeProviders } from "./supabase";
+import { getProviders, hashIp, insertReport, purgeProviders } from "./supabase";
 import {
   AppConfigSchema,
   ErrorSchema,
   HealthSchema,
   PurgeResponseSchema,
+  ReportAcceptedSchema,
+  ReportRequestSchema,
   ScrapeQuerySchema,
   ScrapeResponseSchema,
   type ScrapeResult,
@@ -222,6 +224,77 @@ app.openapi(purgeRoute, async (c) => {
     },
     200,
   );
+});
+
+/* -------------------------------------------------------------------------- */
+/*  POST /report — provider failure/success telemetry                         */
+/* -------------------------------------------------------------------------- */
+
+const reportRoute = createRoute({
+  method: "post",
+  path: "/report",
+  tags: ["System"],
+  summary: "Report a playback outcome (provider health telemetry)",
+  description:
+    "Rate-limited, service-role-backed ingestion. Clients cannot write the table directly. country + client id are derived server-side.",
+  request: {
+    body: { content: { "application/json": { schema: ReportRequestSchema } } },
+  },
+  responses: {
+    202: {
+      content: { "application/json": { schema: ReportAcceptedSchema } },
+      description: "Accepted (fire-and-forget; a failed DB write still returns 202).",
+    },
+    400: {
+      content: { "application/json": { schema: ErrorSchema } },
+      description: "Invalid body.",
+    },
+    429: {
+      content: { "application/json": { schema: ErrorSchema } },
+      description: "Rate limited.",
+    },
+  },
+});
+
+app.openapi(reportRoute, async (c) => {
+  const body = c.req.valid("json");
+
+  // Client IP (Cloudflare-provided) — the rate-limit key and, hashed, the
+  // distinct-client id. Never store the raw IP.
+  const ip = c.req.header("cf-connecting-ip") || "0.0.0.0";
+
+  // Per-IP rate limit (best-effort: if the binding isn't configured, don't block).
+  // IP keys are coarse on mobile/NAT, so aggregation also weights by distinct
+  // clients — this is the first gate, not the only defense.
+  const limiter = c.env.REPORT_LIMITER;
+  if (limiter) {
+    const { success } = await limiter.limit({ key: `report:${ip}` });
+    if (!success) return c.json({ error: "Rate limited" }, 429);
+  }
+
+  // Trusted, server-derived geo (do not accept from the client).
+  const country = (c.req.raw as unknown as { cf?: { country?: string } }).cf?.country ?? null;
+  const clientHash = await hashIp(ip);
+
+  // Best-effort write; telemetry must never break the client, so a failed insert
+  // still returns 202.
+  c.executionCtx.waitUntil(
+    insertReport(c.env, {
+      provider_id: body.providerId,
+      tmdb_id: body.tmdbId,
+      media_type: body.mediaType,
+      outcome: body.outcome,
+      time_to_fail_ms: body.timeToFailMs ?? null,
+      script_version: body.scriptVersion ?? null,
+      platform: body.platform,
+      app_version: body.appVersion ?? null,
+      error_message: body.errorMessage ?? null,
+      country,
+      client_hash: clientHash,
+    }).then(() => undefined),
+  );
+
+  return c.json({ accepted: true }, 202);
 });
 
 /* -------------------------------------------------------------------------- */
