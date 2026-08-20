@@ -47,35 +47,37 @@ Implemented modern Redux Toolkit (RTK) global state architecture.
 
 ---
 
-## `[/]` Phase 5: The Pre-Play UI (Metadata Aggregation)
+## `[x]` Phase 5: The Pre-Play UI (Zero-Wait UX)
+**Status:** CLOSED
+**Summary:**
+Locked in the UX for title details to maximize speed and remove redundancy.
+* **Zero-Wait Direct Load:** The `[▶ Play]` button instantly mounts the `SnifferWebView` for Priority 1 (NetPrime) without wasting a network trip on `/scrape`.
+* **Mechanical Domain Sync:** Established a `supabase db dump --data-only` routine to keep local seed domains perfectly synced with production, avoiding domain rot.
+* **UI Split:** Moved the manual `[⚙️ Sources]` selection into the Player screen (or as a secondary override), relying on auto-routing for the primary flow.
+
+---
+
+## `[/]` Phase 5.5: User Preferences (Silent Memory & Matching)
 **Status:** **ACTIVE**
-**Objective:** Build the UI that fetches `/scrape` when a user clicks a movie.
+**Objective:** Persist user choices for Language and Quality without intrusive onboarding.
 **Details:**
-* Call the Worker with the TMDB ID.
-* Parse the `requires_client_for_stream` and `success` statuses.
-* Render the available Audio Dubs (Hindi, English) and Qualities to the user *before* mounting the WebView.
+* **Lean Architecture:** Use the existing `utils/prefs.ts` synchronous MMKV store. Do not overengineer with Redux slices for local scalars.
+* **Fuzzy Matcher:** The real feature is cross-provider matching. Build `matchAudio(pref, available)` and `matchQuality(pref, available)` to gracefully handle varying provider labels (e.g., falling back if Hindi isn't available).
+* **Data Saver Reconciliation:** Merge the `preferredQuality` concept with the existing `dataSaver` toggle. If `dataSaver` is ON, cap quality $\le$ 480p, while still honoring manual explicit picks.
 
 ---
 
-## `[ ]` Phase 6: The `SnifferWebView` Component (Tier 2)
-**Status:** PENDING
-**Objective:** Build the engine that bypasses Cloudflare and AES keys.
-**Details:**
-* Implement the invisible `<WebView>`.
-* Defeat Wall 1: `injectedJavaScriptForMainFrameOnly={false}`.
-* Defeat Wall 2 (iOS): Inject `MutationObserver` for `<video>` tags.
-* Defeat Wall 3 & 4: Monkey-patch `window.fetch`, `XMLHttpRequest`, and unregister Service Workers.
-* Emit the standard OMSS object back to React Native.
+## `[x]` Phase 6: The `SnifferWebView` (Native Sniffing)
+**Status:** **REJECTED / DEPRECATED**
+**Summary:** 
+*Architectural Pivot:* We explicitly rejected extracting `.m3u8` URLs for native playback (`expo-video`). Deterministic WAF/AES token expiration (HTTP 403s mid-stream) made the "snatch and kill" native player impossible to keep stable.
+*The Final Standard:* The **`HijackPlayer`** (driving the provider's native web player invisibly via JS bridge) is the sole production standard.
 
 ---
 
-## `[ ]` Phase 7: The Native Video Player 
-**Status:** PENDING
-**Objective:** Play the snatched stream and ensure Watch Party sync.
-**Details:**
-* Catch the OMSS payload from the WebView.
-* Mount `expo-video` with the `.m3u8` URL.
-* Connect playback state (Play, Pause, Seek) to the Watch Party socket.
+## `[x]` Phase 7: The Native Video Player (`expo-video`)
+**Status:** **REJECTED / DEPRECATED**
+**Summary:** Abandoned for the reasons listed in Phase 6. All Watch Party sync and playback control is routed through the `HijackPlayer` DOM bridge.
 
 ---
 
@@ -84,5 +86,5 @@ Implemented modern Redux Toolkit (RTK) global state architecture.
 **Objective:** Dramatically reduce Edge Worker execution time by caching metadata.
 **Details:**
 * Create a `title_provider_cache` table in Supabase.
-* Cloudflare Worker checks this table before scraping (valid for 24h).
-* Cache *only* the OMSS metadata (dubs, qualities, statuses). NEVER cache the actual `.m3u8` URL for IP-locked providers.
+* Cloudflare Worker checks this table before scraping (valid for a few hours).
+* Cache *only* the metadata (dubs, qualities, statuses).

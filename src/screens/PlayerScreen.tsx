@@ -16,6 +16,14 @@ import {
 } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
 import {
+  getDataSaver,
+  getPreferredAudio,
+  getPreferredQuality,
+  setPreferredAudio,
+  setPreferredQuality,
+} from "@/utils/prefs";
+import { matchAudio, matchQuality } from "@/utils/trackMatch";
+import {
   isBackgroundPlaybackAvailable,
   startBackgroundPlaybackSession,
   stopBackgroundPlaybackSession,
@@ -108,6 +116,20 @@ export const PlayerScreen: React.FC = () => {
     stopBackgroundPlaybackSession();
   }, [selected?.id, season, ep]);
 
+  // Silent memory: once the bridge binds, read the provider's track lists in the
+  // background so saved audio/quality prefs auto-apply (via onEvent) WITHOUT the
+  // user opening settings. Reading is passive; applying is guarded by matcher +
+  // the track's `active` flag, so a pref that's already default causes no re-buffer.
+  useEffect(() => {
+    if (!playerBound) return;
+    const t1 = setTimeout(() => playerRef.current?.readQuality(), 900);
+    const t2 = setTimeout(() => playerRef.current?.readAudio(), 1600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [playerBound, selected?.id, season, ep]);
+
   // Leaving the screen (e.g. tapping "Watch Party", which PUSHES the party on top so
   // this screen stays mounted) must not leave the video playing behind it — pause it.
   // (Blur does NOT fire on Home, so background audio still works.)
@@ -157,11 +179,20 @@ export const PlayerScreen: React.FC = () => {
 
   const onEvent = (e: PlayerEvent) => {
     if (e.event === "quality") {
-      setQualities(e.qualities ?? []);
+      const q = e.qualities ?? [];
+      setQualities(q);
+      // Silent memory: apply the saved quality (or data-saver cap) if this
+      // provider carries a matching rung that isn't already active.
+      const ql = matchQuality(getPreferredQuality(), q, { dataSaver: getDataSaver() });
+      if (ql && !q.find((t) => t.label === ql)?.active) playerRef.current?.setQuality(ql);
       return;
     }
     if (e.event === "audio") {
-      setAudios(e.audios ?? []);
+      const a = e.audios ?? [];
+      setAudios(a);
+      // Silent memory: apply the saved dub/language if available & not active.
+      const al = matchAudio(getPreferredAudio(), a);
+      if (al && !a.find((t) => t.label === al)?.active) playerRef.current?.setAudio(al);
       return;
     }
     if (Number.isFinite(e.currentTime)) posRef.current = e.currentTime;
@@ -346,9 +377,15 @@ export const PlayerScreen: React.FC = () => {
           playerRef.current?.setRate(r);
         }}
         qualities={qualities}
-        onSetQuality={(label) => playerRef.current?.setQuality(label)}
+        onSetQuality={(label) => {
+          setPreferredQuality(label); // silent memory: remember the manual pick
+          playerRef.current?.setQuality(label);
+        }}
         audios={audios}
-        onSetAudio={(label) => playerRef.current?.setAudio(label)}
+        onSetAudio={(label) => {
+          setPreferredAudio(label);
+          playerRef.current?.setAudio(label);
+        }}
       />
 
       {media.type === "tv" ? (

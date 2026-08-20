@@ -5,29 +5,55 @@
  */
 import { universalStorage as storage } from "@/services/storage/universalStorage";
 
-const K_ONBOARDED = "app.onboarded";
-const K_AUTOPLAY = "pref.autoplayNext";
-const K_DATASAVER = "pref.dataSaver";
+/** MMKV storage keys for app preferences. */
+enum PrefKey {
+  Onboarded = "app.onboarded",
+  AutoplayNext = "pref.autoplayNext",
+  DataSaver = "pref.dataSaver",
+  Audio = "pref.audioLang",
+  Quality = "pref.quality",
+}
 
 export function hasOnboarded(): boolean {
-  return storage.getBoolean(K_ONBOARDED) ?? false;
+  return storage.getBoolean(PrefKey.Onboarded) ?? false;
 }
 export function setOnboarded(v = true): void {
-  storage.set(K_ONBOARDED, v);
+  storage.set(PrefKey.Onboarded, v);
 }
 
 /** Autoplay the next episode when one finishes (default on). */
 export function getAutoplayNext(): boolean {
-  return storage.getBoolean(K_AUTOPLAY) ?? true;
+  return storage.getBoolean(PrefKey.AutoplayNext) ?? true;
 }
 export function setAutoplayNext(v: boolean): void {
-  storage.set(K_AUTOPLAY, v);
+  storage.set(PrefKey.AutoplayNext, v);
 }
 
 /** Data saver — prefer lighter streams / posters (default off). */
 export function getDataSaver(): boolean {
-  return storage.getBoolean(K_DATASAVER) ?? false;
+  return storage.getBoolean(PrefKey.DataSaver) ?? false;
 }
 export function setDataSaver(v: boolean): void {
-  storage.set(K_DATASAVER, v);
+  storage.set(PrefKey.DataSaver, v);
+}
+
+/**
+ * "Silent memory" playback prefs — learned from what the user picks in the
+ * player, then auto-applied on future playback (best-effort, per the fuzzy
+ * matcher in utils/trackMatch — silently no-ops when a provider lacks it).
+ * Stored as the clean bridge label ("Hindi"/"Original", "1080p"/"Auto").
+ * null = no preference expressed yet.
+ */
+export function getPreferredAudio(): string | null {
+  return storage.getString(PrefKey.Audio) ?? null;
+}
+export function setPreferredAudio(label: string): void {
+  storage.set(PrefKey.Audio, label);
+}
+
+export function getPreferredQuality(): string | null {
+  return storage.getString(PrefKey.Quality) ?? null;
+}
+export function setPreferredQuality(label: string): void {
+  storage.set(PrefKey.Quality, label);
 }
