@@ -1,4 +1,4 @@
-import { StreamProvider } from "./providers.types";
+import type { HijackCapability } from "@/components/player/hijackCapabilities";
 
 /**
  * Response shapes for the NetPrime edge worker (worker/src/index.ts).
@@ -6,11 +6,28 @@ import { StreamProvider } from "./providers.types";
  * live OpenAPI spec at `${EXPO_PUBLIC_WORKER_URL}/openapi.json`.
  */
 
+/**
+ * A provider row from Supabase `public.providers` (full-dynamic playback shape).
+ * Mapped to the app's `Provider` via remoteToProvider(). Legacy config columns
+ * (url_template, capabilities, descriptions) may also be present but are unused
+ * by the player.
+ */
+export interface RemoteProviderRow {
+    id: string;
+    name: string;
+    enabled: boolean;
+    priority: number;
+    url_movie: string;
+    url_tv: string | null;
+    allowed_domain: string;
+    hijack: HijackCapability;
+}
+
 /** `GET /config` — app bootstrap config + provider registry. */
 export interface AppConfig {
     appVersion: string;
     maintenanceMode: boolean;
-    providers: StreamProvider[];
+    providers: RemoteProviderRow[];
 }
 
 /** Per-provider resolution outcome from `GET /scrape`. */

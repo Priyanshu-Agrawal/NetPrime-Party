@@ -12,9 +12,9 @@ import { ProviderSheet } from "@/components/player/ProviderSheet";
 import {
   getProvider,
   isHijackable,
-  PROVIDERS,
   type Provider,
 } from "@/components/player/providerRegistry";
+import { useProviders } from "@/src/store/features/providers/hooks";
 import {
   isBackgroundPlaybackAvailable,
   startBackgroundPlaybackSession,
@@ -71,7 +71,8 @@ export const PlayerScreen: React.FC = () => {
   const posRef = useRef(0);
   const sessionStarted = useRef(false);
   const focusedRef = useRef(true);
-  const [selected, setSelected] = useState<Provider>(PROVIDERS[0]);
+  const providers = useProviders();
+  const [selected, setSelected] = useState<Provider | undefined>(() => providers[0]);
   // Our overlay mounts once the bridge binds a <video> (past the pre-play gate).
   const [playerBound, setPlayerBound] = useState(false);
   const [rate, setRate] = useState(1);
@@ -86,6 +87,12 @@ export const PlayerScreen: React.FC = () => {
   const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
   const canParty = isHijackable(selected);
 
+  // Providers load async from /config (no baked-in fallback), so adopt the first
+  // one once it arrives if nothing is selected yet. Empty stays unselected.
+  useEffect(() => {
+    if (!selected && providers.length) setSelected(providers[0]);
+  }, [providers, selected]);
+
   // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {
     setPlayerBound(false);
@@ -94,7 +101,7 @@ export const PlayerScreen: React.FC = () => {
     setAudios([]);
     sessionStarted.current = false;
     stopBackgroundPlaybackSession();
-  }, [selected.id, season, ep]);
+  }, [selected?.id, season, ep]);
 
   // Leaving the screen (e.g. tapping "Watch Party", which PUSHES the party on top so
   // this screen stays mounted) must not leave the video playing behind it — pause it.
@@ -218,7 +225,7 @@ export const PlayerScreen: React.FC = () => {
   };
 
   const startWatchParty = useCallback(() => {
-    if (!isHijackable(selected) || !id) return;
+    if (!selected || !isHijackable(selected) || !id) return;
     openPartyHost({
       role: "host",
       room: genRoomCode(),
@@ -241,7 +248,7 @@ export const PlayerScreen: React.FC = () => {
       <StatusBar style="light" translucent hidden={isImmersive} />
       <SafeAreaView style={styles.container}>
         <View style={isImmersive ? styles.playerFs : styles.playerArea}>
-          {id ? (
+          {id && selected ? (
             <>
               <HijackPlayer
                 ref={playerRef}
@@ -292,7 +299,7 @@ export const PlayerScreen: React.FC = () => {
           <TouchableOpacity style={styles.serverBtn} onPress={() => sheetRef.current?.present()}>
             <Ionicons name="server-outline" size={15} color={colors.textDim} />
             <Text style={styles.serverBtnText} numberOfLines={1}>
-              {selected.name}
+              {selected?.name ?? "No sources"}
             </Text>
             {canParty && <Ionicons name="paw" size={12} color={colors.honey} />}
             <Ionicons name="chevron-up" size={15} color={colors.textDim} />
@@ -307,7 +314,7 @@ export const PlayerScreen: React.FC = () => {
             <Text style={[styles.partyText, !canParty && styles.partyTextDisabled]}>Watch Party</Text>
           </TouchableOpacity>
         </View>
-        <HijackHint provider={selected} />
+        {selected ? <HijackHint provider={selected} /> : null}
       </SafeAreaView>
 
       {/* Fullscreen-rotation cover — a sibling of the whole screen so it hides the WebView
@@ -349,7 +356,7 @@ export const PlayerScreen: React.FC = () => {
         />
       ) : null}
 
-      <ProviderSheet ref={sheetRef} selectedId={selected.id} onSelect={onSelectProvider} />
+      <ProviderSheet ref={sheetRef} selectedId={selected?.id ?? ""} onSelect={onSelectProvider} />
     </>
   );
 };

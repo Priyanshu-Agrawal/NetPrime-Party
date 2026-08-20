@@ -20,36 +20,39 @@ import { z } from "@hono/zod-openapi";
 /*  Provider (mirrors the `public.providers` table in Supabase)               */
 /* -------------------------------------------------------------------------- */
 
-/** Per-provider feature flags stored as JSONB in Postgres. */
-export const CapabilitiesSchema = z
+/**
+ * Hijack capability overlay (JSONB) — how/whether the app's injected bridge can
+ * drive this provider's <video> for watch-party sync. Empirically probed.
+ */
+export const HijackSchema = z
   .object({
-    watchParty: z.boolean().openapi({ example: true }),
-    pip: z.boolean().openapi({ example: true }),
+    supported: z.boolean().openapi({ example: true }),
+    videoLocation: z.enum(["top", "same-origin-iframe"]).optional(),
+    navHosts: z.array(z.string()).optional().openapi({ example: ["player.videasy.to"] }),
+    autoplayParam: z.string().optional().openapi({ example: "autoplay=false" }),
+    unstable: z.boolean().optional(),
+    notes: z.string().optional(),
   })
-  .openapi("Capabilities");
+  .openapi("Hijack");
 
 /**
- * A streaming provider row from `public.providers`, ordered by `priority` asc.
- * `user_description` / `dev_description` are nullable in the DB.
+ * A streaming provider row from `public.providers` (full-dynamic playback shape),
+ * ordered by `priority` asc. The player builds embed URLs from `url_movie`/
+ * `url_tv` and gates WebView navigation with `allowed_domain` + `hijack.navHosts`.
  */
 export const ProviderSchema = z
   .object({
     id: z.string().openapi({ example: "videasy" }),
-    name: z.string().openapi({ example: "NetPrime (Videasy)" }),
+    name: z.string().openapi({ example: "NetPrime" }),
     enabled: z.boolean().openapi({ example: true }),
-    unstable: z.boolean().openapi({ example: false }),
-    url_template: z
-      .string()
-      .openapi({ example: "https://player.videasy.to/movie/${id}" }),
-    requires_client_sniff: z.boolean().openapi({ example: true }),
-    capabilities: CapabilitiesSchema,
     priority: z.number().int().openapi({ example: 1 }),
-    user_description: z.string().nullable().openapi({
-      example: "The absolute best choice for multiple Audio Dubs and Anime.",
-    }),
-    dev_description: z.string().nullable().openapi({
-      example: "Tier 2 Fallback. Strict IP-locked tokens. Requires WebView.",
-    }),
+    url_movie: z.string().openapi({ example: "https://player.videasy.to/movie/${id}" }),
+    url_tv: z
+      .string()
+      .nullable()
+      .openapi({ example: "https://player.videasy.to/tv/${id}/${season}/${episode}" }),
+    allowed_domain: z.string().openapi({ example: "https://player.videasy.to" }),
+    hijack: HijackSchema,
   })
   .openapi("Provider");
 

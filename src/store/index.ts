@@ -27,5 +27,8 @@ export const store = configureStore({
 // Enables refetchOnReconnect (and refetchOnFocus if opted in per-endpoint).
 setupListeners(store.dispatch);
 
+// Note: the provider registry's imperative lookups (getProvider /
+// defaultHijackProvider) read this store directly — no manual mirroring needed.
+
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

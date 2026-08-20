@@ -38,11 +38,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import {
-  PROVIDERS,
   isHijackable,
   isUnstable,
   type Provider,
 } from "@/components/player/providerRegistry";
+import { useProviders } from "@/src/store/features/providers/hooks";
 import { colors, font } from "@/theme/bearoom";
 
 const COLORS = {
@@ -75,17 +75,18 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
   ({ selectedId, onSelect }, ref) => {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<FilterKey>("all");
+    const providers = useProviders();
 
     const snapPoints = useMemo(() => ["70%"], []);
 
     const data = useMemo(() => {
       const q = search.trim().toLowerCase();
-      return PROVIDERS.filter((p) => {
+      return providers.filter((p) => {
         if (filter === "party" && !isHijackable(p)) return false;
         if (q && !p.name.toLowerCase().includes(q)) return false;
         return true;
       });
-    }, [search, filter]);
+    }, [search, filter, providers]);
 
     const dismiss = useCallback(() => {
       if (ref && typeof ref !== "function") {

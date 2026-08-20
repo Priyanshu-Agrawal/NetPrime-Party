@@ -37,18 +37,18 @@ Built and deployed the Cloudflare Worker to `netprime-worker.spiderfan-no1.worke
 
 ---
 
-## `[/]` Phase 4: React Native App Bootstrapping
-**Status:** **ACTIVE**
-**Objective:** Connect the React Native app to the live Cloudflare Worker.
-**Details to Implement:**
-1. Setup a global state store (e.g., Zustand or React Context) to hold the app configuration.
-2. On app launch (Splash Screen), fetch `GET /config` from the live Worker URL.
-3. Save the `providers` list globally so the app knows which providers are enabled, unstable, or require the client sniff.
+## `[x]` Phase 4: React Native App Bootstrapping
+**Status:** CLOSED
+**Summary:**
+Implemented modern Redux Toolkit (RTK) global state architecture.
+* Defined strict type interfaces for Player, Watch Party, and Providers.
+* Created modular feature slices using `extraReducers` to intercept API responses.
+* Built the `workerApi` using RTK Query with Edge-Caching synchronization, and instantiated a headless `ConfigBootstrap` component inside `App.tsx` to automatically pull and hydrate `providersSlice` on launch.
 
 ---
 
-## `[ ]` Phase 5: The Pre-Play UI (Metadata Aggregation)
-**Status:** PENDING
+## `[/]` Phase 5: The Pre-Play UI (Metadata Aggregation)
+**Status:** **ACTIVE**
 **Objective:** Build the UI that fetches `/scrape` when a user clicks a movie.
 **Details:**
 * Call the Worker with the TMDB ID.
@@ -76,3 +76,13 @@ Built and deployed the Cloudflare Worker to `netprime-worker.spiderfan-no1.worke
 * Catch the OMSS payload from the WebView.
 * Mount `expo-video` with the `.m3u8` URL.
 * Connect playback state (Play, Pause, Seek) to the Watch Party socket.
+
+---
+
+## `[ ]` Phase 8: Scrape Results Caching (Supabase)
+**Status:** PENDING
+**Objective:** Dramatically reduce Edge Worker execution time by caching metadata.
+**Details:**
+* Create a `title_provider_cache` table in Supabase.
+* Cloudflare Worker checks this table before scraping (valid for 24h).
+* Cache *only* the OMSS metadata (dubs, qualities, statuses). NEVER cache the actual `.m3u8` URL for IP-locked providers.

@@ -149,9 +149,9 @@ app.openapi(scrapeRoute, async (c) => {
 
   const results = await Promise.all(
     enabled.map<Promise<ScrapeResult>>(async (provider) => {
-      // Tier 2 — IP-locked providers: server can only confirm the title, the
-      // client must mount a WebView to snatch the stream.
-      if (provider.requires_client_sniff) {
+      // Tier 2 — hijackable providers: server can only confirm the title, the
+      // client must mount the WebView bridge to drive/snatch the stream.
+      if (provider.hijack?.supported) {
         try {
           const titleExists = true; // TODO: real existence check.
           if (!titleExists) return { provider: provider.id, status: "not_found" };

@@ -69,7 +69,10 @@ export async function getProviders(
       return [];
     }
 
-    const endpoint = `${url}/rest/v1/providers?select=*&order=priority.asc`;
+    // Only enabled providers leave the edge. Clearing/disabling rows in Supabase
+    // makes /config genuinely empty over the wire — the app has no baked-in
+    // fallback, so it goes "dumb" (nothing observable) during store review.
+    const endpoint = `${url}/rest/v1/providers?select=*&enabled=eq.true&order=priority.asc`;
     let res: Response;
     try {
       res = await fetch(endpoint, {

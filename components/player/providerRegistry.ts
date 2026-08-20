@@ -1,12 +1,14 @@
 /**
- * Unified provider registry — ONE source of truth for both solo playback and
- * watch-party. It merges the user-maintained `providers.json` (the solo server
- * list, full catalog) with the hijack-capability overlay (which of those we can
- * drive for sync). The solo player lists them all; the "Watch Party" button lights
- * up only for `isHijackable` ones.
+ * Unified provider registry — ONE runtime source of truth for solo playback and
+ * watch-party, read live from the Redux store (Supabase → /config →
+ * providersSlice); there is NO baked-in list. Each provider carries its
+ * embed URLs + the hijack-capability overlay (which we can drive for sync). The
+ * solo player lists them all; the "Watch Party" button lights up only for
+ * `isHijackable` ones. `providers.json` + `HIJACK_CAPS` remain in the repo purely
+ * as the Supabase seed source, not imported at runtime.
  */
-import providersData from "@/providers.json";
-import { HIJACK_CAPS, type HijackCapability } from "./hijackCapabilities";
+import { type HijackCapability } from "./hijackCapabilities";
+import { store } from "@/src/store";
 
 export interface RawProvider {
   id: string;
@@ -27,13 +29,22 @@ export interface MediaRef {
   startAt?: number;
 }
 
-export const PROVIDERS: Provider[] = (providersData as RawProvider[]).map((p) => ({
-  ...p,
-  hijack: HIJACK_CAPS[p.id] ?? { supported: false },
-}));
+/**
+ * The live provider list — read straight from the Redux store, the SINGLE source
+ * of truth (Supabase → /config → providersSlice). No module holder, no manual
+ * sync. It's a non-reactive snapshot for imperative/utility code (event handlers,
+ * HijackPlayer's URL build); React components must use `useProviders()` so they
+ * re-render. Starts empty and stays empty when the server sends none — there is
+ * NO baked-in fallback (deliberate: during store review we clear providers and
+ * the app must show nothing). The `registry → store` import is one-way: the store
+ * chain imports this file type-only, so there is no runtime cycle.
+ */
+export function getActiveProviders(): Provider[] {
+  return store.getState().providers.providers;
+}
 
 export function getProvider(id: string): Provider | undefined {
-  return PROVIDERS.find((p) => p.id === id);
+  return getActiveProviders().find((p) => p.id === id);
 }
 
 export function isHijackable(p: Provider | undefined): boolean {
@@ -47,9 +58,10 @@ export function isHijackable(p: Provider | undefined): boolean {
  * hijackable one.
  */
 export function defaultHijackProvider(): Provider | undefined {
+  const list = getActiveProviders();
   return (
-    PROVIDERS.find((p) => p.hijack.supported && !p.hijack.unstable) ??
-    PROVIDERS.find((p) => p.hijack.supported)
+    list.find((p) => p.hijack.supported && !p.hijack.unstable) ??
+    list.find((p) => p.hijack.supported)
   );
 }
 

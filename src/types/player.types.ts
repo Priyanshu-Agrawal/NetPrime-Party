@@ -8,6 +8,10 @@ export interface OmssSource {
     type: 'hls' | 'mp4' | 'dash';
     quality: string;
     audioTracks: AudioTrack[];
+    provider: {
+        id: string;
+        name: string;
+    };
 }
 
 export interface PlayerState {
