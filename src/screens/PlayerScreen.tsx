@@ -12,7 +12,7 @@ import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import { ProviderSheet } from "@/components/player/ProviderSheet";
 import {
   getProvider,
-  isHijackable,
+  isPartyCapable,
   type Provider,
 } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
@@ -24,6 +24,12 @@ import {
   setPreferredQuality,
 } from "@/utils/prefs";
 import { matchAudio, matchQuality } from "@/utils/trackMatch";
+import {
+  clearProviderFailure,
+  getRecentlyFailed,
+  mediaKey,
+  recordProviderFailure,
+} from "@/utils/failureMemory";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
 import type { ReportArgs, ReportOutcome } from "@/src/types/worker.types";
 import Constants from "expo-constants";
@@ -108,8 +114,27 @@ export const PlayerScreen: React.FC = () => {
   const [fallbackBanner, setFallbackBanner] = useState(false); // actionable "try another source"
   const [excludedIds, setExcludedIds] = useState<string[]>([]); // providers that failed this session
   const providers = useProviders();
-  const [selected, setSelected] = useState<Provider | undefined>(
-    () => providers.find((p) => p.id === providerId) ?? providers[0],
+  // Bias the initial/default source away from providers that recently failed for
+  // THIS title (cross-session, MMKV). Never strands — falls back to the top one.
+  const pickInitialProvider = useCallback(
+    (list: Provider[]): Provider | undefined => {
+      if (!list.length) return undefined;
+      const failed = getRecentlyFailed(
+        mediaKey({
+          tmdbId: id ?? "",
+          type: type === "tv" ? "tv" : "movie",
+          season: season ? Number(season) : undefined,
+          episode: ep ? Number(ep) : undefined,
+        }),
+      );
+      const requested = providerId ? list.find((p) => p.id === providerId) : undefined;
+      if (requested && !failed.has(requested.id)) return requested;
+      return list.find((p) => !failed.has(p.id)) ?? requested ?? list[0];
+    },
+    [id, type, season, ep, providerId],
+  );
+  const [selected, setSelected] = useState<Provider | undefined>(() =>
+    pickInitialProvider(providers),
   );
   // Our overlay mounts once the bridge binds a <video> (past the pre-play gate).
   const [playerBound, setPlayerBound] = useState(false);
@@ -123,16 +148,16 @@ export const PlayerScreen: React.FC = () => {
 
   const displayTitle = title || "Bearoom";
   const artworkUrl = img(typeof poster_path === "string" ? poster_path : null, "w342");
-  const canParty = isHijackable(selected);
+  const canParty = isPartyCapable(selected);
 
   // Providers load async from /config (no baked-in fallback), so adopt the
   // requested provider (or the top one) once the list arrives if nothing is
   // selected yet. Empty stays unselected.
   useEffect(() => {
     if (!selected && providers.length) {
-      setSelected(providers.find((p) => p.id === providerId) ?? providers[0]);
+      setSelected(pickInitialProvider(providers));
     }
-  }, [providers, selected, providerId]);
+  }, [providers, selected, pickInitialProvider]);
 
   // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {
@@ -295,10 +320,11 @@ export const PlayerScreen: React.FC = () => {
   const triggerFallback = useCallback(() => {
     if (selected) {
       setExcludedIds((prev) => (prev.includes(selected.id) ? prev : [...prev, selected.id]));
+      recordProviderFailure(mediaKey(media), selected.id); // cross-session: bias future default away
     }
     setFallbackBanner(false);
     presentSheet();
-  }, [selected, presentSheet]);
+  }, [selected, presentSheet, media]);
 
   // Hard error (main-frame HTTP/DNS/crash) → report once + auto-open the fallback.
   const onFatalError = useCallback(
@@ -383,6 +409,7 @@ export const PlayerScreen: React.FC = () => {
     if (!initialOutcomeRef.current && (Number(e.currentTime) || 0) >= 30) {
       initialOutcomeRef.current = true;
       report("success");
+      if (selected) clearProviderFailure(mediaKey(media), selected.id); // works now — forget it
     }
     controlsRef.current?.setPlayback({
       currentTime: e.currentTime || 0,
@@ -459,7 +486,7 @@ export const PlayerScreen: React.FC = () => {
     : () => false;
 
   const startWatchParty = useCallback(() => {
-    if (!selected || !isHijackable(selected) || !id) return;
+    if (!selected || !isPartyCapable(selected) || !id) return;
     openPartyHost({
       role: "host",
       room: genRoomCode(),

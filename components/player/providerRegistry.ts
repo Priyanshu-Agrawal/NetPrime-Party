@@ -54,6 +54,18 @@ export function isHijackable(p: Provider | undefined): boolean {
 }
 
 /**
+ * PARTY-capable = hijackable AND we actually serve an injection script for it
+ * (`scriptVersion` set). Only these can bind the bridge and drive a synced watch
+ * party; a hijackable provider with no served script injects nothing and never
+ * binds (see F1 — currently only `videasy` qualifies). The 🐾 Party badge, the
+ * "Watch Party" button, and party launch all gate on THIS, not bare
+ * `isHijackable`, so the app never offers a party that silently can't sync.
+ */
+export function isPartyCapable(p: Provider | undefined): boolean {
+  return isHijackable(p) && !!p?.scriptVersion;
+}
+
+/**
  * A sensible default provider for launching a watch party directly from a title
  * (e.g. Details → "Watch together"), where the user hasn't hand-picked one in
  * the solo player. Prefers a stable hijackable provider, falling back to any
@@ -61,9 +73,12 @@ export function isHijackable(p: Provider | undefined): boolean {
  */
 export function defaultHijackProvider(): Provider | undefined {
   const list = getActiveProviders();
+  // Only launch a party on a provider we can actually drive (has a served
+  // script); prefer a stable one. Returns undefined if none are party-capable —
+  // callers pass `?.id`, so an undefined provider simply can't host.
   return (
-    list.find((p) => p.hijack.supported && !p.hijack.unstable) ??
-    list.find((p) => p.hijack.supported)
+    list.find((p) => isPartyCapable(p) && !p.hijack.unstable) ??
+    list.find((p) => isPartyCapable(p))
   );
 }
 
@@ -86,12 +101,15 @@ function fill(template: string, m: MediaRef): string {
 export function buildEmbedUrl(
   p: Provider,
   m: MediaRef,
-  opts: { party?: boolean } = {},
+  opts: { party?: boolean; autoplayNext?: boolean } = {},
 ): string {
   let url = m.type === "tv" ? fill(p.urls.tv, m) : fill(p.urls.movie, m);
   const extra: string[] = [];
   if (p.id === "videasy" && m.type === "tv") {
-    extra.push("nextEpisode=true", "autoplayNextEpisode=true", "episodeSelector=true");
+    extra.push("episodeSelector=true");
+    // Respect the "autoplay next episode" pref (default on). videasy advances
+    // internally, so we gate its params rather than hooking the `ended` event.
+    if (opts.autoplayNext !== false) extra.push("nextEpisode=true", "autoplayNextEpisode=true");
   }
   if (opts.party && p.hijack.autoplayParam) extra.push(p.hijack.autoplayParam);
   if (opts.party && m.startAt && m.startAt > 5) {

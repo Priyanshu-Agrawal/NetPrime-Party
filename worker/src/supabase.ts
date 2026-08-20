@@ -55,6 +55,67 @@ function resolveCredentials(env: Bindings): { url?: string; key?: string } {
  * specific `@cloudflare/workers-types` / Hono `ExecutionContext` version). */
 type Waitable = { waitUntil(promise: Promise<unknown>): void };
 
+/** A row from the rolling-24h `provider_health` view. */
+interface HealthRow {
+  provider_id: string;
+  failure_rate: number | null;
+  distinct_clients: number | null;
+}
+
+/** A provider is "unhealthy" (auto-demoted) only above BOTH thresholds — a high
+ *  distinct-client-weighted failure RATE and a real sample size, so one bad title
+ *  or a single abusive client can't sink it. Never auto-DISABLED (that stays the
+ *  manual killswitch); only demoted below healthy providers in the ordering. */
+const UNHEALTHY_RATE = 0.5;
+const MIN_SAMPLE = 3;
+
+/**
+ * Read the `provider_health` view with the SERVICE-ROLE key (the view aggregates
+ * the RLS-locked provider_reports table). Best-effort: returns [] on missing key
+ * / error / timeout, so ordering degrades to plain priority.
+ */
+async function fetchHealth(env: Bindings): Promise<HealthRow[]> {
+  const url = env.SUPABASE_URL || env.EXPO_PUBLIC_SUPABASE_URL;
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return [];
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/provider_health?select=provider_id,failure_rate,distinct_clients`,
+      {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(4000),
+      },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as HealthRow[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Stable partition: demote chronically-failing providers below healthy ones while
+ * preserving priority order within each group. Party launch is unaffected — it
+ * picks a party-capable provider explicitly, not `providers[0]` — so this only
+ * steers the SOLO default toward a working source.
+ */
+function reorderByHealth(providers: Provider[], health: HealthRow[]): Provider[] {
+  if (!health.length) return providers;
+  const bad = new Set(
+    health
+      .filter(
+        (h) =>
+          (h.failure_rate ?? 0) >= UNHEALTHY_RATE && (h.distinct_clients ?? 0) >= MIN_SAMPLE,
+      )
+      .map((h) => h.provider_id),
+  );
+  if (!bad.size) return providers;
+  return [
+    ...providers.filter((p) => !bad.has(p.id)),
+    ...providers.filter((p) => bad.has(p.id)),
+  ];
+}
+
 /**
  * Fetch all providers ordered by priority, with a 60s edge cache.
  *
@@ -107,8 +168,12 @@ export async function getProviders(
       return [];
     }
 
-    const data = await res.text();
-    response = new Response(data, {
+    // Health-aware ordering: demote chronically-failing providers below healthy
+    // ones (best-effort — no health data ⇒ plain priority order). Cached with the
+    // list so the extra Supabase read happens at most once per 60s.
+    const rawProviders = (await res.json()) as Provider[];
+    const ordered = reorderByHealth(rawProviders, await fetchHealth(env));
+    response = new Response(JSON.stringify(ordered), {
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "s-maxage=60",

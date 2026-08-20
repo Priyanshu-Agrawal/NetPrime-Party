@@ -38,7 +38,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import {
-  isHijackable,
+  isPartyCapable,
   isUnstable,
   type Provider,
 } from "@/components/player/providerRegistry";
@@ -92,7 +92,7 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
       const excluded = new Set(excludeIds ?? []);
       return providers.filter((p) => {
         if (excluded.has(p.id)) return false; // failed this session — don't re-offer
-        if (filter === "party" && !isHijackable(p)) return false;
+        if (filter === "party" && !isPartyCapable(p)) return false;
         if (q && !p.name.toLowerCase().includes(q)) return false;
         return true;
       });
@@ -128,7 +128,7 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
     const renderItem: ListRenderItem<Provider> = useCallback(
       ({ item }) => {
         const selected = item.id === selectedId;
-        const party = isHijackable(item);
+        const party = isPartyCapable(item);
         const unstable = isUnstable(item);
         return (
           <Pressable

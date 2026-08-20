@@ -19,6 +19,7 @@ import {
   getProvider,
   type MediaRef,
 } from "./providerRegistry";
+import { getAutoplayNext } from "@/utils/prefs";
 
 export type PlayerEventType =
   | "ready"
@@ -93,7 +94,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(function HijackPlaye
 
   const provider = getProvider(providerId);
   const embedUrl = provider
-    ? buildEmbedUrl(provider, { tmdbId, type, season, episode, startAt }, { party })
+    ? buildEmbedUrl(provider, { tmdbId, type, season, episode, startAt }, { party, autoplayNext: getAutoplayNext() })
     : "";
 
   // Handle iframe message events

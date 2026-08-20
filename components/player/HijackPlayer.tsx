@@ -22,6 +22,7 @@ import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-nativ
 import WebView from "react-native-webview";
 import { subscribeRemoteCommands } from "./backgroundPlayback";
 import { getCachedScript } from "@/src/scripts/bridgeCache";
+import { getAutoplayNext } from "@/utils/prefs";
 import {
   buildEmbedUrl,
   getProvider,
@@ -243,7 +244,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const uri = buildEmbedUrl(
       provider,
       { tmdbId, type, season, episode, startAt },
-      { party },
+      { party, autoplayNext: getAutoplayNext() },
     );
 
     return (
