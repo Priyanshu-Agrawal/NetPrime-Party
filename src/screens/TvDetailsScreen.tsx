@@ -63,6 +63,7 @@ const TvDetailsScreen: React.FC = () => {
   // RTK Query: cached per show id (append_to_response bundle).
   const { data: d, isLoading: loading, error: qErr } = useDetailsQuery({ type: "tv", id: id! });
   const error = qErr ? ((qErr as any)?.message ?? "Failed to load") : undefined;
+  const providers = useProviders();
   const [season, setSeason] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -128,8 +129,6 @@ const TvDetailsScreen: React.FC = () => {
       </View>
     );
   }
-
-  const providers = useProviders();
 
   const playEpisode = (ep: number, sea = season) => {
     void addToWatchHistory({

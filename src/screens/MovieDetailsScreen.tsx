@@ -63,6 +63,7 @@ const MovieDetailsScreen: React.FC = () => {
   // RTK Query: cached per movie id (append_to_response bundle).
   const { data: d, isLoading: loading, error: qErr } = useDetailsQuery({ type: "movie", id: id! });
   const error = qErr ? ((qErr as any)?.message ?? "Failed to load") : undefined;
+  const providers = useProviders();
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -118,8 +119,6 @@ const MovieDetailsScreen: React.FC = () => {
       </View>
     );
   }
-
-  const providers = useProviders();
 
   const handlePlay = () => {
     void addToWatchHistory({
