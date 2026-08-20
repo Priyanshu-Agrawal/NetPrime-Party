@@ -87,16 +87,22 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
 
     const snapPoints = useMemo(() => ["70%"], []);
 
+    const excluded = useMemo(() => new Set(excludeIds ?? []), [excludeIds]);
     const data = useMemo(() => {
       const q = search.trim().toLowerCase();
-      const excluded = new Set(excludeIds ?? []);
-      return providers.filter((p) => {
-        if (excluded.has(p.id)) return false; // failed this session — don't re-offer
+      const matches = providers.filter((p) => {
         if (filter === "party" && !isPartyCapable(p)) return false;
         if (q && !p.name.toLowerCase().includes(q)) return false;
         return true;
       });
-    }, [search, filter, providers, excludeIds]);
+      // Recently-failed providers sink to the bottom (rendered dimmed) but stay
+      // PICKABLE — failures are often transient, so keep them recoverable rather
+      // than hiding them until a remount (picking one clears its exclusion).
+      return [
+        ...matches.filter((p) => !excluded.has(p.id)),
+        ...matches.filter((p) => excluded.has(p.id)),
+      ];
+    }, [search, filter, providers, excluded]);
 
     const dismiss = useCallback(() => {
       if (ref && typeof ref !== "function") {
@@ -130,6 +136,7 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
         const selected = item.id === selectedId;
         const party = isPartyCapable(item);
         const unstable = isUnstable(item);
+        const failed = excluded.has(item.id);
         return (
           <Pressable
             onPress={() => handleSelect(item.id)}
@@ -137,6 +144,7 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
             style={({ pressed }) => [
               styles.row,
               selected && styles.rowSelected,
+              failed && styles.rowFailed,
               pressed && styles.rowPressed,
             ]}
           >
@@ -144,8 +152,11 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
               <Text style={styles.rowTitle} numberOfLines={1}>
                 {item.name}
               </Text>
-              <Text style={styles.rowSubtitle} numberOfLines={1}>
-                {prettyDomain(item.allowedDomain)}
+              <Text
+                style={[styles.rowSubtitle, failed && styles.rowSubtitleFailed]}
+                numberOfLines={1}
+              >
+                {failed ? "Recently failed · tap to retry" : prettyDomain(item.allowedDomain)}
               </Text>
             </View>
 
@@ -173,7 +184,7 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
           </Pressable>
         );
       },
-      [selectedId, handleSelect],
+      [selectedId, handleSelect, excluded],
     );
 
     return (
@@ -410,6 +421,12 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     opacity: 0.65,
+  },
+  rowFailed: {
+    opacity: 0.5,
+  },
+  rowSubtitleFailed: {
+    color: COLORS.warn,
   },
   rowText: {
     flex: 1,

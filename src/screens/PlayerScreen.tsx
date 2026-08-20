@@ -326,7 +326,9 @@ export const PlayerScreen: React.FC = () => {
     presentSheet();
   }, [selected, presentSheet, media]);
 
-  // Hard error (main-frame HTTP/DNS/crash) → report once + auto-open the fallback.
+  // Fatal main-frame error → report telemetry once. HijackPlayer shows the
+  // branded error overlay + auto-retries; its "Try another source" calls
+  // triggerFallback (which excludes the failed provider + opens the picker).
   const onFatalError = useCallback(
     (info: FatalError) => {
       if (!initialOutcomeRef.current) {
@@ -337,9 +339,8 @@ export const PlayerScreen: React.FC = () => {
           timeToFailMs: Date.now() - mountTsRef.current,
         });
       }
-      triggerFallback();
     },
-    [report, triggerFallback],
+    [report],
   );
 
   // Resume-after-switch. A dub/quality/provider switch makes the provider reload
@@ -519,6 +520,12 @@ export const PlayerScreen: React.FC = () => {
           appVersion: Constants.expoConfig?.version,
         });
       }
+      // Picking a provider (even a recently-failed, dimmed one) gives it a fresh
+      // chance — drop it from the session exclusion list.
+      setExcludedIds((prev) => prev.filter((id) => id !== pid));
+      // Re-picking the SAME provider (e.g. a dimmed "tap to retry" row) won't
+      // remount HijackPlayer (keyed by id), so force it to reload.
+      if (selected && pid === selected.id) playerRef.current?.reload();
       // Same title, new source — resume where we were once the new provider binds.
       armResume();
       setSelected(p);
@@ -544,6 +551,10 @@ export const PlayerScreen: React.FC = () => {
                 onPlayerEvent={onEvent}
                 onBound={() => setPlayerBound(true)}
                 onFatalError={onFatalError}
+                onSwitchSource={triggerFallback}
+                onRecovered={() =>
+                  setExcludedIds((prev) => prev.filter((pid) => pid !== selected.id))
+                }
                 nativeControls={playerBound}
                 party={false}
               />
