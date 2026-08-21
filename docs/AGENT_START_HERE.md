@@ -1,0 +1,39 @@
+# 👋 Start Here — Agent / Developer Onboarding
+
+You're picking up **Bearoom / NetPrime** — a server-driven movie & synced-watch-party app on **Expo SDK 53 / React Native 0.79 / React 19 (New Architecture, Bridgeless)**. This file is the fastest path in. Everything here lives in the repo (no external context needed).
+
+## The two living docs that matter most
+- **[docs/HANDBOOK.md](HANDBOOK.md)** — the complete top-to-bottom manual: architecture, every subsystem (what/how/why/alternatives-rejected/key-files/open-items), the **decision log** (#1–#43), the file & directory map, the env/secrets/ops runbook, and **§19 = the deferred backlog**. Read this for depth; jump via its Index.
+- **[docs/project-board.md](project-board.md)** — the living status board (done / active / OPEN). Read the **tail** for the latest batches and open items.
+- QA logs: [docs/qa/](qa/) · investigations: [docs/investigations/](investigations/) · plans: [docs/plans/](plans/).
+
+## The one-paragraph mental model
+Tier 1 is a **Cloudflare Worker (Hono + Zod) + Supabase Postgres** serving `/config` (the dynamic provider registry — **no baked-in fallback**, a store-review killswitch), `/scripts` (OTA DOM-hijack bridges), `/report` (telemetry), `/scrape`. Tier 2 is a **`react-native-webview`** mounted on the provider's own embed page, into which the app injects a JS **bridge** (`src/scripts/legacy-videasy.ts`, served OTA, cached in MMKV) that finds and drives the provider's `<video>` — this is what powers solo playback AND synced watch-party. State is **Redux Toolkit + RTK Query**. Only the `videasy` provider (branded **"NetPrime"** in-app) ships a working bridge today.
+
+## Where things stand (2026-08-21)
+- Branch **`feat/improvements`**, HEAD **`e783682`**, `tsc` clean. Worker live at `netprime-worker.spiderfan-no1.workers.dev`.
+- App plays on iOS sim + Android. Recent batches (all committed): player-UI polish (pro loading screen, error-overlay reachability, autoplay toggle, BearAlert press-feedback), a reverted first-frame gate, rotation-mask + provider-chrome hiding + banner auto-retire. See project-board tail.
+- ⚠️ Commit `4bfb5c0` is **mislabeled** "refactor(api): RTK Query" — it actually also bundles the player-UI-polish batch + iOS pods (an amend collision between two concurrent agents). Don't trust that one message.
+
+## 🚨 TOP OPEN ITEM — videasy no longer binds on iOS (pick this up)
+The OTA bridge is **cached + injected** on iOS (12,565 chars, version `videasy@7ed78cf9`) but `bound` **stays false forever** → no native controls (the play/pause the user sees is videasy's OWN player), the "still syncing" banner fires, and the bind-keyed cover/chrome logic partially disengages.
+- **Why:** the finder (`legacy-videasy.ts` `findVideo`) polls forever for a `<video>`, walking only **same-origin** frames. On iOS, videasy plays the video in a frame it can't reach (cross-origin). Desktop renders `<video>` top-level (CDP-confirmed); Android bound fine earlier → **videasy serves a different, unhijackable layout to the iOS user-agent**.
+- **Shipped palliative:** the "still syncing" banner now auto-retires ~6s so it can't linger over a playing video.
+- **Investigation plan:** attach **Safari Web Inspector / CDP** to the iOS-sim videasy WebView (or reproduce on any device — Android emulator/device or iOS sim, all fine) → find where videasy renders the `<video>` on the mobile layout and whether the bridge globals (`window.__vlChromeOff`, the finder) actually loaded there → then extend the finder (reach the new frame) or the injection. Verify live DOM selectors with Playwright/CDP — **provider selectors rot** (see next section).
+
+## Key gotchas (these will bite you)
+- **A DNS ad-blocker breaks the app before any code runs.** The primary Android test device has **Private DNS = AdGuard** (`adb shell settings get global private_dns_mode` → `hostname` / `dns.adguard.com`), which silently blocks the app's own worker (`*.workers.dev` → `/config` fails → providers EMPTY → "Failed to fetch movies") AND `image.tmdb.org` (blank posters). Looks like "the app is broken," but it's DNS. iOS sim has no DNS block. Also: the **in-app KB/s number is data _consumption_, not bandwidth** — don't diagnose speed from it (`curl -w '%{speed_download}' https://speed.cloudflare.com/__down?bytes=3000000` for the real rate).
+- **Provider DOM selectors rot.** videasy renames classes. As of 2026-08-21 (CDP-verified live): `mobileCenterControls` is **DEAD**; the transport/seekbar is `div.absolute.bottom-0.h-44`; the "Player Settings/Quality/Subs/Servers" drawer is `[class*='z-[110]']`. Always re-verify against the live DOM (Playwright on desktop videasy, or CDP into the app's WebView) before trusting a selector.
+- **The bridge is OTA, not bundled.** Source of truth = `src/scripts/legacy-videasy.ts` (byte-for-byte legacy `BRIDGE_JS`, NOT imported by the app → not decompilable). Changing it requires re-running `scripts/upload-bridge.ts` (needs `SUPABASE_SERVICE_ROLE_KEY`, the operator's secret) to deploy; the app boot-diffs `script_version` and re-caches. Prefer **app-side supplementary injection** (like `HijackPlayer`'s `#__npChromeKill` style) when you can, to avoid an OTA deploy.
+- **NO blur and NO elevation on any screen that plays video** — both blur backends re-capture the WebView every frame and stutter (proven on release). Static image blur (expo-image `blurRadius`) is fine; live `BlurView`/`dimezisBlurView`/elevation is not. See [docs/investigations/playback-stutter.md](investigations/playback-stutter.md).
+- **HTML5 fullscreen is unused** — `playerRef.fullscreen()` has zero callers; "fullscreen" = OS rotation with the video inline. So the bridge's `!document.fullscreenElement` chrome-restore is dead weight (that's why we hide videasy chrome unconditionally).
+- **Don't run two coding agents on the same branch** — it caused an amend collision + detached HEAD this session (recovered by fast-forward). Cursor's eslint server also rewrites files on save.
+
+## How to run & debug
+- **Metro:** `npx expo start` (Android device: `adb reverse tcp:8081 tcp:8081` + the `bearoom://` deep link; a second app on the machine may hold 8081 → use `--port 8082`). iOS: `npx expo run:ios`.
+- **Two-debugger model:** RN layer via **execbro** MCP (`scan_metro`, `get_logs`, `inspect_component`, `redux_get_state`, `execute_in_app`, screenshots/tap) — works on both the iOS sim and Android device. WebView layer via **Chrome DevTools / Safari Web Inspector (CDP)** — the only truthful view of the injected bridge (`console.log` inside the WebView is swallowed under Bridgeless). Public provider DOM via **Playwright** (desktop, cheap selector-rot check). Recipe in [HANDBOOK §"Device debug recipe"](HANDBOOK.md).
+- **Env:** `EXPO_PUBLIC_WORKER_URL` (root `.env.local`, symlinked into `worker/.dev.vars`). `SUPABASE_SERVICE_ROLE_KEY` + `KLIPY` key are the **operator's secrets** — never commit them; the operator runs `wrangler secret put` / the upload CLI.
+- **Commit discipline:** commit **only when explicitly asked**; branch first if on `master`. End commit messages with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+
+## Product guardrails (from the operator)
+Values hard technical pushback over agreement — flag runtime regressions `tsc` can't catch. Scarred by lost work → persist deferred ideas durably (that's what the project-board + HANDBOOK §19 are for). Never demote/pollute production data affecting real users. No baked-in provider fallback (the killswitch).

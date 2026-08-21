@@ -42,6 +42,12 @@ app-example
 # Claude Code / MCP tooling (machine-local)
 .claude/
 .mcp.json
+.mcp-all.json
+.context7-rules.*
+.claude-skills/
+.cursor-skills/
+.cursor-skills-cursor/
+mcp-sync.sh
 .playwright-mcp/
 
 # local UI render captures
