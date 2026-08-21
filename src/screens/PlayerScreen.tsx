@@ -138,12 +138,9 @@ export const PlayerScreen: React.FC = () => {
   const [selected, setSelected] = useState<Provider | undefined>(() =>
     pickInitialProvider(providers),
   );
-  // `playerBound` = the bridge found a controllable <video> (drives chrome-off +
-  // background track reads). `playerReady` = the video is actually PAINTING frames
-  // (first "playing"/data-ready), which can lag bind on a slow start — our controls
-  // mount on THIS so they never appear over the provider's still-visible poster.
+  // The bridge found a controllable <video> — our overlay mounts, and the branded
+  // loading cover lifts, on THIS (chrome-off + background track reads key off it too).
   const [playerBound, setPlayerBound] = useState(false);
-  const [playerReady, setPlayerReady] = useState(false);
   const [rate, setRate] = useState(1);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
@@ -169,7 +166,6 @@ export const PlayerScreen: React.FC = () => {
   // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {
     setPlayerBound(false);
-    setPlayerReady(false);
     setRate(1);
     setQualities([]);
     setAudios([]);
@@ -348,7 +344,6 @@ export const PlayerScreen: React.FC = () => {
   const onFatalError = useCallback(
     (info: FatalError) => {
       setPlayerBound(false);
-      setPlayerReady(false);
       if (selected) recordProviderFailure(mediaKey(media), selected.id);
       if (!initialOutcomeRef.current) {
         initialOutcomeRef.current = true;
@@ -570,7 +565,6 @@ export const PlayerScreen: React.FC = () => {
                 episode={media.episode}
                 onPlayerEvent={onEvent}
                 onBound={() => setPlayerBound(true)}
-                onReady={() => setPlayerReady(true)}
                 onFatalError={onFatalError}
                 onSwitchSource={triggerFallback}
                 onRecovered={() =>
@@ -579,7 +573,7 @@ export const PlayerScreen: React.FC = () => {
                 nativeControls={playerBound}
                 party={false}
               />
-              {playerReady ? (
+              {playerBound ? (
                 <PlayerControls
                   ref={controlsRef}
                   canControl

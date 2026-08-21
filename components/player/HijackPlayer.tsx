@@ -116,11 +116,6 @@ interface Props extends MediaRef {
   onPlayerEvent?: (e: PlayerEvent) => void;
   /** Fires once the bridge binds a <video> (provider is controllable). */
   onBound?: () => void;
-  /** Fires once the video actually starts PAINTING frames (first "playing" /
-   *  data-ready), which can lag bind on a slow start. The host uses this to reveal
-   *  its controls — before it, we hold an opaque cover so the provider's own poster
-   *  splash never shows behind our chrome. */
-  onReady?: () => void;
   /** Fires if the bridge never bound a <video> (provider not controllable here). */
   onBindFailed?: () => void;
   /** Fires on a fatal MAIN-FRAME failure (HTTP 4xx/5xx, DNS, render crash) — for
@@ -163,7 +158,6 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       startAt,
       onPlayerEvent,
       onBound,
-      onReady,
       onBindFailed,
       onFatalError,
       onSwitchSource,
@@ -178,19 +172,6 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const boundRef = useRef(false);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
-    // The provider can BIND (its <video> is found & controllable) before it PAINTS:
-    // on a slow start videasy keeps its own poster splash up until the first frame
-    // decodes. We hold an opaque branded cover over the WebView until playback
-    // actually renders, so the provider's poster never shows behind our chrome.
-    // Latches once per load; later buffering uses the spinner, not the full cover.
-    const firstFrameRef = useRef(false);
-    const [ready, setReady] = useState(false);
-    const markReady = useCallback(() => {
-      if (firstFrameRef.current) return;
-      firstFrameRef.current = true;
-      setReady(true);
-      onReady?.();
-    }, [onReady]);
     const provider = getProvider(providerId);
 
     // Branded error + recovery. On a fatal main-frame failure we cover the
@@ -364,8 +345,6 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       boundRef.current = false;
       setBound(false);
       setSlow(false);
-      firstFrameRef.current = false; // new load → re-cover until it paints again
-      setReady(false);
       const t = setTimeout(() => {
         if (!boundRef.current) {
           setSlow(true);
@@ -375,15 +354,6 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       return () => clearTimeout(t);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [providerId, tmdbId, type, season, episode, remountNonce]);
-
-    // Safety: never leave the cover up forever. If a bound provider emits neither a
-    // "playing" event nor a data-ready tick (unusual), reveal it a few seconds after
-    // bind so playback is never hidden behind a stuck loading screen.
-    useEffect(() => {
-      if (!bound || firstFrameRef.current) return;
-      const t = setTimeout(markReady, 6000);
-      return () => clearTimeout(t);
-    }, [bound, markReady]);
 
     // Recovery-state reset — ONLY on a real media/provider/episode change, NOT on a
     // retry remount (which must PRESERVE the auto-retry budget so the load→crash
@@ -412,22 +382,9 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           setSlow(false);
           onBound?.();
         }
-        // First actual frame: the HTML5 "playing" event fires when frames are
-        // rendering; a data-ready tick (readyState≥3, advancing, not paused) is the
-        // cross-provider backstop. Either lifts the cover so the video (not the
-        // provider's poster) is what shows under our controls.
-        if (
-          e.event === "playing" ||
-          (typeof e.readyState === "number" &&
-            e.readyState >= 3 &&
-            e.currentTime > 0 &&
-            !e.paused)
-        ) {
-          markReady();
-        }
         onPlayerEvent?.(e);
       },
-      [onPlayerEvent, onBound, markReady],
+      [onPlayerEvent, onBound],
     );
 
     if (!provider) {
@@ -487,11 +444,15 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             The blurred poster uses expo-image's STATIC blurRadius (a Glide/CoreImage
             transform, NOT a live backdrop capture) — safe over the player, and it
             unmounts before the video plays, so it never touches the stutter rule. */}
-        {!ready && !fatalError && (
-          // pointerEvents="none": the cover is purely visual — taps pass THROUGH to
-          // the WebView so a gesture-gated provider (videasy creates its <video>
-          // only after a user gesture) still gets the tap that starts playback, and
-          // the cover can never trap a stream that needs one manual tap to begin.
+        {!bound && !slow && !fatalError && (
+          // Cover lifts on BIND (the bridge found the <video> — the proven, reliable,
+          // cross-platform signal), NOT on a fragile "first painted frame" signal that
+          // could leave the video masked behind "Loading" forever. Also lifts once the
+          // bind times out (`slow`) so a stuck stream reveals the provider's own UI
+          // (play button / error) instead of trapping the user.
+          // pointerEvents="none": purely visual — taps pass THROUGH to the WebView so a
+          // gesture-gated provider (videasy creates its <video> only after a user
+          // gesture) still gets the tap that starts playback.
           <View style={styles.loading} pointerEvents="none">
             {posterUrl ? (
               <>
