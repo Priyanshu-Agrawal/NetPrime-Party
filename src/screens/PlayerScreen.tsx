@@ -57,7 +57,7 @@ import type { PlayerStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useResponsive } from "@/hooks/useResponsive";
 
@@ -271,7 +271,6 @@ export const PlayerScreen: React.FC = () => {
       sessionStarted.current = false;
       stopBackgroundPlaybackSession();
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-      if (maskTimer.current) clearTimeout(maskTimer.current);
     };
   }, []);
 
@@ -467,10 +466,32 @@ export const PlayerScreen: React.FC = () => {
   // player, so it also covers the UI that re-appears on collapse.
   const [masking, setMasking] = useState(false);
   const maskFade = useRef(new Animated.Value(1)).current;
-  const maskTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A fixed timer can't know when the OS rotation actually LANDS — on iOS the
+  // rotate + WebView reflow routinely outlast it, so the cover cleared mid-spin and
+  // the rotated frame (and the provider's re-shown chrome) leaked. Instead we hold
+  // the cover opaque until `Dimensions` swaps to the target orientation, give one
+  // beat for the reflow + chrome re-hide, THEN fade — with a hard fallback so a
+  // missed event can never strand the cover.
+  const maskWatch = useRef<{
+    sub?: { remove: () => void };
+    fallback?: ReturnType<typeof setTimeout>;
+    settle?: ReturnType<typeof setTimeout>;
+  }>({});
+  const clearMaskWatch = useCallback(() => {
+    maskWatch.current.sub?.remove();
+    if (maskWatch.current.fallback) clearTimeout(maskWatch.current.fallback);
+    if (maskWatch.current.settle) clearTimeout(maskWatch.current.settle);
+    maskWatch.current = {};
+  }, []);
+  const fadeMaskOut = useCallback(() => {
+    Animated.timing(maskFade, { toValue: 0, duration: 260, useNativeDriver: true }).start(
+      ({ finished }) => finished && setMasking(false),
+    );
+  }, [maskFade]);
+  useEffect(() => clearMaskWatch, [clearMaskWatch]); // clear watchers on unmount
   const toggleFullscreen = () => {
     const next = !fullscreen;
-    if (maskTimer.current) clearTimeout(maskTimer.current);
+    clearMaskWatch();
     maskFade.stopAnimation();
     maskFade.setValue(1);
     setMasking(true);
@@ -483,11 +504,19 @@ export const PlayerScreen: React.FC = () => {
         /* best-effort */
       }
     })();
-    maskTimer.current = setTimeout(() => {
-      Animated.timing(maskFade, { toValue: 0, duration: 300, useNativeDriver: true }).start(
-        ({ finished }) => finished && setMasking(false),
-      );
-    }, 560);
+    const wantLandscape = next; // entering fullscreen → landscape; leaving → portrait
+    const settleAndFade = () => {
+      clearMaskWatch();
+      // one beat for the WebView reflow + the provider chrome re-hide to paint
+      maskWatch.current.settle = setTimeout(fadeMaskOut, 300);
+    };
+    const check = ({ window: w }: { window: { width: number; height: number } }) => {
+      if (w.width > w.height === wantLandscape) settleAndFade();
+    };
+    maskWatch.current.sub = Dimensions.addEventListener("change", check);
+    // Hard fallback: if the orientation event never lands (already-correct, or a
+    // dropped event), fade anyway so the cover can't get stuck opaque.
+    maskWatch.current.fallback = setTimeout(settleAndFade, 1600);
   };
 
   // Hardware back exits fullscreen first (like the overlay back button) before it

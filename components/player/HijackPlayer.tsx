@@ -26,6 +26,7 @@ import React, {
 import {
   ActivityIndicator,
   AppState,
+  Dimensions,
   Platform,
   StyleSheet,
   Text,
@@ -172,6 +173,12 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const boundRef = useRef(false);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
+    // The "still syncing" banner appears at the 30s bind timeout. Some providers
+    // (e.g. videasy on iOS) autoplay in a frame our bridge can't reach — the video
+    // is PLAYING even though we never bound — so the banner is misleading and must
+    // not linger over a watching user. Show it briefly, then auto-retire it (the
+    // source pill stays as the real escape hatch).
+    const [bannerRetired, setBannerRetired] = useState(false);
     const provider = getProvider(providerId);
 
     // Branded error + recovery. On a fatal main-frame failure we cover the
@@ -331,12 +338,60 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       );
     }, [hideTransportControls, bound]);
 
-    // Native-controls takeover: hide ALL videasy chrome (we render our own overlay).
-    useEffect(() => {
+    // Native-controls takeover: hide ALL of the provider's chrome and KEEP it hidden.
+    // We render our own overlay, and — unlike the bridge's __vlChromeOff, which
+    // deliberately restores chrome in HTML5 fullscreen — we never use HTML5 fullscreen
+    // (our fullscreen is OS-rotation with the video inline, so our controls stay on
+    // top and reachable). So we ALSO install a persistent, UNCONDITIONAL kill-style so
+    // the provider's menu can never re-appear (e.g. a stray fullscreen state, or the
+    // rotation reflow re-creating its control DOM). Subtitle controls are intentionally
+    // NOT targeted here, so they stay reachable. Single-quoted attr selector keeps the
+    // JSON.stringify'd injection clean.
+    const applyChrome = useCallback(() => {
+      const on = !!nativeControls;
+      // videasy's on-screen chrome, verified live via CDP 2026-08-21:
+      //  • control bar  → div.absolute.bottom-0.h-44 (seekbar + transport)
+      //  • settings drawer → the z-[110] panel ("Player Settings / Quality / Subs /
+      //    Servers"). It's ALWAYS in the DOM, parked off-screen via transforms, and
+      //    its `transition-transform` animates THROUGH the visible area on rotation —
+      //    that's the panel that flashed. Hidden here (its open button is in the bar
+      //    we hide, so it was never user-reachable anyway).
+      // NOTE: the legacy `mobileCenterControls` class is GONE on current videasy
+      // (renamed) — kept only as a harmless legacy fallback.
+      const css = on
+        ? "[class*='mobileCenterControls']{display:none!important}" +
+          "div.absolute.bottom-0.h-44{display:none!important}" +
+          "[class*='z-[110]']{display:none!important}"
+        : "";
       webRef.current?.injectJavaScript(
-        `window.__vlChromeOff && window.__vlChromeOff(${nativeControls ? "true" : "false"}); true;`,
+        `(function(){try{` +
+          `window.__vlChromeOff&&window.__vlChromeOff(${on});` +
+          `var el=document.getElementById('__npChromeKill');` +
+          `if(!el){el=document.createElement('style');el.id='__npChromeKill';(document.head||document.documentElement).appendChild(el);}` +
+          `el.textContent=${JSON.stringify(css)};` +
+          `}catch(e){}})();true;`,
       );
-    }, [nativeControls, bound]);
+    }, [nativeControls]);
+
+    // Re-applied when `bound` flips (lands even if set before the bridge loaded) and on
+    // every rotation — a WebView reflow can re-create the provider's chrome DOM, which
+    // would otherwise flash its menu until the next inject.
+    useEffect(() => {
+      applyChrome();
+    }, [applyChrome, bound]);
+    useEffect(() => {
+      const sub = Dimensions.addEventListener("change", applyChrome);
+      return () => sub.remove();
+    }, [applyChrome]);
+
+    // Auto-retire the "still syncing" banner ~6s after it appears, so it can't sit
+    // on top of a video that's actually playing in an unreachable frame. Cleared on
+    // bind and on every media change / remount (above).
+    useEffect(() => {
+      if (bound || !slow || bannerRetired) return;
+      const t = setTimeout(() => setBannerRetired(true), 6000);
+      return () => clearTimeout(t);
+    }, [bound, slow, bannerRetired]);
 
     // Bind detection + "still syncing" banner. Re-armed on media change AND every
     // remount (a retry bumps remountNonce), so a remounted WebView that loads but
@@ -345,6 +400,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       boundRef.current = false;
       setBound(false);
       setSlow(false);
+      setBannerRetired(false);
       const t = setTimeout(() => {
         if (!boundRef.current) {
           setSlow(true);
@@ -494,7 +550,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           </View>
         )}
         {/* Slow to bind — keep the WebView mounted (finder keeps polling), just warn. */}
-        {!bound && slow && !fatalError && (
+        {!bound && slow && !fatalError && !bannerRetired && (
           <View style={styles.banner} pointerEvents="none">
             <Text style={styles.bannerText}>
               Still syncing {provider.name}… if it doesn’t start, try another server.
