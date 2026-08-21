@@ -270,10 +270,13 @@ the sheet that fails instantly (offline test): exclusion + banner-clear ran, but
 user is left on the raw error page with no auto-opened sheet. Organic errors with no
 sheet animation in flight auto-open correctly (verified).
 
-**F3 · UX gaps around WebView hard errors.** Raw white "Error loading page /
-net::ERR_…" chrome error page is shown unbranded; no auto-reload when connectivity
-returns; the failed provider stays excluded until player remount (no path back if it
-was a transient network blip — the user must close and reopen).
+**F3 · UX gaps around WebView hard errors — ✅ ADDRESSED (2026-08-21, `2699517`).**
+Was: raw white "Error loading page / net::ERR_…" chrome shown unbranded; no
+auto-reload when connectivity returns; the failed provider stayed excluded until
+player remount. Now: HijackPlayer shows a **branded error overlay** (Retry / Try
+another source) over the raw page, **auto-retries** with backoff (5/10/15s, cap 3)
++ on foreground (no NetInfo dep), and excluded providers are **dimmed-but-pickable**
+and un-excluded on recovery. Verify on device → `error-recovery-qa.md` Suite A.
 
 **F4 · Pre-existing quirk — first `readAudio` can be empty.** The Servers panel renders
 lazily; the 360 ms timeout in `__vlReadAudio` can fire before buttons exist → `audios:[]`.

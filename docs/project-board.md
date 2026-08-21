@@ -127,6 +127,18 @@ moves), and keep the clean core+delta as a **later, incremental refactor**.
 
 ---
 
+## `[x]` Resilience & Error-Recovery batch (post-Phase-8, 2026-08-20/21)
+**Status:** SHIPPED (`ec99342` + `2699517`, branch `feat/improvements`). Worker redeployed. Device QA pending → `docs/qa/error-recovery-qa.md`.
+**Summary:** Cashed in the built telemetry + hardened the failure path.
+* **Party-capability gate:** `isPartyCapable = hijackable && scriptVersion` — the 🐾 badge / Watch-Party / `defaultHijackProvider` / hint show party ONLY where a script is served (videasy), ending the "badge lies" gap.
+* **Health-aware ordering:** worker `/config` demotes chronically-failing providers (`failure_rate ≥ 0.5 && ≥ 3 distinct clients`) below healthy ones (never auto-disables); the client mapper stops re-sorting so the server owns order. Deployed; dormant until telemetry accumulates.
+* **Per-title failure memory:** `utils/failureMemory.ts` (MMKV, 4h TTL) biases the default source away from a provider that recently failed for that title.
+* **Autoplay-next:** `getAutoplayNext()` (default on) gates videasy's next-episode URL params.
+* **Error recovery:** HijackPlayer branded error overlay (Retry / Try another source) + dependency-free auto-retry (5/10/15s, cap 3, remount-nonce) + recoverable exclusions (recently-failed providers dimmed-but-pickable). Hardened via **2 adversarial review rounds (10 bugs fixed)**. Resolves the Phase-8 QA **F3** (unbranded error page / no auto-reload / excluded-until-remount).
+* **Earlier this session (`8fbd13b`):** resume-seek on switch, gesture-gated no-bind banner, hardware-back-exits-fullscreen, fallback-sheet dismiss-race, + a `patch-package` fix for @gorhom/bottom-sheet's rotation redbox.
+
+---
+
 ## `[ ]` Phase 9: Server-Side Scrape Caching (Supabase)
 **Status:** PENDING
 **Objective:** Cache lazy fallback scrapes to protect the Cloudflare Worker from rate limits.
