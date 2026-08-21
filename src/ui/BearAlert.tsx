@@ -3,8 +3,24 @@
  */
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Frost } from "./Frost";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useState } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+
+// Ripple tints: dark reads on the bright honey button, light on the dark ghost/danger.
+const RIPPLE_LIGHT = "rgba(255,255,255,0.13)";
+const RIPPLE_DARK = "rgba(0,0,0,0.16)";
+
+/** Crisp tactile tick on button press — a destructive action gets a heavier bump
+ *  so a "Close/Delete" feels weightier than a "Stay". Best-effort (no-op if the
+ *  device has no haptics / on web). */
+function haptic(style?: "default" | "cancel" | "destructive"): void {
+  const p =
+    style === "destructive"
+      ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      : Haptics.selectionAsync();
+  p.catch(() => {});
+}
 
 export interface BearAlertButton {
   text: string;
@@ -70,12 +86,27 @@ function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton
             {buttons
               .filter((b) => b.style !== "cancel")
               .map((b, i) => (
-                <Pressable key={i} style={styles.stackRow} onPress={() => run(b)}>
+                <Pressable
+                  key={i}
+                  android_ripple={{ color: RIPPLE_LIGHT }}
+                  style={({ pressed }) => [styles.stackRow, pressed && styles.stackRowPressed]}
+                  onPress={() => {
+                    haptic(b.style);
+                    run(b);
+                  }}
+                >
                   <Text style={[styles.stackText, b.style === "destructive" && styles.destructiveText]}>{b.text}</Text>
                 </Pressable>
               ))}
             {buttons.find((b) => b.style === "cancel") ? (
-              <Pressable style={styles.cancelBtn} onPress={() => run(buttons.find((b) => b.style === "cancel")!)}>
+              <Pressable
+                android_ripple={{ color: RIPPLE_LIGHT }}
+                style={({ pressed }) => [styles.cancelBtn, pressed && styles.btnPressed]}
+                onPress={() => {
+                  haptic("cancel");
+                  run(buttons.find((b) => b.style === "cancel")!);
+                }}
+              >
                 <Text style={styles.cancelText}>{buttons.find((b) => b.style === "cancel")!.text}</Text>
               </Pressable>
             ) : null}
@@ -88,8 +119,16 @@ function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton
               return (
                 <Pressable
                   key={i}
-                  style={[styles.btn, isCancel ? styles.btnGhost : isDestructive ? styles.btnDanger : styles.btnHoney]}
-                  onPress={() => run(b)}
+                  android_ripple={{ color: !isCancel && !isDestructive ? RIPPLE_DARK : RIPPLE_LIGHT }}
+                  style={({ pressed }) => [
+                    styles.btn,
+                    isCancel ? styles.btnGhost : isDestructive ? styles.btnDanger : styles.btnHoney,
+                    pressed && styles.btnPressed,
+                  ]}
+                  onPress={() => {
+                    haptic(b.style);
+                    run(b);
+                  }}
                 >
                   <Text
                     style={[
@@ -141,6 +180,10 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", gap: ms(10), marginTop: ms(20) },
   btn: { flex: 1, height: ms(48), borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  // Clear, immediate press feedback (the ripple/haptic are secondary): a visible
+  // dim + shrink so a tap always registers even when haptics are off.
+  btnPressed: { opacity: 0.72, transform: [{ scale: 0.965 }] },
+  stackRowPressed: { backgroundColor: colors.surfaceStrong, borderRadius: radius.lg, opacity: 0.9 },
   btnHoney: { backgroundColor: colors.honey, ...glow.honey },
   btnGhost: { backgroundColor: colors.surfaceStrong, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong },
   btnDanger: { backgroundColor: colors.dangerSoft, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.danger },

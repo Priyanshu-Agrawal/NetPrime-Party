@@ -17,9 +17,11 @@ import {
 } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
 import {
+  getAutoplayNext,
   getDataSaver,
   getPreferredAudio,
   getPreferredQuality,
+  setAutoplayNext,
   setPreferredAudio,
   setPreferredQuality,
 } from "@/utils/prefs";
@@ -136,12 +138,17 @@ export const PlayerScreen: React.FC = () => {
   const [selected, setSelected] = useState<Provider | undefined>(() =>
     pickInitialProvider(providers),
   );
-  // Our overlay mounts once the bridge binds a <video> (past the pre-play gate).
+  // `playerBound` = the bridge found a controllable <video> (drives chrome-off +
+  // background track reads). `playerReady` = the video is actually PAINTING frames
+  // (first "playing"/data-ready), which can lag bind on a slow start — our controls
+  // mount on THIS so they never appear over the provider's still-visible poster.
   const [playerBound, setPlayerBound] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
   const [rate, setRate] = useState(1);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [autoplayNext, setAutoplayNextState] = useState(getAutoplayNext); // TV "autoplay next episode" pref
   const [fullscreen, setFullscreen] = useState(false);
   const { isLandscapeMobile } = useResponsive();
   const isImmersive = fullscreen || isLandscapeMobile;
@@ -162,6 +169,7 @@ export const PlayerScreen: React.FC = () => {
   // Provider OR episode changed → back to the pre-play gate; drop stale settings.
   useEffect(() => {
     setPlayerBound(false);
+    setPlayerReady(false);
     setRate(1);
     setQualities([]);
     setAudios([]);
@@ -202,9 +210,13 @@ export const PlayerScreen: React.FC = () => {
     }
     const soft = setTimeout(() => {
       // Only nudge once the user actually expressed play-intent (a gesture inside
-      // the WebView) but nothing bound — never while idling at the provider's
-      // pre-play / ad gate. Same gate as the 25s hard timeout below.
-      if (!playerBound && userGesturedRef.current) setFallbackBanner(true);
+      // the WebView) but nothing EVER played — never while idling at the pre-play
+      // gate, and never after a stream played then died (a fatal error there drops
+      // playerBound to expose the error overlay, which already offers Retry/Sources
+      // — this banner would just double up). Same intent gate as the 25s hard one.
+      if (!playerBound && userGesturedRef.current && !anyPlaybackRef.current) {
+        setFallbackBanner(true);
+      }
     }, 10000);
     const hard = setTimeout(() => {
       if (playerBound || !focusedRef.current) return;
@@ -326,11 +338,18 @@ export const PlayerScreen: React.FC = () => {
     presentSheet();
   }, [selected, presentSheet, media]);
 
-  // Fatal main-frame error → report telemetry once. HijackPlayer shows the
-  // branded error overlay + auto-retries; its "Try another source" calls
-  // triggerFallback (which excludes the failed provider + opens the picker).
+  // Fatal main-frame error. (1) Drop our overlay so HijackPlayer's error overlay
+  // buttons (Retry / Try another source) are REACHABLE — PlayerControls renders on
+  // top of the player and its tap-to-toggle would otherwise eat the overlay's taps
+  // once bound; it remounts when the provider re-binds after a recovery. (2) Record
+  // the per-title failure (a fatal error, not only a manual "Try another source",
+  // should feed the failure-memory bias). (3) Report telemetry once. HijackPlayer
+  // shows the overlay + auto-retries; "Try another source" calls triggerFallback.
   const onFatalError = useCallback(
     (info: FatalError) => {
+      setPlayerBound(false);
+      setPlayerReady(false);
+      if (selected) recordProviderFailure(mediaKey(media), selected.id);
       if (!initialOutcomeRef.current) {
         initialOutcomeRef.current = true;
         report(info.kind, {
@@ -340,7 +359,7 @@ export const PlayerScreen: React.FC = () => {
         });
       }
     },
-    [report],
+    [report, selected, media],
   );
 
   // Resume-after-switch. A dub/quality/provider switch makes the provider reload
@@ -544,12 +563,14 @@ export const PlayerScreen: React.FC = () => {
                 ref={playerRef}
                 key={selected.id}
                 providerId={selected.id}
+                posterUrl={artworkUrl ?? undefined}
                 tmdbId={media.tmdbId}
                 type={media.type}
                 season={media.season}
                 episode={media.episode}
                 onPlayerEvent={onEvent}
                 onBound={() => setPlayerBound(true)}
+                onReady={() => setPlayerReady(true)}
                 onFatalError={onFatalError}
                 onSwitchSource={triggerFallback}
                 onRecovered={() =>
@@ -558,7 +579,7 @@ export const PlayerScreen: React.FC = () => {
                 nativeControls={playerBound}
                 party={false}
               />
-              {playerBound ? (
+              {playerReady ? (
                 <PlayerControls
                   ref={controlsRef}
                   canControl
@@ -664,6 +685,13 @@ export const PlayerScreen: React.FC = () => {
         onSetAudio={(label) => {
           setPreferredAudio(label);
           applyAudio(label);
+        }}
+        showAutoplay={media.type === "tv"}
+        autoplayNext={autoplayNext}
+        onToggleAutoplayNext={() => {
+          const v = !autoplayNext;
+          setAutoplayNext(v); // persist; applies to the next stream load (URL param)
+          setAutoplayNextState(v);
         }}
       />
 

@@ -27,6 +27,10 @@ export interface PlayerSettingsSheetProps {
   /** Audio / dub tracks (per-device — NOT synced across the room). */
   audios: QualityLevel[];
   onSetAudio: (label: string) => void;
+  /** "Autoplay next episode" pref (TV only) — applies to the NEXT stream load. */
+  showAutoplay?: boolean;
+  autoplayNext?: boolean;
+  onToggleAutoplayNext?: () => void;
 }
 
 export default function PlayerSettingsSheet({
@@ -39,6 +43,9 @@ export default function PlayerSettingsSheet({
   onSetQuality,
   audios,
   onSetAudio,
+  showAutoplay,
+  autoplayNext,
+  onToggleAutoplayNext,
 }: PlayerSettingsSheetProps) {
   const insets = useSafeAreaInsets();
   return (
@@ -101,6 +108,22 @@ export default function PlayerSettingsSheet({
                   <Text style={styles.dim}>Loading…</Text>
                 )}
               </View>
+
+              {showAutoplay ? (
+                <>
+                  <Text style={styles.section}>PLAYBACK</Text>
+                  <View style={styles.row}>
+                    <Pressable
+                      style={[styles.chip, autoplayNext && styles.chipOn]}
+                      onPress={onToggleAutoplayNext}
+                    >
+                      <Text style={[styles.chipText, autoplayNext && styles.chipTextOn]}>
+                        Autoplay next episode · {autoplayNext ? "On" : "Off"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : null}
             </View>
           </GlassCard>
         </Pressable>

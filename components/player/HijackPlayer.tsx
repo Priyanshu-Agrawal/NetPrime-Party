@@ -9,8 +9,12 @@
  * Which providers are controllable is recorded in hijackCapabilities; the party
  * only ever mounts this for a provider whose `hijack.supported` is true.
  */
-import { colors } from "@/theme/bearoom";
+import { getCachedScript } from "@/src/scripts/bridgeCache";
+import { colors, font, ms } from "@/theme/bearoom";
+import { getAutoplayNext } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import React, {
   forwardRef,
   useCallback,
@@ -30,8 +34,6 @@ import {
 } from "react-native";
 import WebView from "react-native-webview";
 import { subscribeRemoteCommands } from "./backgroundPlayback";
-import { getCachedScript } from "@/src/scripts/bridgeCache";
-import { getAutoplayNext } from "@/utils/prefs";
 import {
   buildEmbedUrl,
   getProvider,
@@ -107,10 +109,18 @@ export interface PlayerHandle {
 interface Props extends MediaRef {
   /** The (hijackable) provider id from providers.json to play + control. */
   providerId: string;
+  /** Title artwork (TMDB poster URL) — used as the blurred backdrop + crisp thumb
+   *  on the branded loading cover. Optional; falls back to a paw badge. */
+  posterUrl?: string;
   /** Fires for every player event/heartbeat coming from the injected bridge. */
   onPlayerEvent?: (e: PlayerEvent) => void;
   /** Fires once the bridge binds a <video> (provider is controllable). */
   onBound?: () => void;
+  /** Fires once the video actually starts PAINTING frames (first "playing" /
+   *  data-ready), which can lag bind on a slow start. The host uses this to reveal
+   *  its controls — before it, we hold an opaque cover so the provider's own poster
+   *  splash never shows behind our chrome. */
+  onReady?: () => void;
   /** Fires if the bridge never bound a <video> (provider not controllable here). */
   onBindFailed?: () => void;
   /** Fires on a fatal MAIN-FRAME failure (HTTP 4xx/5xx, DNS, render crash) — for
@@ -145,6 +155,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
   (
     {
       providerId,
+      posterUrl,
       tmdbId,
       type,
       season,
@@ -152,6 +163,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       startAt,
       onPlayerEvent,
       onBound,
+      onReady,
       onBindFailed,
       onFatalError,
       onSwitchSource,
@@ -166,6 +178,19 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const boundRef = useRef(false);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
+    // The provider can BIND (its <video> is found & controllable) before it PAINTS:
+    // on a slow start videasy keeps its own poster splash up until the first frame
+    // decodes. We hold an opaque branded cover over the WebView until playback
+    // actually renders, so the provider's poster never shows behind our chrome.
+    // Latches once per load; later buffering uses the spinner, not the full cover.
+    const firstFrameRef = useRef(false);
+    const [ready, setReady] = useState(false);
+    const markReady = useCallback(() => {
+      if (firstFrameRef.current) return;
+      firstFrameRef.current = true;
+      setReady(true);
+      onReady?.();
+    }, [onReady]);
     const provider = getProvider(providerId);
 
     // Branded error + recovery. On a fatal main-frame failure we cover the
@@ -339,6 +364,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       boundRef.current = false;
       setBound(false);
       setSlow(false);
+      firstFrameRef.current = false; // new load → re-cover until it paints again
+      setReady(false);
       const t = setTimeout(() => {
         if (!boundRef.current) {
           setSlow(true);
@@ -348,6 +375,15 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       return () => clearTimeout(t);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [providerId, tmdbId, type, season, episode, remountNonce]);
+
+    // Safety: never leave the cover up forever. If a bound provider emits neither a
+    // "playing" event nor a data-ready tick (unusual), reveal it a few seconds after
+    // bind so playback is never hidden behind a stuck loading screen.
+    useEffect(() => {
+      if (!bound || firstFrameRef.current) return;
+      const t = setTimeout(markReady, 6000);
+      return () => clearTimeout(t);
+    }, [bound, markReady]);
 
     // Recovery-state reset — ONLY on a real media/provider/episode change, NOT on a
     // retry remount (which must PRESERVE the auto-retry budget so the load→crash
@@ -359,7 +395,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       erroredThisLoadRef.current = false;
       retryAttemptRef.current = 0;
       if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     }, [providerId, tmdbId, type, season, episode]);
 
     const handleMessage = useCallback(
@@ -376,9 +412,22 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           setSlow(false);
           onBound?.();
         }
+        // First actual frame: the HTML5 "playing" event fires when frames are
+        // rendering; a data-ready tick (readyState≥3, advancing, not paused) is the
+        // cross-provider backstop. Either lifts the cover so the video (not the
+        // provider's poster) is what shows under our controls.
+        if (
+          e.event === "playing" ||
+          (typeof e.readyState === "number" &&
+            e.readyState >= 3 &&
+            e.currentTime > 0 &&
+            !e.paused)
+        ) {
+          markReady();
+        }
         onPlayerEvent?.(e);
       },
-      [onPlayerEvent, onBound],
+      [onPlayerEvent, onBound, markReady],
     );
 
     if (!provider) {
@@ -407,13 +456,6 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           allowsFullscreenVideo
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
-          startInLoadingState
-          renderLoading={() => (
-            <View style={[styles.web, styles.center]}>
-              <ActivityIndicator color={colors.white} />
-              <Text style={styles.msg}>Loading {provider.name}…</Text>
-            </View>
-          )}
           setSupportMultipleWindows={false}
           onOpenWindow={() => {
             /* swallow popups */
@@ -439,6 +481,57 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           onRenderProcessGone={() => raiseFatal({ kind: "render_crash" })}
           onContentProcessDidTerminate={() => raiseFatal({ kind: "render_crash" })}
         />
+        {/* Branded cover — opaque over the WebView from mount until the video paints
+            its first frame, so the provider's own poster/splash never shows behind
+            our controls on a slow start. Sits below the banner + error overlay.
+            The blurred poster uses expo-image's STATIC blurRadius (a Glide/CoreImage
+            transform, NOT a live backdrop capture) — safe over the player, and it
+            unmounts before the video plays, so it never touches the stutter rule. */}
+        {!ready && !fatalError && (
+          // pointerEvents="none": the cover is purely visual — taps pass THROUGH to
+          // the WebView so a gesture-gated provider (videasy creates its <video>
+          // only after a user gesture) still gets the tap that starts playback, and
+          // the cover can never trap a stream that needs one manual tap to begin.
+          <View style={styles.loading} pointerEvents="none">
+            {posterUrl ? (
+              <>
+                <Image
+                  source={{ uri: posterUrl }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  blurRadius={25}
+                  transition={250}
+                  cachePolicy="memory-disk"
+                />
+                <LinearGradient colors={LOADING_SCRIM} style={StyleSheet.absoluteFill} />
+              </>
+            ) : null}
+            <View style={styles.loadingContent}>
+              {posterUrl ? (
+                <View style={styles.loadingThumbWrap}>
+                  <Image
+                    source={{ uri: posterUrl }}
+                    style={styles.loadingThumb}
+                    contentFit="cover"
+                    transition={250}
+                    cachePolicy="memory-disk"
+                  />
+                  <View style={styles.loadingThumbGlaze}>
+                    <ActivityIndicator size="large" color={colors.honey} />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.loadingBadge}>
+                  <Ionicons name="paw" size={ms(30)} color={colors.honey} />
+                  <ActivityIndicator size="small" color={colors.honey} style={styles.loadingSpin} />
+                </View>
+              )}
+              <View style={styles.loadingTextCol}>
+                <Text style={styles.loadingSub}>Getting your stream ready…</Text>
+              </View>
+            </View>
+          </View>
+        )}
         {/* Slow to bind — keep the WebView mounted (finder keeps polling), just warn. */}
         {!bound && slow && !fatalError && (
           <View style={styles.banner} pointerEvents="none">
@@ -480,10 +573,61 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
 
 HijackPlayer.displayName = "HijackPlayer";
 
+// Vertical scrim over the blurred poster — lighter at the top, deepening toward the
+// bottom for text legibility (warm-charcoal, derived from colors.bg #100D0A).
+const LOADING_SCRIM = ["rgba(16,13,10,0.35)", "rgba(16,13,10,0.82)"] as const;
+
 const styles = StyleSheet.create({
   web: { flex: 1, backgroundColor: colors.playerBg },
   center: { alignItems: "center", justifyContent: "center", gap: 10 },
   msg: { color: colors.textDim, fontSize: 14, paddingHorizontal: 24, textAlign: "center" },
+  loading: {
+    // Absolute-fill, NOT flex:1 — react-native-webview renders renderLoading() as
+    // a normal flex sibling of the native WebView inside a column container, so a
+    // flex:1 loader splits the space 50/50 (WebView top half, loader bottom half).
+    // Overlaying it edge-to-edge makes the branded loading screen full-bleed.
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg, // solid base under the blurred poster (no poster → flat)
+  },
+  loadingContent: { alignItems: "center", gap: ms(18), paddingHorizontal: 32 },
+  loadingThumbWrap: {
+    width: ms(132),
+    height: ms(198),
+    borderRadius: ms(16),
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+    // NO elevation/shadow — proven stutter rule on any video screen.
+  },
+  loadingThumb: { width: "100%", height: "100%" },
+  loadingThumbGlaze: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(16,13,10,0.42)", // darken the thumb so the honey spinner reads
+  },
+  loadingBadge: {
+    width: ms(72),
+    height: ms(72),
+    borderRadius: ms(24),
+    alignItems: "center",
+    justifyContent: "center",
+    gap: ms(2),
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+  },
+  loadingSpin: {},
+  loadingTextCol: { alignItems: "center", gap: ms(4) },
+  loadingBrandRow: { flexDirection: "row", alignItems: "center", gap: ms(6) },
+  loadingTitle: {
+    color: colors.text,
+    fontFamily: font.headlineSemi,
+    fontSize: ms(17),
+  },
+  loadingSub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(13), textAlign: "center" },
   banner: {
     position: "absolute",
     bottom: 0,

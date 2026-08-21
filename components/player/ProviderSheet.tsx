@@ -191,6 +191,11 @@ export const ProviderSheet = forwardRef<BottomSheetModal, ProviderSheetProps>(
       <BottomSheetModal
         ref={ref}
         snapPoints={snapPoints}
+        // v5 defaults enableDynamicSizing to true, which sizes the sheet to its
+        // content — but a BottomSheetFlatList reports ~0 intrinsic height, so the
+        // sheet opened stunted (header + search only, list clipped). Pin it off so
+        // it always honors the 70% snap point (mirrors EpisodeSheet).
+        enableDynamicSizing={false}
         enablePanDownToClose
         backgroundStyle={styles.sheetBackground}
         backgroundComponent={SheetBackground}
