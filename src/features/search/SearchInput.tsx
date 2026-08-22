@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef } from "react";
 import { View, TextInput, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";

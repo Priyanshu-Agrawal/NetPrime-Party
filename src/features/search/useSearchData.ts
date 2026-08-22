@@ -64,6 +64,11 @@ export function useSearchData() {
   const latestCallIdRef = useRef<number>(0);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Guards against pathological pagination: consecutive loadMore failures (stop
+  // retrying a dead page on every scroll) and runaway short-list auto-fills.
+  const loadMoreFailuresRef = useRef(0);
+  const autoFillRef = useRef(0);
+
 
 
   const applyPageMeta = useCallback((nextPage: number, nextTotalPages: number) => {
@@ -159,7 +164,11 @@ export function useSearchData() {
       setIsInitialLoading(true);
       setError(null);
       setItems([]); // Clear stale results immediately so skeletons can render
-      
+
+      // Reset pagination guards for the new query/browse context
+      loadMoreFailuresRef.current = 0;
+      autoFillRef.current = 0;
+
       providerRef.current = providerId;
       queryRef.current = query;
       
@@ -171,7 +180,15 @@ export function useSearchData() {
         }
       } catch (err) {
         if (thisCallId === latestCallIdRef.current) {
-          setError(err instanceof Error ? err.message : "An unknown error occurred.");
+          // RTK's fakeBaseQuery rejects with a plain string (not an Error), so
+          // surface that directly instead of collapsing to a generic message.
+          const msg =
+            typeof err === "string"
+              ? err
+              : err instanceof Error
+                ? err.message
+                : "An unknown error occurred.";
+          setError(msg);
           setItems([]);
           applyPageMeta(1, 1);
         }
@@ -209,8 +226,12 @@ export function useSearchData() {
       } else {
         await fetchBrowse(providerRef.current, nextPage, true);
       }
+      loadMoreFailuresRef.current = 0;
     } catch {
-      // Ignore errors for next pages to keep current items visible
+      // Keep current items visible, but don't let a dead page retry forever on
+      // every onEndReached — stop paginating after a few consecutive failures.
+      loadMoreFailuresRef.current += 1;
+      if (loadMoreFailuresRef.current >= 3) hasMoreRef.current = false;
     } finally {
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
@@ -268,7 +289,15 @@ export function useSearchData() {
   // won't fill the screen. Since the user can't scroll, onEndReached never fires.
   // We manually force a load if there are items, but too few to scroll, and more exist.
   useEffect(() => {
-    if (!isInitialLoading && !isLoadingMore && items.length > 0 && items.length < 18 && hasMoreRef.current) {
+    if (
+      !isInitialLoading &&
+      !isLoadingMore &&
+      items.length > 0 &&
+      items.length < 18 &&
+      hasMoreRef.current &&
+      autoFillRef.current < 6 // cap auto-fills so heavy dedup can't burst-page forever
+    ) {
+      autoFillRef.current += 1;
       loadMore();
     }
   }, [isInitialLoading, isLoadingMore, items.length, loadMore]);

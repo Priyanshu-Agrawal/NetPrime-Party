@@ -46,6 +46,7 @@ export const PosterCard = React.memo(function PosterCard({
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             recyclingKey={poster}
+            transition={imageTransition}
             cachePolicy="memory-disk"
           />
         ) : (

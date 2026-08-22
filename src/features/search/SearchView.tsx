@@ -189,6 +189,7 @@ const SearchView: React.FC = () => {
             }
             numColumns={COLS}
             estimatedItemSize={183}
+            getItemType={(item) => ("isSkeleton" in item ? "skeleton" : "poster")}
             contentContainerStyle={contentContainerStyle}
             ListHeaderComponent={ListHeaderComponent}
             ListEmptyComponent={ListEmptyComponent}
@@ -208,8 +209,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   flex1: { flex: 1 },
   header: { paddingBottom: spacing.xs },
-  columnWrapper: { gap: layout.gridGap },
-  
+
   grid: { paddingHorizontal: spacing.lg, paddingBottom: ms(120) },
   gridBrowse: { paddingTop: spacing.xs },
   gridResults: { paddingTop: 0 },
@@ -226,12 +226,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
-  footerSkeletonRow: {
-    flexDirection: "row",
-    gap: layout.gridGap,
-  },
-
-  center: { 
+  center: {
     alignItems: "center", 
     justifyContent: "center", 
     paddingVertical: spacing.xxxl + 20, 

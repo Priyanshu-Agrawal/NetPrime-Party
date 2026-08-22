@@ -8,6 +8,11 @@ import {
 } from "@/utils/tmdbLists";
 import { fetchDetails } from "@/utils/tmdbDetails";
 
+// TMDB `with_watch_providers` requires a `watch_region`. The audience is
+// India-first, so default to IN (was hardcoded US). Provider IDs (Netflix=8,
+// etc.) are global; only availability filtering is region-scoped.
+const WATCH_REGION = "IN";
+
 const raw = async (path: string): Promise<any> => {
     const sep = path.includes("?") ? "&" : "?";
     const res = await fetch(`${API_URL}${path}${sep}language=en-US`, {
@@ -101,7 +106,7 @@ export const tmdbApi = createApi({
             >({
                 queryFn: async ({ providerId, page }) => {
                     try {
-                        const filters = providerId ? `&with_watch_providers=${providerId}&watch_region=US` : "";
+                        const filters = providerId ? `&with_watch_providers=${providerId}&watch_region=${WATCH_REGION}` : "";
                         const [tv, movie] = await Promise.all([
                             raw(`discover/tv?page=${page}${filters}&sort_by=popularity.desc`),
                             raw(`discover/movie?page=${page}${filters}&sort_by=popularity.desc`),
