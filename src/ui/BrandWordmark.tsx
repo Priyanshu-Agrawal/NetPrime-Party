@@ -2,12 +2,12 @@
  * BrandWordmark — Bearoom logotype with honey "r" (same weight/size as surrounding letters).
  */
 import { colors, font, ms } from "@/theme/bearoom";
-import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, View, type TextStyle } from "react-native";
+import { Image, StyleSheet, Text, View, type TextStyle } from "react-native";
 
 interface Props {
   size?: number;
+  /** Show the Bearoom mark to the left of the logotype. */
   showPaw?: boolean;
   style?: TextStyle;
 }
@@ -23,11 +23,10 @@ export function BrandWordmark({ size = ms(22), showPaw = true, style }: Props) {
   return (
     <View style={styles.row}>
       {showPaw ? (
-        <Ionicons
-          name="paw"
-          size={size * 0.9}
-          color={colors.honey}
-          style={{ marginRight: size * 0.32 }}
+        <Image
+          source={require("../../assets/images/brandmark.png")}
+          style={{ width: size * 1.2, height: size * 1.2, marginRight: size * 0.3 }}
+          resizeMode="contain"
         />
       ) : null}
       <Text style={[wordmark, style]}>

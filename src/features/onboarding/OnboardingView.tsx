@@ -30,6 +30,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
 import {
   Dimensions,
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
@@ -233,10 +234,20 @@ export default function OnboardingView() {
             ) : (
               <View style={styles.slideContent}>
                 <View style={styles.heroWrap}>
-                  <View style={styles.heroGlow} />
-                  <View style={styles.heroRing}>
-                    {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
-                  </View>
+                  {s.key === "welcome" ? (
+                    <Image
+                      source={require("../../../assets/images/brandmark.png")}
+                      style={styles.heroMark}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <>
+                      <View style={styles.heroGlow} />
+                      <View style={styles.heroRing}>
+                        {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
+                      </View>
+                    </>
+                  )}
                 </View>
 
                 {s.titleAccent ? (
@@ -356,6 +367,7 @@ const styles = StyleSheet.create({
   },
 
   heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: spacing.xxl },
+  heroMark: { width: ms(112), height: ms(112) },
   heroGlow: {
     position: "absolute",
     width: ms(160),
