@@ -1,15 +1,14 @@
-import { openPlayer } from "@/src/navigation/actions";
+import { openPlayer, goBack } from "@/src/navigation/actions";
 import type { PlayerStackParamList } from "@/src/navigation/types";
-import { Badge, Screen, Text } from "@/src/ui";
-import { colors, ms, radius, spacing } from "@/theme/bearoom";
+import { Badge, Screen, Text, BouncyPressable, IconButton, LibraryScreenHeader } from "@/src/ui";
+import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
-import { pressedStyle } from "@/theme/styles/interaction";
 import { getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 
 export default function WatchHistory() {
   const [items, setItems] = useState<any[]>([]);
@@ -41,16 +40,8 @@ export default function WatchHistory() {
   }
 
   return (
-    <Screen edges={["top"]} style={styles.screen}>
-      <View style={styles.headerWrap}>
-        <Text variant="overline" honey>
-          Library
-        </Text>
-        <Text variant="h1">Watch History</Text>
-        <Text variant="bodyDim" style={styles.subtitle}>
-          Your recently watched movies and shows will appear here.
-        </Text>
-      </View>
+    <Screen edges={["top"]}>
+      <LibraryScreenHeader title="Watch History" />
 
       <FlatList
         data={items}
@@ -65,8 +56,8 @@ export default function WatchHistory() {
               ? `Season ${item.season ?? "-"} • Episode ${item.episode ?? "-"}`
               : "Movie";
           return (
-            <Pressable
-              style={({ pressed }) => [styles.card, pressed && pressedStyle]}
+            <BouncyPressable
+              style={styles.card}
               onPress={() => openItem(item)}
             >
               <View style={styles.posterWrap}>
@@ -96,13 +87,16 @@ export default function WatchHistory() {
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={ms(22)} color={colors.textDim} />
-            </Pressable>
+            </BouncyPressable>
           );
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="time-outline" size={ms(30)} color={colors.textFaint} />
+            <View style={styles.heroWrap}>
+              <View style={styles.heroGlow} />
+              <View style={styles.heroRing}>
+                <Ionicons name="time" size={ms(32)} color={colors.honey} />
+              </View>
             </View>
             <Text variant="h2">No watch history yet</Text>
             <Text variant="bodyDim" style={styles.emptyText}>
@@ -116,15 +110,13 @@ export default function WatchHistory() {
 }
 
 const styles = StyleSheet.create({
-  screen: { paddingTop: spacing.lg },
-  headerWrap: { paddingHorizontal: layout.screenPadding, paddingBottom: spacing.md + 2 },
-  subtitle: { marginTop: spacing.sm },
   listContent: {
+    paddingTop: spacing.sm,
     paddingHorizontal: layout.screenPadding,
-    paddingBottom: spacing.xxl,
+    paddingBottom: ms(160),
     gap: spacing.md,
   },
-  emptyContainer: { flexGrow: 1, paddingHorizontal: layout.screenPadding, paddingBottom: spacing.xxl },
+  emptyContainer: { flexGrow: 1, paddingHorizontal: layout.screenPadding, paddingBottom: ms(160) },
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -148,14 +140,25 @@ const styles = StyleSheet.create({
   cardMeta: { marginBottom: spacing.sm - 2 },
   badgeRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: spacing.xxxl + 20 },
-  emptyIcon: {
+  heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: ms(16) },
+  heroGlow: {
+    position: "absolute",
+    width: ms(120),
+    height: ms(120),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeyGlow,
+    opacity: 0.15,
+  },
+  heroRing: {
     width: ms(76),
     height: ms(76),
-    borderRadius: radius.xl,
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeySoft,
+    borderWidth: 1,
+    borderColor: colors.honey,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: spacing.lg,
-    backgroundColor: colors.surfaceStrong,
+    ...glow.honey,
   },
   emptyText: { textAlign: "center", maxWidth: ms(280), marginTop: spacing.sm },
 });

@@ -2,8 +2,8 @@ import { colors, ms, radius } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { Frost } from "./Frost";
 import React from "react";
-import { Platform, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
-import { pressedStyle } from "@/theme/styles/interaction";
+import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
+import { BouncyPressable } from "./BouncyPressable";
 
 interface Props {
   onPress?: () => void;
@@ -22,20 +22,19 @@ export function IconButton({
 }: Props) {
   const d = ms(size);
   return (
-    <Pressable
+    <BouncyPressable
       onPress={onPress}
       hitSlop={6}
-      style={({ pressed }) => [
+      style={[
         styles.btn,
         { width: d, height: d },
-        pressed && pressedStyle,
         style,
       ]}
     >
       <Frost intensity={intensity} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.tint]} />
       {children}
-    </Pressable>
+    </BouncyPressable>
   );
 }
 

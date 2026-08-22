@@ -34,6 +34,7 @@ import {
 } from "@/services/party/identity";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
+import { Button } from "@/src/ui";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
@@ -437,16 +438,21 @@ export default function BearAvatarCustomizer({
             )}
           </ScrollView>
 
-          {/* Sticky Save Footer */}
+          {/* Footer Actions */}
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-              <Ionicons name="checkmark-circle" size={ms(18)} color={colors.onHoney} />
-              <Text style={styles.saveBtnText}>Save Bear</Text>
-            </TouchableOpacity>
+            <Button
+              label="Cancel"
+              variant="glass"
+              onPress={onClose}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Save Bear"
+              icon="checkmark-circle"
+              variant="honey"
+              onPress={handleSave}
+              style={{ flex: 2 }}
+            />
           </View>
         </View>
       </View>
@@ -733,36 +739,5 @@ const styles = StyleSheet.create({
     paddingTop: ms(8),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: ms(48),
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  cancelBtnText: {
-    color: colors.textDim,
-    fontFamily: font.label,
-    fontSize: ms(14),
-  },
-  saveBtn: {
-    flex: 2,
-    flexDirection: "row",
-    gap: ms(6),
-    height: ms(48),
-    borderRadius: radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.honey,
-    ...glow.honey,
-  },
-  saveBtnText: {
-    color: colors.onHoney,
-    fontFamily: font.headline,
-    fontSize: ms(15),
   },
 });

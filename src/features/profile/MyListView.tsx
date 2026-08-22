@@ -3,7 +3,7 @@
  */
 import { bearAlert } from "@/components/ui/BearAlert";
 import { LibraryScreenHeader, PosterCard, Screen, Text } from "@/src/ui";
-import { colors, ms, spacing } from "@/theme/bearoom";
+import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
 import { img } from "@/utils/tmdbDetails";
 import { getWatchlist, removeFromWatchlist, type WatchlistItem } from "@/utils/watchlist";
@@ -51,8 +51,13 @@ export default function MyListScreen() {
 
       {items.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="bookmark-outline" size={ms(40)} color={colors.textFaint} />
-          <Text variant="h3">Your list is empty</Text>
+          <View style={styles.heroWrap}>
+            <View style={styles.heroGlow} />
+            <View style={styles.heroRing}>
+              <Ionicons name="paw" size={ms(32)} color={colors.honey} />
+            </View>
+          </View>
+          <Text variant="h2" style={styles.emptyTitle}>Your list is empty</Text>
           <Text variant="bodyDim" style={styles.emptySub}>
             Save movies & shows from their details page to find them here.
           </Text>
@@ -93,7 +98,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xxxl,
-    gap: layout.railGap,
+    gap: spacing.xs,
+    paddingBottom: ms(60),
   },
+  heroWrap: { alignItems: "center", justifyContent: "center", marginBottom: ms(16) },
+  heroGlow: {
+    position: "absolute",
+    width: ms(120),
+    height: ms(120),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeyGlow,
+    opacity: 0.15,
+  },
+  heroRing: {
+    width: ms(76),
+    height: ms(76),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeySoft,
+    borderWidth: 1,
+    borderColor: colors.honey,
+    alignItems: "center",
+    justifyContent: "center",
+    ...glow.honey,
+  },
+  emptyTitle: { textAlign: "center", marginBottom: spacing.xs },
   emptySub: { textAlign: "center", lineHeight: ms(19) },
 });

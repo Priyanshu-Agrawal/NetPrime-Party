@@ -11,6 +11,7 @@ import {
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
+import { Button } from "@/src/ui";
 import { DetailsSkeleton } from "@/src/ui";
 import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
@@ -215,14 +216,20 @@ const MovieDetailsScreen: React.FC = () => {
 
         {/* Primary actions */}
         <View style={styles.actions}>
-          <Pressable style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]} onPress={handlePlay}>
-            <Ionicons name="play" size={20} color={colors.onHoney} />
-            <Text style={styles.playText}>Play</Text>
-          </Pressable>
-          <Pressable style={({ pressed }) => [styles.togetherBtn, pressed && styles.pressed]} onPress={handleWatchTogether}>
-            <Ionicons name="paw" size={18} color={colors.honey} />
-            <Text style={styles.togetherText}>Watch together</Text>
-          </Pressable>
+          <Button
+            label="Play"
+            icon="play"
+            variant="honey"
+            onPress={handlePlay}
+            style={styles.flexBtn}
+          />
+          <Button
+            label="Watch together"
+            icon="paw"
+            variant="glass"
+            onPress={handleWatchTogether}
+            style={styles.flexBtn}
+          />
         </View>
 
         {/* Quick actions */}
@@ -411,33 +418,7 @@ const styles = StyleSheet.create({
   heroContent: { paddingHorizontal: 16, paddingBottom: 16, gap: 10 },
   title: { color: colors.text, fontFamily: font.headlineXbold, fontSize: ms(32), letterSpacing: -0.6, lineHeight: ms(36) },
 
-  actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
-  playBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: colors.honey,
-    paddingVertical: 14,
-    borderRadius: radius.pill,
-    ...glow.honey,
-  },
-  playText: { color: colors.onHoney, fontFamily: font.headline, fontSize: ms(15) },
-  togetherBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    paddingVertical: 14,
-    borderRadius: radius.pill,
-  },
-  togetherText: { color: colors.text, fontFamily: font.headline, fontSize: ms(15) },
-
+  actions: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 }, flexBtn: { flex: 1 },
   quickRow: {
     flexDirection: "row",
     justifyContent: "space-around",

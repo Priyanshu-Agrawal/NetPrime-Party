@@ -1,11 +1,11 @@
 import { Image } from "expo-image";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { colors, layoutTokens, ms, radius, spacing } from "@/theme/bearoom";
-import { pressedStyle } from "@/theme/styles/interaction";
 import { GlassChip } from "./GlassChip";
 import { RatingBadge } from "./RatingBadge";
 import { Text } from "./Text";
+import { BouncyPressable } from "./BouncyPressable";
 
 interface Props {
   poster?: string;
@@ -32,10 +32,10 @@ export function PosterCard({
 }: Props) {
   const height = width * layoutTokens.posterAspect;
   return (
-    <Pressable
+    <BouncyPressable
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => [{ width }, pressed && pressedStyle]}
+      style={[{ width }]}
     >
       <View style={[styles.card, { width, height }]}>
         {poster ? (
@@ -67,7 +67,7 @@ export function PosterCard({
           {title}
         </Text>
       ) : null}
-    </Pressable>
+    </BouncyPressable>
   );
 }
 

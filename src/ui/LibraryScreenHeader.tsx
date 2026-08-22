@@ -20,7 +20,7 @@ export function LibraryScreenHeader({ title }: { title: string }) {
 }
 
 const styles = StyleSheet.create({
-  header: {
+  header: { zIndex: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

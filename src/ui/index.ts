@@ -24,3 +24,4 @@ export { useCollapsingHeader, useFadeInStyle } from "./useCollapsingHeader";
 
 /** Legacy alias */
 export { Button as HoneyButton } from "./Button";
+export * from "./BouncyPressable";

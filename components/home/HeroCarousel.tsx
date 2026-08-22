@@ -180,8 +180,10 @@ export function HeroCarousel() {
                     size="xs"
                     glowing={false}
                   />
-                  <Pressable
-                    style={({ pressed }) => [styles.togetherBtn, pressed && pressedStyle]}
+                  <Button
+                    label="Watch together"
+                    icon="paw"
+                    variant="ghost"
                     onPress={() =>
                       openPartyHost({
                         role: "host",
@@ -192,13 +194,8 @@ export function HeroCarousel() {
                         title: itemTitle(item),
                       })
                     }
-                    hitSlop={8}
-                  >
-                    <Ionicons name="paw" size={ms(14)} color={colors.honey} />
-                    <Text variant="caption" honey>
-                      Watch together
-                    </Text>
-                  </Pressable>
+                    size="xs"
+                  />
                 </View>
               </View>
             </Pressable>
@@ -223,7 +220,6 @@ const styles = StyleSheet.create({
   title: { fontSize: ms(30), letterSpacing: -0.5, marginBottom: spacing.sm - 2 },
   overview: { fontSize: ms(13), lineHeight: ms(19), marginBottom: spacing.lg },
   actions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  togetherBtn: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   dots: { position: "absolute", top: ms(14), right: ms(14), flexDirection: "row", gap: ms(5) },
   dot: { width: ms(6), height: ms(6), borderRadius: ms(3), backgroundColor: colors.heroDotActive },
   dotActive: { backgroundColor: colors.honey, width: ms(16) },

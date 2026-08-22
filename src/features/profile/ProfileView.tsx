@@ -332,7 +332,7 @@ function Row({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: ms(16), paddingBottom: ms(130) },
+  content: { paddingHorizontal: ms(16), paddingBottom: ms(180) },
   topBarBg: { position: "absolute", top: 0, left: 0, right: 0, overflow: "hidden" },
   headerBgLine: {
     position: "absolute",
