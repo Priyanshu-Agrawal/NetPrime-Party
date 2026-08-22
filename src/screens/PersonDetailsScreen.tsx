@@ -40,7 +40,7 @@ export default function PersonDetailsScreen({ route }: Props) {
       seen.add(c.id);
       return true;
     });
-    return deduped.sort((a: any, b: any) => b.popularity - a.popularity);
+    return deduped.sort((a: any, b: any) => (b.popularity ?? 0) - (a.popularity ?? 0));
   }, [creditsRaw]);
 
   // --- Scroll & Parallax Animations ---
@@ -79,7 +79,22 @@ export default function PersonDetailsScreen({ route }: Props) {
     );
   }
 
-  if (!details) return null;
+  if (!details) {
+    // Load failed (network/404) — never leave a blank dead-end; keep a back affordance.
+    return (
+      <Screen edges={["bottom"]}>
+        <View style={[styles.headerRow, { marginTop: Math.max(insets.top, ms(16)) }]}>
+          <GlassIconButton onPress={goBack}>
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </GlassIconButton>
+        </View>
+        <View style={styles.errorWrap}>
+          <Ionicons name="person-circle-outline" size={48} color={colors.textFaint} />
+          <Text variant="bodyDim">Couldn&apos;t load this profile.</Text>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={["bottom"]}>
@@ -300,5 +315,12 @@ const styles = StyleSheet.create({
   },
   creditCard: {
     width: gridColumnWidth(3),
+  },
+  errorWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+    paddingBottom: ms(80),
   },
 });
