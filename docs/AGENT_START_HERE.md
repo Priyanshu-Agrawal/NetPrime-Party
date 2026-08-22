@@ -10,8 +10,9 @@ You're picking up **Bearoom / NetPrime** — a server-driven movie & synced-watc
 ## The one-paragraph mental model
 Tier 1 is a **Cloudflare Worker (Hono + Zod) + Supabase Postgres** serving `/config` (the dynamic provider registry — **no baked-in fallback**, a store-review killswitch), `/scripts` (OTA DOM-hijack bridges), `/report` (telemetry), `/scrape`. Tier 2 is a **`react-native-webview`** mounted on the provider's own embed page, into which the app injects a JS **bridge** (`src/scripts/legacy-videasy.ts`, served OTA, cached in MMKV) that finds and drives the provider's `<video>` — this is what powers solo playback AND synced watch-party. State is **Redux Toolkit + RTK Query**. Only the `videasy` provider (branded **"NetPrime"** in-app) ships a working bridge today.
 
-## Where things stand (2026-08-21)
-- Branch **`feat/improvements`**, HEAD **`e783682`**, `tsc` clean. Worker live at `netprime-worker.spiderfan-no1.workers.dev`.
+## Where things stand (2026-08-22)
+- Branch **`feat/improvements`**, HEAD ≈ **`7932d54`**, `tsc` clean. Worker live at `netprime-worker.spiderfan-no1.workers.dev`. (The branch moves fast across concurrent sessions — trust `git log`, not this hash.)
+- **Brand refresh (`7932d54`):** the logo is now a **bear + film-strip + play** mark (not the old paw) — honey on flat charcoal, no glow. Every app-icon/splash asset was regenerated from it (source + native), and `assets/images/brandmark.png` (transparent) is wired into the header/onboarding via `src/ui/BrandWordmark.tsx`. See the "Brand identity" board entry for the reusable SVG→headless-Chromium asset pipeline. The board's 3D mascot bear is NOT generated (needs an image model).
 - App plays on iOS sim + Android. Recent batches (all committed): player-UI polish (pro loading screen, error-overlay reachability, autoplay toggle, BearAlert press-feedback), a reverted first-frame gate, rotation-mask + provider-chrome hiding + banner auto-retire. See project-board tail.
 - ⚠️ Commit `4bfb5c0` is **mislabeled** "refactor(api): RTK Query" — it actually also bundles the player-UI-polish batch + iOS pods (an amend collision between two concurrent agents). Don't trust that one message.
 

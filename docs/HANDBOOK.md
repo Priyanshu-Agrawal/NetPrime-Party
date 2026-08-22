@@ -1,6 +1,6 @@
 # Bearoom / NetPrime — Project Handbook
 
-> Branch `feat/improvements` @ `e783682` · Expo SDK 53 / React Native 0.79 / React 19 (New Architecture, Bridgeless) · edge worker deployed at `netprime-worker.spiderfan-no1.workers.dev`.
+> Branch `feat/improvements` @ `7932d54` (brand refresh: new bear+film+play logo mark) · Expo SDK 53 / React Native 0.79 / React 19 (New Architecture, Bridgeless) · edge worker deployed at `netprime-worker.spiderfan-no1.workers.dev`.
 >
 > **New here? Read [docs/AGENT_START_HERE.md](AGENT_START_HERE.md) first** (fast orientation + the current TOP OPEN item), then [docs/project-board.md](project-board.md) for live status. This handbook is the deep manual. *Note: this header commit + the §1 phase status lag behind the project-board tail — treat the board as the source of truth for "what's the latest."*
 
