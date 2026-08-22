@@ -11,7 +11,7 @@ interface Props {
   poster?: string;
   title?: string;
   rating?: number;
-  kind?: "movie" | "tv";
+  kind?: "movie" | "tv" | "person";
   progress?: number;
   width?: number;
   onPress?: () => void;
@@ -55,6 +55,10 @@ export const PosterCard = React.memo(function PosterCard({
         {kind === "tv" ? (
           <View style={styles.tag}>
             <GlassChip label="TV" size="sm" blur={false} />
+          </View>
+        ) : kind === "person" ? (
+          <View style={styles.tag}>
+            <GlassChip label="Person" size="sm" blur={false} />
           </View>
         ) : null}
         {progress != null ? (

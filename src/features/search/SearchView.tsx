@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import AppHeader from "@/components/ui/AppHeader";
-import { PosterSkeleton, Text, BouncyPressable } from "@/src/ui";
+import { PosterSkeleton, Text, BouncyPressable, Chip } from "@/src/ui";
 import { colors, ms, spacing, radius } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import type { MediaItem } from "@/utils/tmdbLists";
@@ -33,11 +33,13 @@ const SearchView: React.FC = () => {
     error,
     searchQuery,
     selectedProvider,
+    searchType,
     mode,
     hasMore,
     loadMore,
     handleSearch,
     selectProvider,
+    selectSearchType,
   } = useSearchData();
 
   const handleClearSearch = useCallback(() => {
@@ -98,14 +100,39 @@ const SearchView: React.FC = () => {
     </View>
   ) : null;
 
-  const ListHeaderComponent = mode === "browse" ? (
-    <BrowseHeader
-      searchQuery={searchQuery}
-      onSearch={handleSearch}
-      selectedProvider={selectedProvider}
-      onSelectProvider={selectProvider}
-    />
-  ) : null;
+  const ListHeaderComponent = (
+    <View style={styles.header}>
+      {mode === "browse" ? (
+        <BrowseHeader
+          searchQuery={searchQuery}
+          onSearch={handleSearch}
+          selectedProvider={selectedProvider}
+          onSelectProvider={selectProvider}
+        />
+      ) : (
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={[
+            { id: "multi", label: "All" },
+            { id: "movie", label: "Movies" },
+            { id: "tv", label: "TV Shows" },
+            { id: "person", label: "People" },
+          ]}
+          keyExtractor={(item) => item.id}
+          style={styles.filterList}
+          contentContainerStyle={styles.filterRow}
+          renderItem={({ item }) => (
+            <Chip
+              label={item.label}
+              active={searchType === item.id}
+              onPress={() => selectSearchType(item.id as any)}
+            />
+          )}
+        />
+      )}
+    </View>
+  );
 
   const ListFooterComponent = (
     <View style={{ paddingVertical: spacing.xl, alignItems: 'center' }}>
@@ -193,6 +220,8 @@ const styles = StyleSheet.create({
     gap: layout.gridGap,
     justifyContent: "space-between",
   },
+  filterList: { flexGrow: 0, marginBottom: spacing.md },
+  filterRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   skeletonItem: {
     marginBottom: spacing.lg,
   },

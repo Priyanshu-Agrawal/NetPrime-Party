@@ -8,109 +8,115 @@ import {
 } from "@/utils/tmdbLists";
 import { fetchDetails } from "@/utils/tmdbDetails";
 
-/**
- * RTK Query layer over the existing TMDB helpers (utils/tmdbLists,
- * utils/tmdbDetails) and the direct proxy fetches. Implemented with `queryFn`
- * so every proven transform/extractor stays untouched — this only adds caching,
- * request dedupe, and generated hooks. Replaces the bespoke module cache in
- * src/features/home/tmdbCache.ts (RTK Query keeps entries warm via
- * keepUnusedDataFor, so Home no longer flashes skeleton on tab focus).
- *
- * `MediaType` responses for details/season/search are raw TMDB JSON (`unknown`);
- * screens pass them to the pure extractors (pickTrailer, topCast, pickProviders…).
- */
-
 const raw = async (path: string): Promise<any> => {
     const sep = path.includes("?") ? "&" : "?";
     const res = await fetch(`${API_URL}${path}${sep}language=en-US`, {
         headers: API_HEADERS,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try {
+            const errBody = await res.json();
+            msg = errBody.status_message || msg;
+        } catch {}
+        throw new Error(msg);
+    }
     return res.json();
 };
 
 export const tmdbApi = createApi({
     reducerPath: "tmdbApi",
     baseQuery: fakeBaseQuery<string>(),
-    endpoints: (build) => ({
-        /** Home rails — a TMDB list path e.g. "movie/popular", "trending/tv/week". */
-        list: build.query<MediaItem[], string>({
-            queryFn: async (path) => ({ data: await fetchList(path) }),
-            keepUnusedDataFor: 600,
-        }),
+    endpoints: (build) => {
+        const wrapQuery = (pathFn: (arg: any) => string | Promise<string>) => async (arg: any) => {
+            try {
+                return { data: await raw(await pathFn(arg)) };
+            } catch (e: any) {
+                return { error: e.message };
+            }
+        };
 
-        /** Hero carousel — trending, backdrop-only, top 8. */
-        hero: build.query<MediaItem[], void>({
-            queryFn: async () => {
-                const r = await fetchList("trending/all/week");
-                return { data: r.filter((m) => m.backdrop_path).slice(0, 8) };
-            },
-            keepUnusedDataFor: 600,
-        }),
-
-        /** Paginated list — library "See all" screens. */
-        listPage: build.query<ListPageResult, { path: string; page: number }>({
-            queryFn: async ({ path, page }) => ({
-                data: await fetchListPage(path, page),
+        return {
+            list: build.query<MediaItem[], string>({
+                queryFn: async (path) => {
+                    try { return { data: await fetchList(path) }; }
+                    catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 600,
             }),
-            keepUnusedDataFor: 300,
-        }),
-
-        /** Rich details (append_to_response bundle) — raw TMDB JSON for extractors. */
-        details: build.query<any, { type: "movie" | "tv"; id: string }>({
-            queryFn: async ({ type, id }) => ({ data: await fetchDetails(type, id) }),
-            keepUnusedDataFor: 600,
-        }),
-
-        /** A single TV season (episodes list). */
-        season: build.query<any, { id: string; season: number }>({
-            queryFn: async ({ id, season }) => ({
-                data: await raw(`tv/${id}/season/${season}`),
+            hero: build.query<MediaItem[], void>({
+                queryFn: async () => {
+                    try {
+                        const r = await fetchList("trending/all/week");
+                        return { data: r.filter((m) => m.backdrop_path).slice(0, 8) };
+                    } catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 600,
             }),
-            keepUnusedDataFor: 600,
-        }),
-
-        personDetails: build.query<any, number | string>({
-            queryFn: async (id) => ({ data: await raw(`person/${id}`) }),
-            keepUnusedDataFor: 600,
-        }),
-        personCredits: build.query<any, number | string>({
-            queryFn: async (id) => ({ data: await raw(`person/${id}/combined_credits`) }),
-            keepUnusedDataFor: 600,
-        }),
-
-        /** Multi search (movies + tv + people). Returns raw page for the caller to filter. */
-        searchMulti: build.query<any, { query: string; page: number }>({
-            queryFn: async ({ query, page }) => ({
-                data: await raw(`search/multi?query=${encodeURIComponent(query)}&page=${page}`),
+            listPage: build.query<ListPageResult, { path: string; page: number }>({
+                queryFn: async ({ path, page }) => {
+                    try { return { data: await fetchListPage(path, page) }; }
+                    catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 300,
             }),
-            keepUnusedDataFor: 120,
-        }),
-
-        /** Discover by streaming provider (tv + movie in parallel), US region. */
-        discoverByProvider: build.query<
-            { tv: any; movie: any },
-            { providerId: number; page: number }
-        >({
-            queryFn: async ({ providerId, page }) => {
-                const q = `sort_by=popularity.desc&watch_region=US&with_watch_providers=${providerId}&page=${page}`;
-                const [tv, movie] = await Promise.all([
-                    raw(`discover/tv?${q}`),
-                    raw(`discover/movie?${q}`),
-                ]);
-                return { data: { tv, movie } };
-            },
-            keepUnusedDataFor: 120,
-        }),
-
-        /** Trending across all media for a given day-page (Search browse default). */
-        trendingAllDay: build.query<any, { page: number }>({
-            queryFn: async ({ page }) => ({
-                data: await raw(`trending/all/day?page=${page}`),
+            details: build.query<any, { type: "movie" | "tv"; id: string | number }>({
+                queryFn: async ({ type, id }) => {
+                    try { return { data: await fetchDetails(type, String(id)) }; }
+                    catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 600,
             }),
-            keepUnusedDataFor: 120,
-        }),
-    }),
+            season: build.query<any, { id: number | string; season: number }>({
+                queryFn: wrapQuery(({ id, season }) => `tv/${id}/season/${season}`),
+                keepUnusedDataFor: 600,
+            }),
+            personDetails: build.query<any, number | string>({
+                queryFn: wrapQuery((id) => `person/${id}`),
+                keepUnusedDataFor: 600,
+            }),
+            personCredits: build.query<any, number | string>({
+                queryFn: wrapQuery((id) => `person/${id}/combined_credits`),
+                keepUnusedDataFor: 600,
+            }),
+            searchMulti: build.query<any, { query: string; page: number }>({
+                queryFn: wrapQuery(({ query, page }) => `search/multi?query=${encodeURIComponent(query)}&page=${page}`),
+                keepUnusedDataFor: 120,
+            }),
+            searchMovie: build.query<any, { query: string; page: number }>({
+                queryFn: wrapQuery(({ query, page }) => `search/movie?query=${encodeURIComponent(query)}&page=${page}`),
+                keepUnusedDataFor: 120,
+            }),
+            searchTv: build.query<any, { query: string; page: number }>({
+                queryFn: wrapQuery(({ query, page }) => `search/tv?query=${encodeURIComponent(query)}&page=${page}`),
+                keepUnusedDataFor: 120,
+            }),
+            searchPerson: build.query<any, { query: string; page: number }>({
+                queryFn: wrapQuery(({ query, page }) => `search/person?query=${encodeURIComponent(query)}&page=${page}`),
+                keepUnusedDataFor: 120,
+            }),
+            discoverByProvider: build.query<
+                { tv: any; movie: any },
+                { providerId: number | null; page: number }
+            >({
+                queryFn: async ({ providerId, page }) => {
+                    try {
+                        const filters = providerId ? `&with_watch_providers=${providerId}&watch_region=US` : "";
+                        const [tv, movie] = await Promise.all([
+                            raw(`discover/tv?page=${page}${filters}&sort_by=popularity.desc`),
+                            raw(`discover/movie?page=${page}${filters}&sort_by=popularity.desc`),
+                        ]);
+                        return { data: { tv, movie } };
+                    } catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 120,
+            }),
+            trendingAllDay: build.query<any, { page: number }>({
+                queryFn: wrapQuery(({ page }) => `trending/all/day?page=${page}`),
+                keepUnusedDataFor: 120,
+            }),
+        };
+    },
 });
 
 export const {
@@ -124,6 +130,9 @@ export const {
     usePersonCreditsQuery,
     useLazySeasonQuery,
     useLazySearchMultiQuery,
+    useLazySearchMovieQuery,
+    useLazySearchTvQuery,
+    useLazySearchPersonQuery,
     useLazyDiscoverByProviderQuery,
     useLazyTrendingAllDayQuery,
 } = tmdbApi;

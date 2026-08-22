@@ -2,14 +2,22 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import {
   useLazyDiscoverByProviderQuery,
   useLazySearchMultiQuery,
+  useLazySearchMovieQuery,
+  useLazySearchTvQuery,
+  useLazySearchPersonQuery,
   useLazyTrendingAllDayQuery,
 } from "@/src/store/services/tmdbApi";
 import type { MediaItem } from "@/utils/tmdbLists";
 
-function filterResults(items: unknown[]): MediaItem[] {
-  return (items ?? []).filter(
-    (item: any) => item?.poster_path && item?.media_type !== "person"
-  ) as MediaItem[];
+export type SearchType = "multi" | "movie" | "tv" | "person";
+
+function filterResults(items: unknown[], searchType: SearchType): MediaItem[] {
+  return (items ?? []).filter((item: any) => {
+    const hasImage = item?.poster_path || item?.profile_path;
+    if (!hasImage) return false;
+    if (searchType === "multi" || searchType === "person") return true;
+    return item?.media_type !== "person";
+  }) as MediaItem[];
 }
 
 function mergeProviderResults(tvData: any, movieData: any): MediaItem[] {
@@ -24,6 +32,17 @@ function mergeProviderResults(tvData: any, movieData: any): MediaItem[] {
 export function useSearchData() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
+  const [searchType, setSearchType] = useState<SearchType>("multi");
+  
+  const mode = searchQuery ? "search" : "browse";
+
+  // API Hooks
+  const [fetchDiscover] = useLazyDiscoverByProviderQuery();
+  const [fetchTrending] = useLazyTrendingAllDayQuery();
+  const [fetchMulti] = useLazySearchMultiQuery();
+  const [fetchMovie] = useLazySearchMovieQuery();
+  const [fetchTv] = useLazySearchTvQuery();
+  const [fetchPerson] = useLazySearchPersonQuery();
 
   // Data State
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -45,10 +64,7 @@ export function useSearchData() {
   const latestCallIdRef = useRef<number>(0);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // RTK Query hooks
-  const [fetchTrending] = useLazyTrendingAllDayQuery();
-  const [fetchDiscover] = useLazyDiscoverByProviderQuery();
-  const [fetchSearch] = useLazySearchMultiQuery();
+
 
   const applyPageMeta = useCallback((nextPage: number, nextTotalPages: number) => {
     pageRef.current = nextPage;
@@ -68,7 +84,7 @@ export function useSearchData() {
         const data = await fetchTrending({ page: pageNum }).unwrap();
         if (callId !== latestCallIdRef.current) return;
         
-        batch = filterResults(data.results ?? []);
+        batch = filterResults(data.results ?? [], "multi");
         totalPages = data.total_pages ?? 1000;
         returnedPage = data.page ?? pageNum;
       } else {
@@ -100,30 +116,44 @@ export function useSearchData() {
   );
 
   const fetchSearchPage = useCallback(
-    async (query: string, pageNum: number, append: boolean): Promise<void> => {
+    async (query: string, pageNum: number, append: boolean, type: SearchType = searchType): Promise<void> => {
       const callId = latestCallIdRef.current;
-      const data = await fetchSearch({ query, page: pageNum }).unwrap();
+      
+      let data: any;
+      if (type === "movie") {
+        data = await fetchMovie({ query, page: pageNum }).unwrap();
+      } else if (type === "tv") {
+        data = await fetchTv({ query, page: pageNum }).unwrap();
+      } else if (type === "person") {
+        data = await fetchPerson({ query, page: pageNum }).unwrap();
+      } else {
+        data = await fetchMulti({ query, page: pageNum }).unwrap();
+      }
       
       if (callId !== latestCallIdRef.current) return;
-      
-      const batch = filterResults(data.results ?? []);
+
+      let batch = filterResults(data.results ?? [], type);
+      // Ensure media_type is set for specific endpoints (RTK Query data is frozen)
+      if (type !== "multi") {
+        batch = batch.map((item: any) => ({ ...item, media_type: type }));
+      }
+
       setItems((prev) => {
         if (!append) return batch;
-        
         const seen = new Set(prev.map((i) => `${i.media_type || "media"}:${i.id}`));
         const filteredBatch = batch.filter(
           (i) => !seen.has(`${i.media_type || "media"}:${i.id}`)
         );
         return [...prev, ...filteredBatch];
       });
-      
+
       applyPageMeta(data.page ?? pageNum, data.total_pages ?? 1);
     },
-    [applyPageMeta, fetchSearch]
+    [applyPageMeta, fetchMulti, fetchMovie, fetchTv, fetchPerson, searchType]
   );
 
   const fetchInitial = useCallback(
-    async (providerId: number | null = selectedProvider, query = ""): Promise<void> => {
+    async (providerId: number | null = selectedProvider, query = searchQuery, type: SearchType = searchType): Promise<void> => {
       const thisCallId = ++latestCallIdRef.current;
       
       setIsInitialLoading(true);
@@ -135,7 +165,7 @@ export function useSearchData() {
       
       try {
         if (query) {
-          await fetchSearchPage(query, 1, false);
+          await fetchSearchPage(query, 1, false, type);
         } else {
           await fetchBrowse(providerId, 1, false);
         }
@@ -151,7 +181,18 @@ export function useSearchData() {
         }
       }
     },
-    [applyPageMeta, fetchBrowse, fetchSearchPage, selectedProvider]
+    [applyPageMeta, fetchBrowse, fetchSearchPage, searchQuery, searchType, selectedProvider]
+  );
+
+  const selectSearchType = useCallback(
+    (type: SearchType) => {
+      if (type === searchType) return;
+      setSearchType(type);
+      if (searchQuery) {
+        fetchInitial(selectedProvider, searchQuery, type);
+      }
+    },
+    [fetchInitial, searchQuery, searchType, selectedProvider]
   );
 
   const loadMore = useCallback(async () => {
@@ -240,9 +281,11 @@ export function useSearchData() {
     error,
     searchQuery,
     selectedProvider,
+    searchType,
     loadMore,
     handleSearch,
     selectProvider,
+    selectSearchType,
     mode: searchQuery ? ("search" as const) : ("browse" as const),
   };
 }
