@@ -16,6 +16,7 @@ export interface MediaItem {
   first_air_date?: string;
   media_type?: "movie" | "tv";
   genre_ids?: number[];
+  popularity?: number;
 }
 
 export async function fetchList(path: string): Promise<MediaItem[]> {

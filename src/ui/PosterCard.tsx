@@ -19,7 +19,7 @@ interface Props {
   imageTransition?: number;
 }
 
-export function PosterCard({
+export const PosterCard = React.memo(function PosterCard({
   poster,
   title,
   rating,
@@ -31,6 +31,7 @@ export function PosterCard({
   imageTransition = 300,
 }: Props) {
   const height = width * layoutTokens.posterAspect;
+
   return (
     <BouncyPressable
       onPress={onPress}
@@ -40,10 +41,12 @@ export function PosterCard({
       <View style={[styles.card, { width, height }]}>
         {poster ? (
           <Image
-            source={{ uri: poster }}
+            source={poster}
+            placeholder={{ blurhash: "L15#|n_3~pD%4nIW%M?c?HIW%MRj" }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
-            transition={imageTransition}
+            recyclingKey={poster}
+            cachePolicy="memory-disk"
           />
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.placeholder]} />
@@ -69,7 +72,7 @@ export function PosterCard({
       ) : null}
     </BouncyPressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
