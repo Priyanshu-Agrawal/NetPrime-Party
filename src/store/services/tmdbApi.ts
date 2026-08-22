@@ -70,6 +70,15 @@ export const tmdbApi = createApi({
             keepUnusedDataFor: 600,
         }),
 
+        personDetails: build.query<any, number | string>({
+            queryFn: async (id) => ({ data: await raw(`person/${id}`) }),
+            keepUnusedDataFor: 600,
+        }),
+        personCredits: build.query<any, number | string>({
+            queryFn: async (id) => ({ data: await raw(`person/${id}/combined_credits`) }),
+            keepUnusedDataFor: 600,
+        }),
+
         /** Multi search (movies + tv + people). Returns raw page for the caller to filter. */
         searchMulti: build.query<any, { query: string; page: number }>({
             queryFn: async ({ query, page }) => ({
@@ -111,6 +120,8 @@ export const {
     useLazyListPageQuery,
     useDetailsQuery,
     useSeasonQuery,
+    usePersonDetailsQuery,
+    usePersonCreditsQuery,
     useLazySeasonQuery,
     useLazySearchMultiQuery,
     useLazyDiscoverByProviderQuery,

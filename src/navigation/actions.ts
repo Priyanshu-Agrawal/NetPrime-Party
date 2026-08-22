@@ -28,6 +28,10 @@ export function openDetails(item: MediaItem, fallback: "movie" | "tv" = "movie")
   navigate("PlayerStack", detailsRoute(item, fallback));
 }
 
+export function openPerson(id: number | string) {
+  navigate("PlayerStack", { screen: "PersonDetails", params: { id } } as any);
+}
+
 export function openPlayer(params: PlayerStackParamList["Player"]) {
   navigate("PlayerStack", { screen: "Player", params });
 }

@@ -3,6 +3,7 @@ import type { NavigatorScreenParams } from "@react-navigation/native";
 export type PlayerStackParamList = {
   MovieDetails: { id: string; type?: "movie" };
   TvDetails: { id: string; type?: "tv" };
+  PersonDetails: { id: string | number };
   Player: {
     id: string;
     type: "movie" | "tv";

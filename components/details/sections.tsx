@@ -7,6 +7,8 @@
 import { colors, ms, font, radius } from "@/theme/bearoom";
 import type { ExternalLink, Person, WatchProviders } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
+import { BouncyPressable } from "@/src/ui";
+import { openPerson } from "@/src/navigation/actions";
 import { Image } from "expo-image";
 import React from "react";
 import {
@@ -106,7 +108,11 @@ export function PeopleRow({ people }: { people: Person[] }) {
       contentContainerStyle={styles.peopleRow}
     >
       {people.map((p, i) => (
-        <View key={`${p.id}-${i}`} style={styles.person}>
+        <BouncyPressable 
+          key={`${p.id}-${i}`} 
+          style={styles.person}
+          onPress={() => openPerson(p.id)}
+        >
           {p.profile ? (
             <Image source={{ uri: p.profile }} style={styles.personImg} contentFit="cover" />
           ) : (
@@ -122,7 +128,7 @@ export function PeopleRow({ people }: { people: Person[] }) {
               {p.role}
             </Text>
           ) : null}
-        </View>
+        </BouncyPressable>
       ))}
     </ScrollView>
   );

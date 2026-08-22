@@ -248,6 +248,7 @@ const TvDetailsScreen: React.FC = () => {
             label="Play"
             icon="play"
             variant="honey"
+            size="sm"
             onPress={handlePlay}
             style={styles.flexBtn}
           />
@@ -255,6 +256,7 @@ const TvDetailsScreen: React.FC = () => {
             label="Watch together"
             icon="paw"
             variant="glass"
+            size="sm"
             onPress={handleWatchTogether}
             style={styles.flexBtn}
           />

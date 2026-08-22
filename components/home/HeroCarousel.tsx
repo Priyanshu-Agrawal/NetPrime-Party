@@ -33,18 +33,12 @@ const HERO_H = Math.round(width * 1.12);
 
 export function HeroSkeleton() {
   return (
-    <View style={styles.hero}>
+    <View style={[styles.hero, { justifyContent: "flex-end" }]}>
       {/* Background Shimmer Backdrop */}
       <Shimmer shimmerColors={SHIMMER} style={styles.heroFill} />
-
-      {/* Cinematic Vignette Gradients */}
+      
+      {/* Smooth bottom fade into page background */}
       <LinearGradient colors={[...gradients.heroBottom]} style={StyleSheet.absoluteFill} />
-      <LinearGradient
-        colors={[...gradients.heroTop]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={StyleSheet.absoluteFill}
-      />
 
       <View style={styles.content}>
         {/* Metadata Chips Placeholder */}

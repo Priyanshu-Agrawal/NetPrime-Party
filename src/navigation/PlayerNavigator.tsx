@@ -2,6 +2,7 @@ import { colors } from "@/theme/bearoom";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import MovieDetailsScreen from "../screens/MovieDetailsScreen";
+import PersonDetailsScreen from "../screens/PersonDetailsScreen";
 import { PlayerScreen } from "../screens/PlayerScreen";
 import TvDetailsScreen from "../screens/TvDetailsScreen";
 import type { PlayerStackParamList } from "./types";
@@ -20,6 +21,7 @@ export default function PlayerNavigator() {
       <PlayerStack.Screen name="MovieDetails" component={MovieDetailsScreen} />
       <PlayerStack.Screen name="TvDetails" component={TvDetailsScreen} />
       <PlayerStack.Screen name="Player" component={PlayerScreen} />
+      <PlayerStack.Screen name="PersonDetails" component={PersonDetailsScreen} />
     </PlayerStack.Navigator>
   );
 }
