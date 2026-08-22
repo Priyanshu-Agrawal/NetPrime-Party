@@ -156,7 +156,7 @@ const SearchScreen: React.FC = () => {
 
   const loadMore = useCallback(async () => {
     if (loadingMore || searchLoading || pageRef.current >= totalPagesRef.current) return;
-    setLoadingMore(true);
+    setLoadingMore(true); console.log("loadMore FIRED");
     setSearchError(null);
     try {
       const nextPage = pageRef.current + 1;
@@ -338,6 +338,7 @@ const SearchScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={listData as any[]}
           renderItem={({ item }) =>
             (item as any).__skeleton ? <PosterSkeleton /> : renderCard({ item })
@@ -349,6 +350,11 @@ const SearchScreen: React.FC = () => {
           ListHeaderComponent={!searchQuery ? BrowseHeader : null}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={(_w, h) => {
+            if (h < 1000 && hasMore && !searchLoading && !loadingMore) {
+              void loadMore();
+            }
+          }}
           ListEmptyComponent={
             searchQuery && !searchLoading ? (
               <View style={styles.center}>
