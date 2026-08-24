@@ -41,11 +41,11 @@ export default function JoinParty() {
   };
 
   const join = () => {
-    if (!valid) return;
-    if (code === "000000") {
-      triggerError("Room not found");
+    if (!valid) {
+      triggerError(`Enter all ${CODE_LEN} digits`);
       return;
     }
+    // The Party screen's join result drives "room not found"; no client-side stub.
     navigation.replace("Party", { role: "guest", room: code });
   };
 

@@ -6,7 +6,7 @@
  */
 import { BearAvatarConfig, generateBearDataUri } from "@/services/avatar/bearAvatar";
 import { getAvatarConfig } from "@/services/party/identity";
-import { colors, glow, ms, radius } from "@/theme/bearoom";
+import { colors, ms, radius } from "@/theme/bearoom";
 import { Image } from "expo-image";
 import React, { useMemo } from "react";
 import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
@@ -108,14 +108,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // NB: no shadow/elevation here — BearAvatar renders over the video on the party
+  // surface (see no-elevation-on-video rule). The honey halo is the glowEffect view
+  // + honey border, which don't re-capture the WebView per frame.
   hostRing: {
     borderColor: colors.honey,
     borderWidth: 2,
-    ...glow.honey,
   },
-  glow: {
-    ...glow.honey,
-  },
+  glow: {},
   glowEffect: {
     position: "absolute",
     backgroundColor: colors.honeyGlow,

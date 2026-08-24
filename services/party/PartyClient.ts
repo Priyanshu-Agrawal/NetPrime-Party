@@ -69,6 +69,7 @@ export class PartyClient {
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private claiming = false;
   private destroyed = false;
+  private kicked = false;
   private lastLeaseRenewAt = 0;
   private leaseRenewInFlight = false;
 
@@ -255,6 +256,12 @@ export class PartyClient {
       const stillMember = s.members?.some((m) => m.userId === this.userId);
       if (strictlyNewer && wasMember && !stillMember) {
         this.snap = s;
+        // Stop acting as a member: halt the watchdog/clock so we don't keep
+        // pinging or re-attempting party_claim_host after being removed.
+        this.kicked = true;
+        if (this.watchdog) clearInterval(this.watchdog);
+        if (this.clockTimer) clearInterval(this.clockTimer);
+        this.watchdog = this.clockTimer = null;
         this.kickedCb?.();
         return;
       }
@@ -345,7 +352,7 @@ export class PartyClient {
 
   // --- election (guest side) ------------------------------------------------
   private checkHost(): void {
-    if (this.destroyed || this.isHost || !this.snap || this.claiming) return;
+    if (this.destroyed || this.kicked || this.isHost || !this.snap || this.claiming) return;
     const s = this.snap;
     const leaseExpired = !s.lease.leaseExpiresAt || s.lease.leaseExpiresAt < this.now();
     const staleHeartbeat = Date.now() - this.lastSnapAt > HOST_TIMEOUT_MS;
@@ -361,7 +368,7 @@ export class PartyClient {
   }
 
   private async tryClaim(force = false): Promise<void> {
-    if (this.destroyed || this.isHost || this.claiming) return;
+    if (this.destroyed || this.kicked || this.isHost || this.claiming) return;
     if (!force) {
       const s = this.snap;
       const stillHosted =
@@ -381,7 +388,7 @@ export class PartyClient {
 
   // --- clock offset (min-RTT filter against the stable server clock) --------
   private async pingClock(): Promise<void> {
-    if (this.destroyed) return;
+    if (this.destroyed || this.kicked) return;
     const t0 = Date.now();
     const { data, error } = await supabase.rpc("party_server_time");
     if (error || data == null) return;

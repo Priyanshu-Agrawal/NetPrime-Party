@@ -70,11 +70,14 @@ export function usePartyChat(opts: {
       });
       channel.on("broadcast", { event: "chat" }, ({ payload }) => {
         const p = payload as Omit<ChatMessage, "mine">;
-        setMessages((m) =>
-          m.some((x) => x.id === p.id)
-            ? m
-            : [...m, { ...p, mine: p.userId === userId }].slice(-200),
-        );
+        setMessages((m) => {
+          if (m.some((x) => x.id === p.id)) return m;
+          // Insert in timestamp order (realtime delivery can arrive out of order),
+          // tie-break by id for stability.
+          const next = [...m, { ...p, mine: p.userId === userId }];
+          next.sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : 1));
+          return next.slice(-200);
+        });
       });
       channel.on("broadcast", { event: "reaction" }, ({ payload }) => {
         popReaction((payload as { emoji: string }).emoji);
@@ -98,7 +101,7 @@ export function usePartyChat(opts: {
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const msg = { id: uid(), userId, name, text: trimmed, ts: Date.now() };
+      const msg = { id: `${userId}-${uid()}`, userId, name, text: trimmed, ts: Date.now() };
       // optimistic local echo (channel is self:false)
       setMessages((m) => [...m, { ...msg, mine: true }].slice(-200));
       void channelRef.current?.send({ type: "broadcast", event: "chat", payload: msg });
@@ -110,7 +113,7 @@ export function usePartyChat(opts: {
     (gif: { url: string; width?: number; height?: number }, sticker = false) => {
       if (!gif?.url) return;
       const msg = {
-        id: uid(),
+        id: `${userId}-${uid()}`,
         userId,
         name,
         text: "",

@@ -44,7 +44,7 @@ import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "@/src/navigation/types";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
@@ -65,6 +65,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 // Stable empty reference so `members` doesn't churn memo deps before the snapshot lands.
 const EMPTY_MEMBERS: Member[] = [];
+
+// `generateRandomBearConfig` is deterministic per userId seed, but returns a NEW
+// object each call — which invalidated BearAvatar's useMemo and rebuilt the full
+// SVG for every visible avatar on every PartyScreen re-render (over live video).
+// Cache the config per userId so the object identity is stable.
+const bearConfigCache = new Map<string, ReturnType<typeof generateRandomBearConfig>>();
+function bearConfigFor(userId: string) {
+  let cfg = bearConfigCache.get(userId);
+  if (!cfg) {
+    cfg = generateRandomBearConfig("neutral", userId);
+    bearConfigCache.set(userId, cfg);
+  }
+  return cfg;
+}
 
 // Group a sender's consecutive messages sent within this window (WhatsApp/IG-style):
 // avatar + name shown once per group, bubbles tight-stacked, one timestamp at the end.
@@ -424,10 +438,14 @@ export default function Party() {
   };
 
   // Tap a timestamp in a message → jump there. Controllers move the room; others peek locally.
-  const seekToMoment = (sec: number) => {
-    if (canSeek) party.seekTo(sec);
-    else playerRef.current?.seek(sec);
-  };
+  // Stable identity so memoized <Bubble> rows don't re-render on every parent update.
+  const seekToMoment = useCallback(
+    (sec: number) => {
+      if (canSeek) party.seekTo(sec);
+      else playerRef.current?.seek(sec);
+    },
+    [canSeek, party],
+  );
 
   const share = () => {
     void Share.share({
@@ -902,7 +920,9 @@ export default function Party() {
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: colors.black, opacity: maskFade, zIndex: 1000, elevation: 1000 },
+            // zIndex only — no elevation: this mask sits over the live video during the
+            // rotation fade and elevation would re-capture frames (no-elevation-on-video).
+            { backgroundColor: colors.black, opacity: maskFade, zIndex: 1000 },
           ]}
         />
       ) : null}
@@ -1005,7 +1025,7 @@ function AvatarStack({
             <BearAvatar
               size={ms(26)}
               hostRing={isHost}
-              config={generateRandomBearConfig("neutral", m.userId)}
+              config={bearConfigFor(m.userId)}
             />
           </View>
         );
@@ -1045,7 +1065,7 @@ function Meta({ msg, mine }: { msg: ChatMessage; mine?: boolean }) {
   );
 }
 
-function Bubble({
+const Bubble = React.memo(function Bubble({
   msg,
   onSeek,
   firstOfGroup,
@@ -1084,7 +1104,7 @@ function Bubble({
         {lastOfGroup ? (
           <BearAvatar
             size={ms(26)}
-            config={generateRandomBearConfig("neutral", msg.userId)}
+            config={bearConfigFor(msg.userId)}
           />
         ) : null}
       </View>
@@ -1105,7 +1125,7 @@ function Bubble({
       </View>
     </View>
   );
-}
+});
 
 function FloatingEmoji({ reaction, offset }: { reaction: FloatingReaction; offset: number }) {
   const p = useRef(new Animated.Value(0)).current;
@@ -1292,7 +1312,9 @@ const styles = StyleSheet.create({
   landscapeInput: { fontSize: ms(12) },
   landscapeStampBtn: { height: ms(24), paddingHorizontal: ms(6) },
   landscapeStampBtnText: { fontSize: ms(9) },
-  landscapeSendBtn: { width: ms(36), height: ms(36) },
+  // In landscape the chat drawer overlays the live video — strip the send button's
+  // shadow/elevation so it doesn't re-capture the WebView each frame.
+  landscapeSendBtn: { width: ms(36), height: ms(36), shadowOpacity: 0, elevation: 0 },
   pressed: { opacity: 0.7 },
   glassRound: {
     width: ms(40),
