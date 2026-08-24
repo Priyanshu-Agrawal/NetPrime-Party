@@ -57,3 +57,9 @@ bearoom_*_render.png
 .env
 .env.local
 !.env.example
+
+# opencode local artifacts (auto-regenerated)
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/bun.lock
