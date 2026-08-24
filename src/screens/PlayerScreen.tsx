@@ -16,6 +16,7 @@ import {
   type Provider,
 } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
+import { getCachedVersion } from "@/src/scripts/bridgeCache";
 import {
   getAutoplayNext,
   getDataSaver,
@@ -42,7 +43,7 @@ import {
   updateBackgroundPlaybackState,
 } from "@/components/player/backgroundPlayback";
 import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
-import { colors, font, glow, ms, radius } from "@/theme/bearoom";
+import { colors, font, ms, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { genRoomCode } from "@/utils/roomCode";
 import { img } from "@/utils/tmdbDetails";
@@ -72,7 +73,10 @@ export const PlayerScreen: React.FC = () => {
   useKeepAwake();
 
   const route = useRoute<RouteProp<PlayerStackParamList, "Player">>();
-  const { id, type, season, ep, title, poster_path, providerId } = route.params;
+  // A param-less deep link (bearoom://player) yields undefined params — guard the
+  // destructure so it can't throw; a missing id degrades to the player error path.
+  const { id, type, season, ep, title, poster_path, providerId } =
+    route.params ?? ({} as (typeof route)["params"]);
 
   const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
 
@@ -259,6 +263,11 @@ export const PlayerScreen: React.FC = () => {
       return () => {
         focusedRef.current = false;
         playerRef.current?.pause();
+        // Blur only fires when another screen is PUSHED on top (e.g. Watch Party) —
+        // not on Home — so tear down the FGS/MediaSession here too, else a stale
+        // paused media notification lingers. Re-armed on refocus by the next tick.
+        stopBackgroundPlaybackSession();
+        sessionStarted.current = false;
       };
     }, []),
   );
@@ -306,7 +315,7 @@ export const PlayerScreen: React.FC = () => {
         tmdbId: media.tmdbId,
         mediaType: media.type,
         outcome,
-        scriptVersion: selected.scriptVersion ?? undefined, // which served bridge was live
+        scriptVersion: getCachedVersion(selected.id) ?? selected.scriptVersion ?? undefined, // the bridge actually injected
         platform: Platform.OS as ReportArgs["platform"],
         appVersion: Constants.expoConfig?.version,
         ...extra,
@@ -558,7 +567,7 @@ export const PlayerScreen: React.FC = () => {
           mediaType: media.type,
           outcome: "manual_switch",
           timeToFailMs: Date.now() - mountTsRef.current,
-          scriptVersion: selected.scriptVersion ?? undefined,
+          scriptVersion: getCachedVersion(selected.id) ?? selected.scriptVersion ?? undefined,
           platform: Platform.OS as ReportArgs["platform"],
           appVersion: Constants.expoConfig?.version,
         });
@@ -819,7 +828,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 11,
     borderRadius: radius.pill,
-    ...glow.honey,
+    // No shadow/elevation on the player surface (re-captures the WebView each frame).
   },
   partyBtnDisabled: { backgroundColor: colors.surfaceStrong, ...({ shadowOpacity: 0, elevation: 0 } as const) },
   partyText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(13) },
