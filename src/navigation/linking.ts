@@ -20,6 +20,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
         screens: {
           MovieDetails: "movie/:id",
           TvDetails: "tv/:id",
+          PersonDetails: "person/:id",
           Player: "player",
         },
       },

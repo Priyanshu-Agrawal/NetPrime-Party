@@ -302,6 +302,11 @@ export function useSearchData() {
     }
   }, [isInitialLoading, isLoadingMore, items.length, loadMore]);
 
+  // Re-run the current (browse or search) fetch — for the error view's Retry.
+  const retry = useCallback(() => {
+    fetchInitial(providerRef.current, queryRef.current, searchType);
+  }, [fetchInitial, searchType]);
+
   return {
     items,
     isInitialLoading,
@@ -315,6 +320,7 @@ export function useSearchData() {
     handleSearch,
     selectProvider,
     selectSearchType,
+    retry,
     mode: searchQuery ? ("search" as const) : ("browse" as const),
   };
 }

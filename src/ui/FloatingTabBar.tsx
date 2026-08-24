@@ -40,6 +40,7 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
     <Pressable
       key={route.key}
       accessibilityRole="button"
+      accessibilityLabel={route.name}
       accessibilityState={focused ? { selected: true } : {}}
       onPress={() => goTab(route.name, route.key, focused)}
       style={styles.tab}

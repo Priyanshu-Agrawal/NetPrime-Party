@@ -16,14 +16,18 @@ interface Props {
   hitSlop?: number;
   /** Real frosted blur (default). false = solid tint — use over/near video: the blur re-samples every frame and stutters playback. */
   blur?: boolean;
+  /** Screen-reader label — required for icon-only buttons that render no text. */
+  accessibilityLabel?: string;
 }
 
-export function GlassButton({ onPress, children, intensity = 42, style, disabled, hitSlop = 6, blur = true }: Props) {
+export function GlassButton({ onPress, children, intensity = 42, style, disabled, hitSlop = 6, blur = true, accessibilityLabel }: Props) {
   return (
     <BouncyPressable
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={[styles.btn, style]}
     >
       {blur ? <Frost intensity={intensity} style={StyleSheet.absoluteFill} /> : null}

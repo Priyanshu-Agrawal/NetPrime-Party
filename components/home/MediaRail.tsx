@@ -7,10 +7,10 @@ import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { useListQuery } from "@/src/store/services/tmdbApi";
 import { openDetails as openDetailsAction } from "@/src/navigation/actions";
-import { PosterCard, PosterSkeleton, SectionHeader } from "@/src/ui";
+import { PosterCard, PosterSkeleton, SectionHeader, Text } from "@/src/ui";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 const POSTER_W = ms(112);
 
@@ -30,14 +30,19 @@ export function MediaRail({
   // RTK Query caches per-path and keeps it warm (keepUnusedDataFor), so
   // returning to Home never flashes skeleton→content. `data` is undefined
   // while first loading, [] when the endpoint has nothing.
-  const { data: items } = useListQuery(path);
+  const { data: items, isError, refetch } = useListQuery(path);
 
   if (items && items.length === 0) return null;
 
   return (
     <View style={styles.rail}>
       <SectionHeader title={title} icon={icon} onSeeAll={onSeeAll} />
-      {items === undefined ? (
+      {items === undefined && isError ? (
+        <Pressable style={styles.retryRow} onPress={() => refetch()} hitSlop={8}>
+          <Ionicons name="refresh" size={ms(15)} color={colors.honey} />
+          <Text variant="bodyDim">Couldn&apos;t load — tap to retry</Text>
+        </Pressable>
+      ) : items === undefined ? (
         <View style={styles.skeletonRow}>
           {[0, 1, 2, 3].map((i) => (
             <PosterSkeleton key={i} width={POSTER_W} />
@@ -70,6 +75,7 @@ const styles = StyleSheet.create({
   rail: { marginTop: spacing.xl },
   list: { paddingHorizontal: spacing.lg, gap: layout.railGap },
   skeletonRow: { flexDirection: "row", gap: layout.railGap, paddingHorizontal: spacing.lg },
+  retryRow: { flexDirection: "row", alignItems: "center", gap: ms(8), paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   skeleton: { borderRadius: radius.lg, backgroundColor: colors.bgElevated },
 });
 

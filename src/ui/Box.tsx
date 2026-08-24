@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, type ViewProps, type ViewStyle } from "react-native";
 import { colors, radius as radiusTokens, spacing } from "@/theme/bearoom";
 
@@ -54,32 +54,35 @@ export function Box({
   children,
   ...rest
 }: Props) {
-  const s: ViewStyle = {};
-  const pad = resolveSpacing(p);
-  if (pad != null) s.padding = pad;
-  if (px != null) {
-    s.paddingHorizontal = resolveSpacing(px);
-  } else if (pl != null || pr != null) {
-    if (pl != null) s.paddingLeft = resolveSpacing(pl);
-    if (pr != null) s.paddingRight = resolveSpacing(pr);
-  }
-  if (py != null) {
-    s.paddingVertical = resolveSpacing(py);
-  } else {
-    if (pt != null) s.paddingTop = resolveSpacing(pt);
-    if (pb != null) s.paddingBottom = resolveSpacing(pb);
-  }
-  if (gap != null) s.gap = resolveSpacing(gap);
-  if (bg) s.backgroundColor = colors[bg];
-  const rad = resolveRadius(r);
-  if (rad != null) s.borderRadius = rad;
-  if (flex != null) s.flex = flex;
-  if (row) s.flexDirection = "row";
-  if (center) {
-    s.alignItems = "center";
-    s.justifyContent = "center";
-  }
-  if (fill) s.flex = 1;
+  const s = useMemo<ViewStyle>(() => {
+    const o: ViewStyle = {};
+    const pad = resolveSpacing(p);
+    if (pad != null) o.padding = pad;
+    if (px != null) {
+      o.paddingHorizontal = resolveSpacing(px);
+    } else if (pl != null || pr != null) {
+      if (pl != null) o.paddingLeft = resolveSpacing(pl);
+      if (pr != null) o.paddingRight = resolveSpacing(pr);
+    }
+    if (py != null) {
+      o.paddingVertical = resolveSpacing(py);
+    } else {
+      if (pt != null) o.paddingTop = resolveSpacing(pt);
+      if (pb != null) o.paddingBottom = resolveSpacing(pb);
+    }
+    if (gap != null) o.gap = resolveSpacing(gap);
+    if (bg) o.backgroundColor = colors[bg];
+    const rad = resolveRadius(r);
+    if (rad != null) o.borderRadius = rad;
+    if (flex != null) o.flex = flex;
+    if (row) o.flexDirection = "row";
+    if (center) {
+      o.alignItems = "center";
+      o.justifyContent = "center";
+    }
+    if (fill) o.flex = 1;
+    return o;
+  }, [p, px, py, pt, pb, pl, pr, gap, bg, r, flex, row, center, fill]);
 
   return (
     <View style={[s, style]} {...rest}>

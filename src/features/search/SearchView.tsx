@@ -40,6 +40,7 @@ const SearchView: React.FC = () => {
     handleSearch,
     selectProvider,
     selectSearchType,
+    retry,
   } = useSearchData();
 
   const handleClearSearch = useCallback(() => {
@@ -176,6 +177,12 @@ const SearchView: React.FC = () => {
           <Text variant="body" danger>
             {error}
           </Text>
+          <BouncyPressable onPress={retry} style={styles.retryBtn}>
+            <Ionicons name="refresh" size={ms(16)} color={colors.honeyBright} />
+            <Text variant="body" style={styles.retryText}>
+              Retry
+            </Text>
+          </BouncyPressable>
         </View>
       ) : (
         <View style={styles.flex1}>
@@ -230,8 +237,21 @@ const styles = StyleSheet.create({
     alignItems: "center", 
     justifyContent: "center", 
     paddingVertical: spacing.xxxl + 20, 
-    gap: spacing.md 
+    gap: spacing.md
   },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(8),
+    marginTop: spacing.xs,
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(24),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+  },
+  retryText: { color: colors.honeyBright, fontWeight: "600" },
 });
 
 export default React.memo(SearchView);

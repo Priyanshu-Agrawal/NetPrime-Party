@@ -36,7 +36,7 @@ export const workerApi = createApi({
          */
         getConfig: build.query<AppConfig, void>({
             query: () => "/config",
-            keepUnusedDataFor: 18000,
+            keepUnusedDataFor: 300, // 5 min, matching the comment (was 18000 = 5h)
             providesTags: ["Config"],
         }),
 

@@ -11,6 +11,8 @@ interface Props {
   intensity?: number;
   size?: number;
   style?: ViewStyle;
+  /** Screen-reader label — icon-only buttons announce nothing without it. */
+  accessibilityLabel?: string;
 }
 
 export function IconButton({
@@ -19,12 +21,15 @@ export function IconButton({
   intensity = 55,
   size = layout.iconButton,
   style,
+  accessibilityLabel,
 }: Props) {
   const d = ms(size);
   return (
     <BouncyPressable
       onPress={onPress}
       hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={[
         styles.btn,
         { width: d, height: d },

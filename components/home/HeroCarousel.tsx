@@ -75,7 +75,7 @@ export function HeroSkeleton() {
 
 export function HeroCarousel() {
   // Cached hero set (trending, backdrop-only, top 8) — warm across tab focus.
-  const { data: items = [] } = useHeroQuery();
+  const { data: items = [], isError, refetch } = useHeroQuery();
   const [index, setIndex] = useState(0);
   const listRef = useRef<FlatList<MediaItem>>(null);
   const idxRef = useRef(0);
@@ -113,6 +113,14 @@ export function HeroCarousel() {
   };
 
   if (items.length === 0) {
+    if (isError) {
+      return (
+        <Pressable style={styles.heroError} onPress={() => refetch()}>
+          <Ionicons name="cloud-offline-outline" size={ms(30)} color={colors.textFaint} />
+          <Text variant="bodyDim">Couldn&apos;t load — tap to retry</Text>
+        </Pressable>
+      );
+    }
     return <HeroSkeleton />;
   }
 
@@ -207,6 +215,7 @@ export function HeroCarousel() {
 
 const styles = StyleSheet.create({
   hero: { width, height: HERO_H },
+  heroError: { width, height: HERO_H, alignItems: "center", justifyContent: "center", gap: spacing.md },
   heroFill: { position: "absolute", top: 0, left: 0, width, height: HERO_H },
   slide: { width, height: HERO_H, justifyContent: "flex-end" },
   content: { paddingHorizontal: spacing.lg, paddingBottom: ms(22) },

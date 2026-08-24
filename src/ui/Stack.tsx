@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, type ViewProps, type ViewStyle } from "react-native";
 import { spacing } from "@/theme/bearoom";
 
@@ -30,20 +30,18 @@ export function Stack({
   children,
   ...rest
 }: StackProps) {
+  const inner = useMemo<ViewStyle>(
+    () => ({
+      gap: resolveGap(g),
+      alignItems: align,
+      justifyContent: justify,
+      flexWrap: wrap ? "wrap" : undefined,
+      flex: fill ? 1 : flex,
+    }),
+    [g, align, justify, wrap, flex, fill],
+  );
   return (
-    <View
-      style={[
-        {
-          gap: resolveGap(g),
-          alignItems: align,
-          justifyContent: justify,
-          flexWrap: wrap ? "wrap" : undefined,
-          flex: fill ? 1 : flex,
-        },
-        style,
-      ]}
-      {...rest}
-    >
+    <View style={[inner, style]} {...rest}>
       {children}
     </View>
   );

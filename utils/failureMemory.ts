@@ -50,7 +50,13 @@ function writePruned(map: FailMap): void {
     }
     if (Object.keys(map[k]).length === 0) delete map[k];
   }
-  storage.set(KEY, JSON.stringify(map));
+  // Never let a storage write throw into the player failure path (recordProviderFailure
+  // runs inside error handling) — failure memory is best-effort.
+  try {
+    storage.set(KEY, JSON.stringify(map));
+  } catch {
+    /* best-effort */
+  }
 }
 
 /** Remember that `providerId` failed for this title just now. */

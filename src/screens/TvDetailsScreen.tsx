@@ -63,7 +63,11 @@ const TvDetailsScreen: React.FC = () => {
 
   // RTK Query: cached per show id (append_to_response bundle).
   const { data: d, isLoading: loading, error: qErr } = useDetailsQuery({ type: "tv", id: id! });
-  const error = qErr ? ((qErr as any)?.message ?? "Failed to load") : undefined;
+  const error = qErr
+    ? typeof qErr === "string"
+      ? qErr
+      : (qErr as any)?.message ?? "Failed to load"
+    : undefined;
   const providers = useProviders();
   const [season, setSeason] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -228,9 +232,12 @@ const TvDetailsScreen: React.FC = () => {
           />
           <View style={styles.heroContent}>
             <Text style={styles.title}>{d.name}</Text>
-            <Text style={styles.seasonsLine}>
-              {d.number_of_seasons} Seasons · {d.number_of_episodes} Episodes
-            </Text>
+            {d.number_of_seasons || d.number_of_episodes ? (
+              <Text style={styles.seasonsLine}>
+                {d.number_of_seasons ?? 0} Season{d.number_of_seasons === 1 ? "" : "s"} ·{" "}
+                {d.number_of_episodes ?? 0} Episodes
+              </Text>
+            ) : null}
             <MetaBar
               rating={d.vote_average}
               votes={d.vote_count}
