@@ -140,14 +140,12 @@ export function isAllowedTopNav(
   hosts: string[],
   req: { url: string; isTopFrame?: boolean },
 ): boolean {
-  if (req.isTopFrame === false) return true;
+  if (req.isTopFrame === false) return true; // subframes (incl. their data:/blob:) unrestricted
   const url = req.url || "";
-  if (
-    !url ||
-    url.startsWith("about:") ||
-    url.startsWith("data:") ||
-    url.startsWith("blob:")
-  ) {
+  // Allow blank/transition URLs on the TOP frame, but NOT data:/blob: — navigating the
+  // main frame to an attacker-authored data:/blob: document would keep the RN bridge on
+  // a page we don't control (bridge escape). Those remain allowed only in subframes above.
+  if (!url || url.startsWith("about:")) {
     return true;
   }
   try {

@@ -101,6 +101,10 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(function HijackPlaye
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       try {
+        // Only trust events from OUR embed iframe's window — an arbitrary page/tab
+        // can otherwise postMessage a forged __BEAROOM_PLAYER_EVENT__ and drive playback.
+        const frameWin = iframeRef.current?.contentWindow;
+        if (frameWin && event.source !== frameWin) return;
         if (!event.data) return;
         const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (data && data.__BEAROOM_PLAYER_EVENT__) {
