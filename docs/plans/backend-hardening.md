@@ -70,22 +70,30 @@ _Original:_ `providerId` attacker-controlled and unchecked; `REPORT_LIMITER` a n
 `no_bind` for the live provider demotes it for all users.
 
 ## Client + Worker together (OTA bridge integrity)
-### H2 (HIGH) — OTA bridge injected with no integrity check → WebView RCE
-`components/player/HijackPlayer.tsx` injects `getCachedScript(providerId)` (Supabase `bridge_script`,
-cached raw in MMKV) with no hash/signature → a compromised worker/DB row (or a non-TLS
-`EXPO_PUBLIC_WORKER_URL`) = arbitrary JS in the provider WebView. **Fix:** the `/scripts` `version` tag is
-already a **content hash** — have the client **verify the fetched body against it** before caching/
-injecting (in `src/scripts/bridgeCache.ts`), and **hard-require https** for the worker URL. (Client-side,
-but listed here because it's the security cluster and pairs with H3.)
+### H2 (HIGH) — OTA bridge injected with no integrity check → WebView RCE — ✅ DONE (2026-08-25)
+**Shipped (client-side, `src/scripts/bridgeCache.ts`):** (1) **hard-require https** for the worker URL —
+`isSafeWorkerUrl` refuses a non-https `EXPO_PUBLIC_WORKER_URL` (localhost + RFC-1918 LAN exempt for dev),
+so an http MITM can't inject the bridge; (2) **verify the fetched body against its content-hash `version`**
+before caching — `bodyMatchesVersion` computes `sha256(body)[:8]` (new dep-free `utils/sha256.ts`, since
+Hermes has no `crypto.subtle` and expo-crypto would force a native rebuild) and drops a body that doesn't
+match its `<id>@<hash>` tag. Verified: sha256 matches Node for known vectors + the live bridge hash; a
+tampered body is rejected; the URL gate passes https/localhost/LAN and blocks public http. Works with the
+current live bridge (its body still matches its tag). _Caveat:_ the version is self-computed by the worker,
+so this is integrity/consistency + TLS enforcement, not defence against a fully-compromised source (that
+needs a separately-keyed signature — future).
 
-### H3 (HIGH) — WebView message bridge trusts any page script
-`handleMessage` acts on any `postMessage` with no shared secret → ad scripts on the embed page can spoof
-`ready`/`ended`/`currentTime`. **Fix:** stamp a **per-session nonce** on every bridge `post({...})` in the
-injected script (`src/scripts/legacy-videasy.ts`) and drop messages lacking it in `HijackPlayer.handleMessage`.
-**Deferred because it's coupled to an OTA deploy:** the bridge is served over-the-air, so shipping the
-nonce requires re-running `scripts/upload-bridge.ts` (needs `SUPABASE_SERVICE_ROLE_KEY`) — do it together
-with H2 so the client only starts requiring the nonce once the new signed+nonce'd script is deployed
-(otherwise the client would reject the current no-nonce bridge and break playback).
+### H3 (HIGH) — WebView message bridge trusts any page script — ✅ DONE + DEPLOYED + VERIFIED (2026-08-25)
+**Shipped:** the client publishes a per-mount nonce (`window.__vlMsgNonce`) in an injected prologue; the
+bridge (`src/scripts/legacy-videasy.ts`) captures + deletes it at documentStart (before any page/ad script
+runs) along with the genuine `ReactNativeWebView.postMessage`, and stamps `o.__n` on every `post()`.
+`HijackPlayer.handleMessage` **latches**: a correct nonce flips strict mode on, after which any un-nonced
+message (an ad-script spoof of `ready`/`ended`/`currentTime`) is dropped. Latching (vs. requiring upfront)
+means an older cached bridge that doesn't stamp still plays — **no breakage regardless of deploy order**;
+with the current live bridge (no nonce) the client is a no-op until the nonce bridge is live.
+Nonce bridge `videasy@0c9a827c` **deployed** (upload-bridge + cache purge). **Verified end-to-end on a
+real device:** the app re-synced the new bridge (H2 accepted its hash), the first event arrived carrying
+the nonce → the client latched strict mode, and playback proceeded with zero legitimately-dropped events
+(so real events are nonced + accepted, and any un-nonced spoof would be dropped).
 
 ## Suggested order
 1. **C1** (+ M5's server seq bump) — the one remote-abuse hole.

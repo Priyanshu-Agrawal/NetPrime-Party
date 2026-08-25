@@ -11,9 +11,48 @@
  * provider simply won't be hijack-controllable until a sync succeeds.
  */
 import { universalStorage as storage } from "@/services/storage/universalStorage";
+import { sha256Hex } from "@/utils/sha256";
 
 const CACHE_KEY = "bridge.scripts.v1";
-const WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL ?? "";
+// H2: the bridge is arbitrary JS injected into the provider WebView, so it must
+// arrive over TLS — an http worker URL is a MITM injection vector. Refuse a
+// non-https worker outright (dev localhost is exempt so `wrangler dev` still works).
+const RAW_WORKER_URL = process.env.EXPO_PUBLIC_WORKER_URL ?? "";
+const WORKER_URL = isSafeWorkerUrl(RAW_WORKER_URL) ? RAW_WORKER_URL : "";
+
+function isSafeWorkerUrl(u: string): boolean {
+  if (!u) return false;
+  try {
+    const { protocol, hostname } = new URL(u);
+    if (protocol === "https:") return true;
+    if (protocol !== "http:") return false;
+    // Allow plain http ONLY for local / private-network dev hosts (localhost,
+    // *.local, and RFC-1918 LAN ranges — the docs suggest a LAN IP for wrangler dev).
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local")) return true;
+    return (
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * H2: the `version` tag is a content hash (`<id>@<sha256[:8]>`), so verify the
+ * fetched body hashes to it before we cache/inject — a corrupted or swapped body
+ * (or a /scripts vs /config version mismatch) is dropped rather than injected as
+ * JS into the WebView. Scripts with no version tag are accepted (nothing to check
+ * against); a present tag MUST match.
+ */
+function bodyMatchesVersion(script: string, version: string | null): boolean {
+  if (!version) return true;
+  const at = version.lastIndexOf("@");
+  const want = (at >= 0 ? version.slice(at + 1) : version).toLowerCase();
+  if (!/^[0-9a-f]{6,64}$/.test(want)) return true; // not a hash tag → nothing to verify
+  return sha256Hex(script).slice(0, want.length) === want;
+}
 
 type Entry = { version: string | null; script: string };
 type CacheMap = Record<string, Entry>;
@@ -74,7 +113,14 @@ export async function syncScripts(
     }[];
     const next: CacheMap = { ...cache };
     for (const s of scripts) {
-      if (s.id && s.script) next[s.id] = { version: s.version ?? null, script: s.script };
+      if (!s.id || !s.script) continue;
+      // H2: drop a body that doesn't match its content-hash version tag (never
+      // cache/inject unverified JS). Keep any previously-verified cached entry.
+      if (!bodyMatchesVersion(s.script, s.version ?? null)) {
+        console.warn(`bridgeCache: ${s.id} body failed hash check (version ${s.version}) — not caching.`);
+        continue;
+      }
+      next[s.id] = { version: s.version ?? null, script: s.script };
     }
     writeCache(next);
   } catch {

@@ -18,7 +18,14 @@ export const LEGACY_VIDEASY_ID = "videasy";
 export const LEGACY_VIDEASY_BRIDGE: string = `
 (function(){
   if (window.__vlBridge) return; window.__vlBridge = true;
-  function post(o){ try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} }
+  // H3: at documentStart — before any page/ad script runs — capture the per-session
+  // nonce the client published and the GENUINE RN postMessage, then delete the nonce
+  // global. Every event we post is stamped with the nonce (o.__n); the client drops
+  // messages lacking it, so an embed-page/ad script can't spoof ready/ended/currentTime
+  // (it can't read the nonce — deleted before it loads — nor snoop our captured post).
+  var __vlN; try { __vlN = window.__vlMsgNonce; delete window.__vlMsgNonce; } catch(e){}
+  var __rnpost; try { __rnpost = window.ReactNativeWebView.postMessage.bind(window.ReactNativeWebView); } catch(e){}
+  function post(o){ try { if (__vlN !== undefined) o.__n = __vlN; (__rnpost || window.ReactNativeWebView.postMessage)(JSON.stringify(o)); } catch(e){} }
   try { window.open = function(){ return null; }; } catch(e){}
   try {
     document.addEventListener('click', function(ev){

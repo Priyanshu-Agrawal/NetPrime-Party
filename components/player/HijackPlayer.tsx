@@ -190,6 +190,12 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // never collide; only near-simultaneous duplicates from a second frame do).
     const lastEventRef = useRef<{ sig: string; t: number }>({ sig: "", t: 0 });
     const lastTickRef = useRef(0);
+    // H3: once we've seen ONE correctly-nonced message we know the bridge stamps the
+    // per-session nonce, so from then on we drop any message lacking it (an embed-page
+    // / ad script spoofing ready/ended/currentTime). Latches rather than requiring the
+    // nonce upfront, so an older cached bridge that doesn't stamp still works (no
+    // playback break) until the nonce-capable bridge is live.
+    const nonceStrictRef = useRef(false);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
     // The "still syncing" banner appears at the 30s bind timeout. Some providers
@@ -491,12 +497,19 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
 
     const handleMessage = useCallback(
       (raw: string) => {
-        let e: PlayerEvent;
+        let e: PlayerEvent & { __n?: string };
         try {
-          e = JSON.parse(raw) as PlayerEvent;
+          e = JSON.parse(raw) as PlayerEvent & { __n?: string };
         } catch {
           return;
         }
+        // H3: authenticate the sender by the per-session nonce the bridge stamps on
+        // every post(). A correct nonce latches strict mode; thereafter any message
+        // without it is an embed-page/ad script spoof and is dropped. Before the first
+        // nonced message (older bridge, or startup) we stay permissive so playback
+        // isn't broken by a not-yet-redeployed bridge.
+        if (e.__n === relayNonce) nonceStrictRef.current = true;
+        else if (nonceStrictRef.current) return;
         // Drop duplicates posted by a SECOND injected frame (the bridge runs in every
         // frame). Two mechanisms because the two event kinds duplicate differently:
         const now = Date.now();
@@ -521,7 +534,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         }
         onPlayerEvent?.(e);
       },
-      [onPlayerEvent, onBound],
+      [onPlayerEvent, onBound, relayNonce],
     );
 
     if (!provider) {
@@ -555,7 +568,14 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             /* swallow popups */
           }}
           onShouldStartLoadWithRequest={(req) => isAllowedTopNav(hosts, req)}
-          injectedJavaScriptBeforeContentLoaded={(getCachedScript(providerId) ?? "") + relayListenerJs}
+          injectedJavaScriptBeforeContentLoaded={
+            // H3 prologue FIRST: publish the per-session nonce so the bridge (next)
+            // can capture + delete it at documentStart, before any page/ad script
+            // runs. Then the cached bridge, then the command-relay listener.
+            `;window.__vlMsgNonce=${JSON.stringify(relayNonce)};` +
+            (getCachedScript(providerId) ?? "") +
+            relayListenerJs
+          }
           // Inject the bridge into EVERY frame, not just the main one. On iOS videasy
           // renders its <video> inside a cross-origin iframe the main-frame finder
           // can't reach (contentDocument throws) → never binds. Running the bridge in
