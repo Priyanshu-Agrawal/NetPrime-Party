@@ -23,6 +23,7 @@
 import { ensurePartyAuth, supabase } from "@/services/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getInstallationId } from "./identity";
+import { genRoomCode } from "@/utils/roomCode";
 import { LEASE_RENEW_INTERVAL_MS } from "./protocol";
 import type {
   HostLease,
@@ -123,11 +124,25 @@ export class PartyClient {
     for (let i = 0; i < CLOCK_PING_BURST; i++) await this.pingClock();
 
     if (this.wantHost) {
-      await this.rpcSnap("party_create", {
-        p_code: this.code,
-        p_installation_id: instId,
-        p_display_name: this.displayName,
-      });
+      // Codes are minted client-side; on the rare collision the server rejects with
+      // "room in use" — regenerate a fresh code and retry instead of failing the host.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await this.rpcSnap("party_create", {
+            p_code: this.code,
+            p_installation_id: instId,
+            p_display_name: this.displayName,
+          });
+          break;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (/in use/i.test(msg) && attempt < 4) {
+            this.code = genRoomCode();
+            continue;
+          }
+          throw e;
+        }
+      }
       if (this.initialMedia) {
         await this.rpcSnap("party_set_media", { p_code: this.code, p_media: this.initialMedia });
       }
@@ -141,6 +156,7 @@ export class PartyClient {
     }
 
     await this.subscribe();
+    if (this.destroyed) return; // torn down during create/subscribe — don't start timers
     // Our create/join RPC already ran + broadcast, but the channel wasn't
     // subscribed yet so peers never received it. Re-announce our snapshot now
     // that we're listening, so the host (and others) pick up our membership.
@@ -282,6 +298,10 @@ export class PartyClient {
     const channel = supabase.channel(`party:${this.code}`, {
       config: { broadcast: { self: false }, presence: { key: this.userId } },
     });
+    // Assign immediately so a destroy() that races this subscribe still removes it
+    // (previously `this.channel` was only set after SUBSCRIBED resolved, leaking the
+    // channel + its presence entry on a fast unmount / password-retry rebuild).
+    this.channel = channel;
     channel.on("broadcast", { event: "snap" }, ({ payload }) =>
       this.applySnapshot(payload as RoomSnapshot),
     );
@@ -289,15 +309,35 @@ export class PartyClient {
       const state = channel.presenceState();
       this.connCb?.(Object.keys(state).length);
     });
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
+      // Handle the failure statuses too — otherwise a CHANNEL_ERROR/TIMED_OUT left
+      // the promise pending forever, hanging start() (no heartbeat/watchdog/role).
+      const timer = setTimeout(
+        () => reject(new Error("party channel subscribe timed out")),
+        15000,
+      );
       channel.subscribe((status) => {
+        if (this.destroyed) {
+          clearTimeout(timer);
+          resolve();
+          return;
+        }
         if (status === "SUBSCRIBED") {
+          clearTimeout(timer);
           void channel.track({ userId: this.userId });
           resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          clearTimeout(timer);
+          reject(new Error(`party channel ${status}`));
         }
       });
     });
-    this.channel = channel;
+    // Torn down mid-subscribe: remove the channel we created if destroy() didn't
+    // already (destroy() nulls this.channel after removing it).
+    if (this.destroyed && this.channel === channel) {
+      await supabase.removeChannel(channel);
+      this.channel = null;
+    }
   }
 
   // --- role reconciliation (host lease loop on/off) -------------------------

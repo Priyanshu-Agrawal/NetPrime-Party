@@ -144,7 +144,7 @@ export default function JoinParty() {
 
         <BouncyPressable onPress={host} hitSlop={8} style={styles.hostLink}>
           <Text variant="label" honey>
-            or Host your own room
+            or browse to start a party
           </Text>
           <Ionicons name="arrow-forward" size={ms(15)} color={colors.honey} />
         </BouncyPressable>
