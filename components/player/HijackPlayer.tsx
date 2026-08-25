@@ -20,6 +20,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -301,11 +302,48 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       [],
     );
 
-    const cmd = useCallback((c: Record<string, unknown>) => {
-      webRef.current?.injectJavaScript(
-        `window.__vlCmd && window.__vlCmd(${JSON.stringify(c)}); true;`,
-      );
-    }, []);
+    // The bridge is injected into EVERY frame (see the WebView's
+    // injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}) because on iOS
+    // videasy renders its <video> in a cross-origin sub-frame. But injectJavaScript
+    // only reaches the MAIN frame, so bridge COMMANDS must be relayed down to every
+    // descendant frame via postMessage. A per-mount nonce gates the relay so page/ad
+    // scripts can't drive the bridge (also mitigates the message-spoofing concern).
+    const relayNonce = useMemo(
+      () => Math.random().toString(36).slice(2) + Date.now().toString(36),
+      [],
+    );
+    // Appended to the injected bridge (runs in each frame): eval relayed code if the
+    // nonce matches, then re-broadcast to this frame's own children (handles nesting).
+    const relayListenerJs = useMemo(
+      () =>
+        `;(function(){try{if(window.__vlRelayI)return;window.__vlRelayI=1;` +
+        `window.addEventListener('message',function(e){var d=e&&e.data;` +
+        `if(d&&d.__vlEval&&d.__vlN===${JSON.stringify(relayNonce)}){` +
+        `try{(0,eval)(d.__vlEval);}catch(_){}` +
+        `try{var f=document.querySelectorAll('iframe');for(var i=0;i<f.length;i++){try{f[i].contentWindow.postMessage(d,'*');}catch(_){}}}catch(_){}` +
+        `}});}catch(_){}})();`,
+      [relayNonce],
+    );
+    // Run `code` in the main frame AND fan it out to all descendant frames.
+    const relayInject = useCallback(
+      (code: string) => {
+        const payload = JSON.stringify({ __vlEval: code, __vlN: relayNonce });
+        webRef.current?.injectJavaScript(
+          `(function(){var P=${payload};` +
+            `try{(0,eval)(P.__vlEval);}catch(e){}` +
+            `try{var f=document.querySelectorAll('iframe');for(var i=0;i<f.length;i++){try{f[i].contentWindow.postMessage(P,'*');}catch(e){}}}catch(e){}` +
+            `})();true;`,
+        );
+      },
+      [relayNonce],
+    );
+
+    const cmd = useCallback(
+      (c: Record<string, unknown>) => {
+        relayInject(`window.__vlCmd && window.__vlCmd(${JSON.stringify(c)})`);
+      },
+      [relayInject],
+    );
 
     useImperativeHandle(
       ref,
@@ -342,10 +380,10 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // when `bound` flips so it lands even if the prop was set before the bridge
     // loaded (an injectJavaScript before __vlSetGuest exists is a harmless no-op).
     useEffect(() => {
-      webRef.current?.injectJavaScript(
-        `window.__vlSetGuest && window.__vlSetGuest(${hideTransportControls ? "true" : "false"}); true;`,
+      relayInject(
+        `window.__vlSetGuest && window.__vlSetGuest(${hideTransportControls ? "true" : "false"})`,
       );
-    }, [hideTransportControls, bound]);
+    }, [hideTransportControls, bound, relayInject]);
 
     // Native-controls takeover: hide ALL of the provider's chrome and KEEP it hidden.
     // We render our own overlay, and — unlike the bridge's __vlChromeOff, which
@@ -372,15 +410,15 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           "div.absolute.bottom-0.h-44{display:none!important}" +
           "[class*='z-[110]']{display:none!important}"
         : "";
-      webRef.current?.injectJavaScript(
-        `(function(){try{` +
+      relayInject(
+        `try{` +
           `window.__vlChromeOff&&window.__vlChromeOff(${on});` +
           `var el=document.getElementById('__npChromeKill');` +
           `if(!el){el=document.createElement('style');el.id='__npChromeKill';(document.head||document.documentElement).appendChild(el);}` +
           `el.textContent=${JSON.stringify(css)};` +
-          `}catch(e){}})();true;`,
+          `}catch(e){}`,
       );
-    }, [nativeControls]);
+    }, [nativeControls, relayInject]);
 
     // Re-applied when `bound` flips (lands even if set before the bridge loaded) and on
     // every rotation — a WebView reflow can re-create the provider's chrome DOM, which
@@ -483,7 +521,12 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             /* swallow popups */
           }}
           onShouldStartLoadWithRequest={(req) => isAllowedTopNav(hosts, req)}
-          injectedJavaScriptBeforeContentLoaded={getCachedScript(providerId) ?? ""}
+          injectedJavaScriptBeforeContentLoaded={(getCachedScript(providerId) ?? "") + relayListenerJs}
+          // Inject the bridge into EVERY frame, not just the main one. On iOS videasy
+          // renders its <video> inside a cross-origin iframe the main-frame finder
+          // can't reach (contentDocument throws) → never binds. Running the bridge in
+          // each frame lets the finder bind the video from inside its own frame.
+          injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
           onMessage={(ev) => handleMessage(ev.nativeEvent.data)}
           onLoadStart={(ev) => {
             erroredThisLoadRef.current = false; // fresh load — clear the per-load error flag
