@@ -98,9 +98,19 @@ export const LEGACY_VIDEASY_BRIDGE: string = `
     });
     post({ event:'ready', currentTime:v.currentTime||0, duration:v.duration||0, paused:!!v.paused, readyState:v.readyState });
   }
-  var finder = setInterval(function(){
+  // Persistent finder (NOT one-shot): videasy tears the <video> down when it reverts
+  // to its poster on pause and mounts a FRESH element on resume, so a bind-once finder
+  // would leave the vid ref pointing at a detached, dead element (resume no-ops). Keep
+  // polling: drop a detached vid, and (re)bind whenever the live <video> differs from
+  // the bound one. bind() is idempotent (guards on v.__vlBound).
+  setInterval(function(){
+    // isConnected (not document.contains): findVideo may bind a <video> inside a
+    // same-origin sub-iframe, which the TOP document doesn't "contain" — isConnected
+    // is true while the element is attached to ANY document, so we only drop it when
+    // videasy actually removes it.
+    if (vid && vid.isConnected === false) vid = null;
     var v = findVideo(document);
-    if (v){ clearInterval(finder); bind(v); }
+    if (v && v !== vid) bind(v);
   }, 700);
   document.addEventListener('visibilitychange', function(){
     if (!document.hidden) return;
@@ -168,16 +178,32 @@ export const LEGACY_VIDEASY_BRIDGE: string = `
       try { var b=__vlAudioButtons().filter(function(x){ return __vlAudioLang(x)===label; })[0]; if(b){ __vlPointerHit(b); setTimeout(__vlReadAudio,900); } } catch(e){}
     }, 300);
   }
+  // videasy's pre-play / paused "poster card" shows a white round play button and,
+  // in that state, the real <video> isn't mounted yet (or was torn down) — so a bare
+  // vid.play() can't lift the card. Click videasy's OWN button (needs the full
+  // synthetic pointer sequence a plain .click() can't trigger); the finder then
+  // re-binds the <video> videasy (re)creates. Selector: a rounded-full bg-white/95
+  // circle (verified live on player.videasy.to). NB: this button lives in videasy's
+  // top frame; harmless (returns null) in the sub-frame that owns the <video>.
+  function __vlPrePlayBtn(){ try { return document.querySelector('button[class*="bg-white/95"], button[class*="bg-white/9"]'); } catch(e){ return null; } }
   window.__vlCmd = function(cmd){
-    if (!vid) return;
     try {
-      // Only echo-suppress commands that actually emit a listened event (play/pause/
+      // PLAY must work even with NO bound <video> (pure poster state) — handle it
+      // before the no-video guard below so we can still click videasy's play button.
+      if (cmd.action === 'play') {
+        wasPlaying = true;
+        var pre = __vlPrePlayBtn();
+        if (pre) __vlPointerHit(pre);
+        if (vid) { markApplying(); var p = vid.play(); if (p && p.catch) p.catch(function(){}); }
+        return;
+      }
+      if (!vid) return;
+      // Only echo-suppress commands that actually emit a listened event (pause/
       // seeked). 'rate' emits 'ratechange' (which we don't observe), so suppressing
       // after it is needless AND harmful: the drift engine nudges playbackRate on
       // nearly every tick, and a blanket markApplying() there was swallowing the
       // user's real play/pause/seek taps during playback.
-      if (cmd.action === 'play') { wasPlaying = true; markApplying(); var p = vid.play(); if (p && p.catch) p.catch(function(){}); }
-      else if (cmd.action === 'pause') { wasPlaying = false; markApplying(); vid.pause(); }
+      if (cmd.action === 'pause') { wasPlaying = false; markApplying(); vid.pause(); }
       else if (cmd.action === 'seek') { markApplying(); vid.currentTime = cmd.time; }
       else if (cmd.action === 'rate') { vid.playbackRate = cmd.rate; }
       else if (cmd.action === 'fullscreen') {

@@ -144,6 +144,16 @@ interface Props extends MediaRef {
  *  (we DON'T unmount — the finder keeps polling, so a slow provider still binds). */
 const BIND_TIMEOUT_MS = 30000;
 
+// Relay fan-out snippet (shared by the injector + the per-frame listener). Posts a
+// payload to every CHILD browsing context via window.frames — which, unlike
+// document.querySelectorAll('iframe'), reaches frames nested inside a shadow root
+// (where videasy mounts its cross-origin <video> frame). Substitute the var name for
+// RELAY_MSG. window.frames is a strict superset of the light-DOM iframe list, so it is
+// used ALONE — fanning via both would double-deliver and blow up exponentially with
+// each frame's re-broadcast.
+const RELAY_FAN_JS =
+  "try{for(var _i=0;_i<window.frames.length;_i++){try{window.frames[_i].postMessage(RELAY_MSG,'*');}catch(_e){}}}catch(_e){}";
+
 // The injection bridge is no longer bundled in the binary — it is served OTA
 // (worker /scripts) and cached in MMKV. Source of truth: src/scripts/legacy-videasy.ts
 // (uploaded via scripts/upload-bridge.ts). Injected per-provider in the WebView below.
@@ -320,7 +330,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         `window.addEventListener('message',function(e){var d=e&&e.data;` +
         `if(d&&d.__vlEval&&d.__vlN===${JSON.stringify(relayNonce)}){` +
         `try{(0,eval)(d.__vlEval);}catch(_){}` +
-        `try{var f=document.querySelectorAll('iframe');for(var i=0;i<f.length;i++){try{f[i].contentWindow.postMessage(d,'*');}catch(_){}}}catch(_){}` +
+        RELAY_FAN_JS.replace("RELAY_MSG", "d") +
         `}});}catch(_){}})();`,
       [relayNonce],
     );
@@ -331,7 +341,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         webRef.current?.injectJavaScript(
           `(function(){var P=${payload};` +
             `try{(0,eval)(P.__vlEval);}catch(e){}` +
-            `try{var f=document.querySelectorAll('iframe');for(var i=0;i<f.length;i++){try{f[i].contentWindow.postMessage(P,'*');}catch(e){}}}catch(e){}` +
+            RELAY_FAN_JS.replace("RELAY_MSG", "P") +
             `})();true;`,
         );
       },
