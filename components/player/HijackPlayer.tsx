@@ -182,6 +182,14 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
   ) => {
     const webRef = useRef<WebView>(null);
     const boundRef = useRef(false);
+    // De-dupe transport events: the bridge is injected into ALL frames
+    // (injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}), so more than
+    // one frame can post the SAME event/tick — the sync engine would then process
+    // every play/pause/seek/tick ~2×. Drop an event whose signature repeats within a
+    // short window (genuine ticks are ~1s apart with a moving currentTime, so they
+    // never collide; only near-simultaneous duplicates from a second frame do).
+    const lastEventRef = useRef<{ sig: string; t: number }>({ sig: "", t: 0 });
+    const lastTickRef = useRef(0);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
     // The "still syncing" banner appears at the 30s bind timeout. Some providers
@@ -488,6 +496,22 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           e = JSON.parse(raw) as PlayerEvent;
         } catch {
           return;
+        }
+        // Drop duplicates posted by a SECOND injected frame (the bridge runs in every
+        // frame). Two mechanisms because the two event kinds duplicate differently:
+        const now = Date.now();
+        if (e.event === "tick") {
+          // Periodic (~1/s per frame) and each frame samples currentTime at a slightly
+          // different instant, so values differ — an exact-value match misses them.
+          // Rate-limit ticks to ~1/s by wall clock instead.
+          if (now - lastTickRef.current < 850) return;
+          lastTickRef.current = now;
+        } else {
+          // Discrete transport/state events fire at an agreed currentTime in both
+          // frames, so a signature match within a short window drops the duplicate.
+          const sig = `${e.event}|${Math.round((e.currentTime ?? 0) * 10)}|${e.paused ? 1 : 0}|${e.readyState ?? ""}`;
+          if (sig === lastEventRef.current.sig && now - lastEventRef.current.t < 300) return;
+          lastEventRef.current = { sig, t: now };
         }
         if (e.event === "ready" && !boundRef.current) {
           boundRef.current = true;

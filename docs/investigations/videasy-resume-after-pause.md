@@ -101,11 +101,18 @@ the bridge = re-upload the prior version. Remaining follow-up: de-dupe the ~2× 
    (b) make `__vlCmd('play')` fall back to clicking videasy's play button when there's no source-backed
    video. Redeploy via `scripts/upload-bridge.ts`.
 
-## Also found (separate, worth fixing)
-**All-frames injection emits DUPLICATE transport events.** With
-`injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}` the bridge runs in multiple frames and
-each posts the same play/pause/tick, so the party sync engine receives every event ~2×. Not fatal, but
-de-dupe (e.g. gate posting to the frame that owns the bound `<video>`, or a per-event nonce).
+## Also found — DUPLICATE transport events → FIXED 2026-08-25 (app-side)
+With `injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}` the bridge runs in multiple frames,
+so ≥2 frames post the same event and the sync engine saw every event ~2×. Fixed in `HijackPlayer.tsx`
+`handleMessage` with TWO de-dupe mechanisms (the two kinds duplicate differently — confirmed live):
+- **Discrete transport/state events** (play/pause/seeking/seeked/playing/canplay/waiting/ended/quality/
+  audio) fire at an agreed `currentTime` in both frames → drop when the signature
+  (`event|round(ct*10)|paused|readyState`) repeats within 300ms. (Live-verified: the post-play burst
+  came through single.)
+- **Ticks** are periodic (~1/s per frame) and each frame samples `currentTime` a few ms apart, so an
+  exact-value match misses them → rate-limit to one tick per 850ms by wall clock. (Correct by
+  construction for any frame phase-offset; a clean live tick-count recheck was blocked by videasy's
+  pre-play gate + Fast-Refresh remounts on the sim.)
 
 ## Repro notes / gotchas
 - Driving playback in a party is entangled with the sync engine + videasy's pre-play gate; **solo
