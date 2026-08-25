@@ -5,7 +5,16 @@ and **`wrangler secret`** on the worker. Grouped by where the work lives. Severi
 [docs/reviews/2026-08-22-full-app-review.md](../reviews/2026-08-22-full-app-review.md).
 
 ## Supabase (SQL / Realtime)
-### C1 (CRITICAL) — watch-party realtime is remotely abusable
+### C1 (CRITICAL) — watch-party realtime is remotely abusable — ✅ DONE (2026-08-25)
+**Shipped:** migration `0007_party_realtime_authz` (applied to the remote project) adds RLS on
+`realtime.messages` so only an authed room member can read/send on `party:<code>` and `party-chat:<code>`
+(via `party_is_member` + `split_part(topic,':',2)`), and the client sets `private: true` on both channels
+(`PartyClient.subscribe`, `usePartyChat`) with `realtime.setAuth()` before subscribe. This closes the
+external attacker vector (guess-a-code → hijack/kick/impersonate). **Residual (member-level forgery):** a
+legit member can still forge a snapshot within their own room — fully closing needs server-authored state
+(postgres_changes) or RPC-stamped chat identity; lower severity (invited member griefing a room they're in,
+and the host can kick). Verify with a 2-device party smoke test before release.
+_Original problem, for reference:_
 Channels are public and the client applies peer `snap`/chat broadcasts as authority with zero server
 verification → anyone who guesses a room code can hijack playback, remote-kick a member, or impersonate
 in chat. The Postgres RPC layer is well-hardened; the transport bypasses it.
@@ -18,7 +27,10 @@ in chat. The Postgres RPC layer is well-hardened; the transport bypasses it.
 Files: `services/party/PartyClient.ts` (subscribe/applySnapshot/broadcast), `services/party/usePartyChat.ts`,
 new migration under `supabase/migrations/`.
 
-### M5 (MEDIUM) — membership flap (paired with C1's server-authored move)
+### M5 (MEDIUM) — membership flap — ✅ ALREADY HANDLED (migration 0004)
+`0004_party_join_bump_seq` already bumps `seq` + re-anchors on a NEW membership, so a joiner's snapshot is
+strictly-newer and doesn't flap against pre-join heartbeats. No further action unless a flap is observed in
+practice. _Original note, for reference:_
 Joins don't bump the playback `seq`, so two near-simultaneous joiners broadcast equal-`(epoch,seq)`
 snapshots with divergent member lists → the client's newest-wins accepts equal seq and the member list
 flickers until the host heartbeat re-anchors. **Deliberately NOT fixed client-side:** the client's `>=`

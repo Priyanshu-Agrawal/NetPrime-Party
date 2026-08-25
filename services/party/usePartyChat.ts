@@ -63,10 +63,15 @@ export function usePartyChat(opts: {
     if (!code) return;
     let cancelled = false;
 
-    void ensurePartyAuth().finally(() => {
+    void (async () => {
+      await ensurePartyAuth().catch(() => {});
+      if (cancelled) return;
+      // Private channel — ensure the realtime socket carries our JWT before subscribe.
+      await supabase.realtime.setAuth();
       if (cancelled) return;
       const channel = supabase.channel(`party-chat:${code}`, {
-        config: { broadcast: { self: false } },
+        // private: RLS-gated to room members (migration 0007) — no outsider chat.
+        config: { private: true, broadcast: { self: false } },
       });
       channel.on("broadcast", { event: "chat" }, ({ payload }) => {
         const p = payload as Omit<ChatMessage, "mine">;
@@ -86,7 +91,7 @@ export function usePartyChat(opts: {
         if (!cancelled && status === "SUBSCRIBED") setReady(true);
       });
       channelRef.current = channel;
-    });
+    })();
 
     return () => {
       cancelled = true;

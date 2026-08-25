@@ -11,10 +11,12 @@ Severity: **Critical** = remote abuse / data loss for all users · **High** = ex
   live main-frame URL, redirects included), M3 (malformed provider rows dropped + `fill` guarded),
   M4 (subscribe handles CHANNEL_ERROR/TIMED_OUT/CLOSED + 15s timeout), M6 (room-code collision retry +
   CSPRNG codes), M11 ("Host your own room" relabeled to match its browse action). `tsc` clean.
+- ✅ **Fixed (2026-08-25, backend):** C1 (realtime authority) — migration `0007_party_realtime_authz`
+  (private channels + RLS on `realtime.messages`) + client `private: true`. M5 (membership flap) was
+  **already handled** by migration `0004_party_join_bump_seq`.
 - ⏳ **Deferred → backend task** ([../plans/backend-hardening.md](../plans/backend-hardening.md)):
-  C1 (realtime authority), H1 + M1 (worker `/cache/purge` + `/report` auth), H2 (OTA bridge integrity),
-  H3 (bridge message nonce — must ship with H2's OTA deploy), M5 (membership flap — needs server-side seq
-  bump; client `>=` is load-bearing for heartbeat liveness), M7 (IP HMAC salt).
+  H1 + M1 (worker `/cache/purge` + `/report` auth), H2 (OTA bridge integrity), H3 (bridge message nonce —
+  must ship with H2's OTA deploy), M7 (IP HMAC salt).
 - ⏹️ **N/A:** M13 (rotation-reflow from frozen `Dimensions`) — moot; the app stays **portrait-locked**
   (the landscape-enable was reverted), so grids/skeletons never reflow. Revisit only if landscape is enabled.
 

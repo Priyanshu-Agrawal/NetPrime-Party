@@ -295,8 +295,14 @@ export class PartyClient {
 
   // --- realtime channel (broadcast transport + presence) --------------------
   private async subscribe(): Promise<void> {
+    // Private channels are authorized by RLS on realtime.messages against auth.uid(),
+    // so the realtime socket must carry our JWT before we subscribe (avoids a race
+    // where the socket connects before the anon token propagates).
+    await supabase.realtime.setAuth();
     const channel = supabase.channel(`party:${this.code}`, {
-      config: { broadcast: { self: false }, presence: { key: this.userId } },
+      // private: gated by RLS on realtime.messages (migration 0007) — only authed
+      // room members can read/send, so an outsider can't hijack via a guessed code.
+      config: { private: true, broadcast: { self: false }, presence: { key: this.userId } },
     });
     // Assign immediately so a destroy() that races this subscribe still removes it
     // (previously `this.channel` was only set after SUBSCRIBED resolved, leaking the
