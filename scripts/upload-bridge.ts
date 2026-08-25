@@ -103,9 +103,16 @@ async function main(): Promise<void> {
   // Purge the worker edge cache so the new script serves immediately.
   const worker = process.env.EXPO_PUBLIC_WORKER_URL || envFromDotLocal("EXPO_PUBLIC_WORKER_URL");
   if (worker) {
+    // /cache/purge is now gated by a shared secret (worker H1). Send it if we have
+    // one; without it the purge just 401s and scripts still propagate within ~60s.
+    const purgeToken = process.env.PURGE_TOKEN || envFromDotLocal("PURGE_TOKEN");
     try {
-      await fetch(`${worker.replace(/\/$/, "")}/cache/purge`, { method: "POST" });
-      console.log("✔ purged worker cache");
+      const res = await fetch(`${worker.replace(/\/$/, "")}/cache/purge`, {
+        method: "POST",
+        headers: purgeToken ? { "x-purge-token": purgeToken } : undefined,
+      });
+      if (res.ok) console.log("✔ purged worker cache");
+      else console.warn(`⚠ purge returned ${res.status} — set PURGE_TOKEN; scripts propagate within ~60s`);
     } catch {
       console.warn("⚠ could not purge worker cache — new scripts propagate within ~60s");
     }

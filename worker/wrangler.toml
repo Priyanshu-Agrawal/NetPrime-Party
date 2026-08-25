@@ -3,8 +3,15 @@ main = "src/index.ts"
 compatibility_date = "2024-03-20"
 
 # Environment variables that don't contain secrets can be added here.
-# For secrets (like Supabase Anon Key), we will use .dev.vars locally 
-# and `npx wrangler secret put` for production.
+# For secrets, use .dev.vars locally and `npx wrangler secret put` for production.
+#
+# Required production secrets (set with `wrangler secret put <NAME>`):
+#   SUPABASE_SERVICE_ROLE_KEY  — write provider_reports + read provider_health.
+#   PURGE_TOKEN                — shared secret gating POST /cache/purge (H1). Also
+#                                pass it to scripts/upload-bridge.ts via env so its
+#                                post-upload purge is authorized.
+#   IP_HASH_SALT               — HMAC salt so /report's client_hash isn't a
+#                                reversible bare SHA-256 of the IP (M7). Rotate.
 [vars]
 # SUPABASE_URL = "https://your-project-id.supabase.co"
 

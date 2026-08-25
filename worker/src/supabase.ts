@@ -31,6 +31,12 @@ export type Bindings = {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   /** Optional rate-limit binding for /report (see wrangler.toml [[ratelimits]]). */
   REPORT_LIMITER?: RateLimiter;
+  /** Shared secret gating POST /cache/purge (H1). Set in prod with
+   *  `wrangler secret put PURGE_TOKEN`; when unset, purge is open (dev only). */
+  PURGE_TOKEN?: string;
+  /** Server-only salt so `client_hash` is a keyed HMAC, not a brute-forceable
+   *  bare SHA-256 of the IP (M7). Set with `wrangler secret put IP_HASH_SALT`. */
+  IP_HASH_SALT?: string;
 };
 
 /**
@@ -296,11 +302,33 @@ export async function insertReport(env: Bindings, row: ReportRow): Promise<boole
   }
 }
 
-/** SHA-256 of the client IP (privacy: we store a hash, never the raw IP). */
-export async function hashIp(ip: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 32);
+/**
+ * Keyed hash of the client IP for the distinct-client id — privacy: we store a
+ * hash, never the raw IP. A bare SHA-256 is NOT enough: the IPv4 space is ~4B
+ * values, brute-forceable in seconds, so an unsalted digest ≈ the raw IP (M7).
+ * With `salt` set (production, `wrangler secret put IP_HASH_SALT`) this is an
+ * HMAC-SHA256 that can't be reversed without the server secret. Without a salt
+ * (dev/unset) it degrades to the old plain digest with a warning — production
+ * MUST set the secret. Both paths return the same 32-hex-char shape so distinct-
+ * client counting is unaffected by whether the salt is present.
+ */
+export async function hashIp(ip: string, salt?: string): Promise<string> {
+  const enc = new TextEncoder();
+  const toHex = (buf: ArrayBuffer) =>
+    [...new Uint8Array(buf)]
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 32);
+  if (salt) {
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(salt),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    return toHex(await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(ip)));
+  }
+  console.warn("hashIp: IP_HASH_SALT not set — client_hash is reversible. Set the secret in production.");
+  return toHex(await crypto.subtle.digest("SHA-256", enc.encode(ip)));
 }

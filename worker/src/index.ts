@@ -208,16 +208,29 @@ const purgeRoute = createRoute({
   path: "/cache/purge",
   tags: ["System"],
   summary: "Invalidate the provider cache",
-  description: "Call after editing rows in Supabase to skip the 60s TTL.",
+  description:
+    "Call after editing rows in Supabase to skip the 60s TTL. Requires the x-purge-token header (shared secret) when PURGE_TOKEN is configured.",
   responses: {
     200: {
       content: { "application/json": { schema: PurgeResponseSchema } },
       description: "Cache purge result.",
     },
+    401: {
+      content: { "application/json": { schema: ErrorSchema } },
+      description: "Missing or invalid purge token.",
+    },
   },
 });
 
 app.openapi(purgeRoute, async (c) => {
+  // H1: gate the purge behind a shared secret. Unauthenticated, anyone could loop
+  // purge + /config and, under the resulting Supabase load, leave the no-fallback
+  // app with an empty provider list for everyone (global blackout). When
+  // PURGE_TOKEN is unset (local dev) the endpoint stays open for convenience.
+  const required = c.env.PURGE_TOKEN;
+  if (required && c.req.header("x-purge-token") !== required) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
   const purged = await purgeProviders();
   return c.json(
     {
@@ -289,18 +302,29 @@ app.openapi(reportRoute, async (c) => {
   // distinct-client id. Never store the raw IP.
   const ip = c.req.header("cf-connecting-ip") || "0.0.0.0";
 
-  // Per-IP rate limit (best-effort: if the binding isn't configured, don't block).
-  // IP keys are coarse on mobile/NAT, so aggregation also weights by distinct
-  // clients — this is the first gate, not the only defense.
+  // Per-IP rate limit. FAIL-CLOSED (M1): if the binding is missing we reject
+  // rather than allow unlimited writes — an unthrottled /report lets an attacker
+  // flood `no_bind` for the live provider and demote it for everyone. IP keys are
+  // coarse on mobile/NAT, so aggregation also weights by distinct clients — this
+  // is the first gate, not the only defense.
   const limiter = c.env.REPORT_LIMITER;
-  if (limiter) {
-    const { success } = await limiter.limit({ key: `report:${ip}` });
-    if (!success) return c.json({ error: "Rate limited" }, 429);
+  if (!limiter) return c.json({ error: "Rate limiting unavailable" }, 429);
+  const { success } = await limiter.limit({ key: `report:${ip}` });
+  if (!success) return c.json({ error: "Rate limited" }, 429);
+
+  // M1: reject a providerId that isn't a real, currently-enabled provider, so a
+  // client can't poison the health table with fabricated ids. Silently accepted
+  // (202) without an insert — telemetry is fire-and-forget and we don't hand an
+  // attacker a probe for which ids are live. (getProviders is edge-cached, shared
+  // with /config, so this adds no per-request Supabase load in the common case.)
+  const providers = await getProviders(c.env, c.executionCtx);
+  if (!providers.some((p) => p.id === body.providerId)) {
+    return c.json({ accepted: true }, 202);
   }
 
   // Trusted, server-derived geo (do not accept from the client).
   const country = (c.req.raw as unknown as { cf?: { country?: string } }).cf?.country ?? null;
-  const clientHash = await hashIp(ip);
+  const clientHash = await hashIp(ip, c.env.IP_HASH_SALT);
 
   // Best-effort write; telemetry must never break the client, so a failed insert
   // still returns 202.

@@ -39,22 +39,35 @@ seq test is load-bearing for host-heartbeat **liveness/election** (equal-seq hea
 on membership change in the `party_join`/`party_leave` RPCs so joins are strictly-ordered. Then the
 client can treat equal-seq peer snapshots as liveness-only. Files: party RPC migration.
 
-### M7 (MEDIUM) — IP "hash" is reversible → de-anonymizable PII
-`worker/src/supabase.ts:hashIp` is a bare SHA-256 of the IP; the IPv4 space brute-forces in seconds, so
-`client_hash` ≈ the raw IP (store-review privacy risk). **Fix:** HMAC-SHA256 with a **server-only secret
-salt** (`wrangler secret put IP_HASH_SALT`), rotated periodically.
+### M7 (MEDIUM) — IP "hash" is reversible → de-anonymizable PII — ✅ DONE (2026-08-25)
+**Shipped:** `worker/src/supabase.ts:hashIp(ip, salt?)` is now HMAC-SHA256 keyed by a server-only secret
+(`IP_HASH_SALT`) when set; without it, degrades to the old plain digest with a `console.warn` (dev only).
+`/report` passes `c.env.IP_HASH_SALT`. Verified locally: with the salt set no warning fires and the HMAC
+output differs from the bare SHA-256 for the same IP (not reversible without the secret). **Operator TODO
+before release:** `wrangler secret put IP_HASH_SALT` (rotate periodically).
+_Original:_ a bare SHA-256 of the IP; the IPv4 space brute-forces in seconds, so `client_hash` ≈ the raw IP.
 
 ## Cloudflare Worker
-### H1 (HIGH) — `/cache/purge` is unauthenticated → global provider blackout
-`worker/src/index.ts:~220`, CORS wildcard. Anyone can loop purge+`/config`; under load `getProviders`
-returns `[]`, cached 60s → the no-fallback app goes dumb for everyone. **Fix:** require a shared-secret
-header (`wrangler secret put PURGE_TOKEN`) on `/cache/purge`; scope CORS to app origins.
+### H1 (HIGH) — `/cache/purge` is unauthenticated → global provider blackout — ✅ DONE (2026-08-25)
+**Shipped:** `/cache/purge` now requires `x-purge-token: <PURGE_TOKEN>` when the secret is configured
+(open when unset, for local dev). `scripts/upload-bridge.ts` sends the header from `PURGE_TOKEN` env/.env.local.
+Verified locally: no token / wrong token → 401, correct token → 200. **Operator TODO before release:**
+`wrangler secret put PURGE_TOKEN` (and add `PURGE_TOKEN=…` to the env used to run `upload-bridge.ts`).
+_Residual:_ CORS is still global `cors()` — defence-in-depth only; the token is the real gate (it holds
+against non-browser clients like curl, which CORS can't stop). Scope CORS per-route later if desired.
+_Original:_ anyone can loop purge+`/config`; under load `getProviders` returns `[]`, cached 60s → the
+no-fallback app goes dumb for everyone.
 
-### M1 (MEDIUM) — `/report` unauthenticated/unvalidated → health-ordering poisoning
-`worker/src/index.ts:~285`, `schemas.ts`. `providerId`/`outcome` are attacker-controlled and never checked
-against the real provider set; `REPORT_LIMITER` is a no-op if the binding is unset. Flooding `no_bind`
-for the live provider demotes it for all users. **Fix:** reject `providerId` not in the current provider
-list; **fail-closed** if the rate-limiter binding is missing; consider a lightweight app attestation/nonce.
+### M1 (MEDIUM) — `/report` unvalidated → health-ordering poisoning — ✅ DONE (2026-08-25)
+**Shipped:** `/report` now (a) **fails closed** — if `REPORT_LIMITER` is missing it returns 429 instead of
+allowing unlimited writes, and (b) rejects a `providerId` not in the current enabled-provider list (returns
+202 without an insert, so no poison row and no probe feedback to an attacker). `outcome` was already an enum
+(can't be arbitrary). Verified locally: an unknown providerId returns 202 and never reaches `insertReport`
+(only the valid `videasy` report did); limiter binding present in `wrangler dev`. **Deferred:** a real app
+attestation/nonce (bigger lift; the rate-limit + distinct-client weighting + providerId gate cover the
+cheap floods).
+_Original:_ `providerId` attacker-controlled and unchecked; `REPORT_LIMITER` a no-op if unset — flooding
+`no_bind` for the live provider demotes it for all users.
 
 ## Client + Worker together (OTA bridge integrity)
 ### H2 (HIGH) — OTA bridge injected with no integrity check → WebView RCE
