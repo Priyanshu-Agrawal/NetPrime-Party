@@ -4,10 +4,19 @@ Comprehensive review of Bearoom/NetPrime `feat/improvements` @ `a1d1d87`, run as
 
 Severity: **Critical** = remote abuse / data loss for all users · **High** = exploitable or breaks a primary flow · **Medium** = real bug in a common path · **Low** = edge case / polish.
 
-## Fix status (2026-08-22, uncommitted client pass)
-- ✅ **Fixed:** H5, M8, M9, M10, M12, and all Low items (L1–L14). `tsc` clean.
-- ⏳ **Open — needs backend/infra (service-role / wrangler / Realtime RLS):** C1 (realtime authority), H1 + M1 (worker `/cache/purge` + `/report` auth), H2 (OTA bridge integrity — needs the client to verify the `version` hash; deferred with the security cluster), M7 (IP HMAC salt).
-- ⏳ **Open — deferred client items:** H3 (bridge message nonce — pairs with H2), H4 (autoplay-toggle remount), H6 (subscribe/destroy race leak), M2 (redirect-fragile error filter), M3 (malformed provider-row crash guard), M4 (subscribe error-status hang), M5 (membership flap), M6 (room-code collision retry), M11 ("Host your own room" dead button), M13 (rotation-reflow from frozen Dimensions).
+## Fix status
+- ✅ **Fixed (2026-08-22):** H5, M8, M9, M10, M12, all Low items (L1–L14).
+- ✅ **Fixed (2026-08-25, client hardening pass):** H4 (autoplay-toggle remount → pref snapshotted in a ref),
+  H6 (subscribe/destroy race → channel assigned up front + torn-down guard), M2 (error filter compares the
+  live main-frame URL, redirects included), M3 (malformed provider rows dropped + `fill` guarded),
+  M4 (subscribe handles CHANNEL_ERROR/TIMED_OUT/CLOSED + 15s timeout), M6 (room-code collision retry +
+  CSPRNG codes), M11 ("Host your own room" relabeled to match its browse action). `tsc` clean.
+- ⏳ **Deferred → backend task** ([../plans/backend-hardening.md](../plans/backend-hardening.md)):
+  C1 (realtime authority), H1 + M1 (worker `/cache/purge` + `/report` auth), H2 (OTA bridge integrity),
+  H3 (bridge message nonce — must ship with H2's OTA deploy), M5 (membership flap — needs server-side seq
+  bump; client `>=` is load-bearing for heartbeat liveness), M7 (IP HMAC salt).
+- ⏹️ **N/A:** M13 (rotation-reflow from frozen `Dimensions`) — moot; the app stays **portrait-locked**
+  (the landscape-enable was reverted), so grids/skeletons never reflow. Revisit only if landscape is enabled.
 
 ---
 
