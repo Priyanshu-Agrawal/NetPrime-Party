@@ -432,7 +432,16 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       const css = on
         ? "[class*='mobileCenterControls']{display:none!important}" +
           "div.absolute.bottom-0.h-44{display:none!important}" +
-          "[class*='z-[110]']{display:none!important}"
+          "[class*='z-[110]']{display:none!important}" +
+          // videasy's pre-play / PAUSED poster card is a full-screen clickable overlay
+          // (div.fixed.inset-0.bg-black.cursor-pointer with the white play button
+          // centered; verified live). Post-bind it re-appears on pause and blacks out
+          // the frame ABOVE our own controls. Hide it with opacity:0 (NOT display:none)
+          // so it's invisible but stays in layout + clickable — the resume path
+          // (__vlCmd('play') → click the inner bg-white/95 button, which bubbles to this
+          // overlay's handler) keeps working. Targeted by inset-0 + bg-black +
+          // cursor-pointer so it can't match the video container.
+          "div[class*='inset-0'][class*='bg-black'][class*='cursor-pointer']{opacity:0!important}"
         : "";
       relayInject(
         `try{` +

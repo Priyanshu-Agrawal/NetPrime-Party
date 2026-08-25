@@ -358,6 +358,11 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                   onPress={() => {
                     if (paused) onPlay();
                     else onPause();
+                    // Flip the icon immediately instead of waiting up to ~1s for the
+                    // next tick (or a videasy poster-swap that stalls events) — the
+                    // control would otherwise desync from what the tap just did. The
+                    // next real playback event confirms or corrects this.
+                    setPaused((p) => !p);
                     show();
                   }}
                   hitSlop={10}
