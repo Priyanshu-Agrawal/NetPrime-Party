@@ -25,5 +25,10 @@ export function remoteToProvider(row: RemoteProviderRow): Provider {
  * the single source of truth for order (consistent with the no-fallback design).
  */
 export function remoteToProviders(rows: RemoteProviderRow[]): Provider[] {
-    return rows.filter((r) => r.enabled).map(remoteToProvider);
+    // Drop rows missing the fields playback needs — a null url_movie/allowed_domain
+    // would otherwise crash the player (fill().replace on undefined) or blank it
+    // (empty host blocks the initial top-frame nav). Keep the app dumb but safe.
+    return rows
+        .filter((r) => r.enabled && r.url_movie && r.allowed_domain)
+        .map(remoteToProvider);
 }

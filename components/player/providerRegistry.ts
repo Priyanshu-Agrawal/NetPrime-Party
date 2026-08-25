@@ -88,6 +88,7 @@ export function isUnstable(p: Provider | undefined): boolean {
 }
 
 function fill(template: string, m: MediaRef): string {
+  if (!template) return ""; // defensive: a malformed provider row shouldn't crash the player
   return template
     .replace(/\$\{id\}/g, m.tmdbId)
     .replace(/\$\{season\}/g, String(m.season ?? 1))

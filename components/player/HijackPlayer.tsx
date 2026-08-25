@@ -191,6 +191,15 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // instance.
     const [remountNonce, setRemountNonce] = useState(0);
     const retryAttemptRef = useRef(0);
+    // Snapshot the autoplay-next pref at mount. Reading it every render put it in the
+    // WebView `key`, so toggling the setting mid-episode remounted the player and
+    // restarted at 0:00. The pref is meant to apply to the NEXT load — honor that.
+    const autoplayNextRef = useRef(getAutoplayNext());
+    // The current main-frame URL (updated on every top-frame load, incl. redirects).
+    // Fatal-error detection compares against THIS, not the original `uri`, so a
+    // provider whose embed redirects (e.g. vidfast pro→vc) still surfaces a real
+    // main-frame 4xx/5xx instead of it being filtered as a sub-resource error.
+    const mainFrameUrlRef = useRef<string | null>(null);
     // Survives reloadNow()'s transient clear of `fatalError`, so a genuine recovery
     // still fires onRecovered. Set on error; consumed on the next SUCCESSFUL load.
     const hadErrorRef = useRef(false);
@@ -455,7 +464,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const uri = buildEmbedUrl(
       provider,
       { tmdbId, type, season, episode, startAt },
-      { party, autoplayNext: getAutoplayNext() },
+      { party, autoplayNext: autoplayNextRef.current },
     );
 
     return (
@@ -476,20 +485,24 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           onShouldStartLoadWithRequest={(req) => isAllowedTopNav(hosts, req)}
           injectedJavaScriptBeforeContentLoaded={getCachedScript(providerId) ?? ""}
           onMessage={(ev) => handleMessage(ev.nativeEvent.data)}
-          onLoadStart={() => {
+          onLoadStart={(ev) => {
             erroredThisLoadRef.current = false; // fresh load — clear the per-load error flag
+            // Track the committed main-frame URL (redirects included) for error scoping.
+            if (ev.nativeEvent.url) mainFrameUrlRef.current = ev.nativeEvent.url;
           }}
           onLoad={handleLoadEnd}
           // MAIN-FRAME failures only. Provider pages throw constant sub-resource
-          // 404s (ads/trackers); we compare the errored URL to the embed URL so
-          // those never trigger the overlay/telemetry.
+          // 404s (ads/trackers); we treat a failure as fatal only when its URL is the
+          // embed URL OR the current main-frame URL (so a redirected embed still counts).
           onError={(ev) => {
             const n = ev.nativeEvent;
-            if (!n.url || n.url === uri) raiseFatal({ kind: "http_error", description: n.description });
+            if (!n.url || n.url === uri || n.url === mainFrameUrlRef.current)
+              raiseFatal({ kind: "http_error", description: n.description });
           }}
           onHttpError={(ev) => {
             const n = ev.nativeEvent;
-            if (n.url === uri && n.statusCode >= 400) raiseFatal({ kind: "http_error", statusCode: n.statusCode });
+            if ((n.url === uri || n.url === mainFrameUrlRef.current) && n.statusCode >= 400)
+              raiseFatal({ kind: "http_error", statusCode: n.statusCode });
           }}
           onRenderProcessGone={() => raiseFatal({ kind: "render_crash" })}
           onContentProcessDidTerminate={() => raiseFatal({ kind: "render_crash" })}
