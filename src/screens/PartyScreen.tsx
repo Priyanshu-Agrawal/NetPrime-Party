@@ -38,6 +38,9 @@ import ReanimatedAnimated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from
 import { useResponsive } from "@/hooks/useResponsive";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useDetailsQuery } from "@/src/store/services/tmdbApi";
+import { img } from "@/utils/tmdbDetails";
 import { exitMedia } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
@@ -227,6 +230,13 @@ export default function Party() {
   const media = snap?.media;
   const config = snap?.config;
   const providerId = media?.providerId;
+  // The room snapshot carries no artwork, so the loading cover would fall back to a
+  // bare badge in a black void. Fetch the title's poster (cached, shared with the
+  // details screens) so host AND guest get the rich blurred-poster loader.
+  const { data: mediaDetails } = useDetailsQuery(
+    media ? { type: media.type, id: media.tmdbId } : skipToken,
+  );
+  const posterUrl = img(mediaDetails?.poster_path, "w342") ?? undefined;
   const roomCode = snap?.code || room;
   const hostPresent = !!snap?.lease.hostId;
   const hostId = snap?.lease.hostId;
@@ -588,6 +598,7 @@ export default function Party() {
                 type={media.type}
                 season={media.season}
                 episode={media.episode}
+                posterUrl={posterUrl}
                 onPlayerEvent={onEvent}
                 onBound={() => setPlayerBound(true)}
                 nativeControls={playerBound}
@@ -672,12 +683,6 @@ export default function Party() {
                   overlayChildren={
                     isImmersive ? (
                       <>
-                        <View style={[styles.livePillLandscape, { left: Math.max(insets.left, ms(12)) }]}>
-                          <View style={[styles.liveDot, party.detached && styles.liveDotOff]} />
-                          <Text style={styles.liveText}>
-                            {party.detached ? "Paused · Detached" : "Live · In Sync"}
-                          </Text>
-                        </View>
                         {!landscapeChatOpen && reactionsOn && canParticipate ? (
                           <ReanimatedAnimated.View
                             entering={FadeIn.duration(200)}
@@ -712,17 +717,10 @@ export default function Party() {
             </View>
           )}
 
-          {/* LIVE · In Sync pill (portrait / tablet only; immersive uses overlayChildren). */}
-          {providerId && media && !isImmersive ? (
-            <View style={styles.livePill}>
-              <View style={[styles.liveDot, party.detached && styles.liveDotOff]} />
-              <Text style={styles.liveText}>
-                {party.detached ? "Paused · Detached" : "Live · In Sync"}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* guest paused → the PlayerControls overlay shows "Tap to sync" */}
+          {/* No standalone sync badge: for the host it just repeats the "You're
+              hosting" bar, for a synced guest it says nothing actionable, and the
+              only state that matters — detached — is surfaced by PlayerControls'
+              actionable "Tap to sync". */}
 
           {/* no host → take over */}
           {!party.isHost && !hostPresent && !!snap ? (
@@ -1236,20 +1234,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     overflow: "hidden",
   },
-  livePillLandscape: {
-    position: "absolute",
-    top: ms(56),
-    left: ms(12),
-    flexDirection: "row",
-    alignItems: "center",
-    gap: ms(6),
-    backgroundColor: colors.honeySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honey,
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(4),
-    borderRadius: radius.pill,
-  },
   landscapeQuickReactions: {
     position: "absolute",
     right: ms(16),
@@ -1376,24 +1360,6 @@ const styles = StyleSheet.create({
   },
   waiting: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 24 },
   waitingText: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14), textAlign: "center" },
-
-  livePill: {
-    position: "absolute",
-    top: ms(10),
-    left: ms(12),
-    flexDirection: "row",
-    alignItems: "center",
-    gap: ms(6),
-    backgroundColor: colors.honeySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honey,
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(4),
-    borderRadius: radius.pill,
-  },
-  liveDot: { width: ms(6), height: ms(6), borderRadius: ms(3), backgroundColor: colors.honey },
-  liveDotOff: { backgroundColor: colors.textDim },
-  liveText: { color: colors.honey, fontFamily: font.label, fontSize: ms(10), letterSpacing: 1 },
 
   floatBtn: {
     position: "absolute",

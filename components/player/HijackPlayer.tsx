@@ -581,6 +581,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             ) : null}
             <View style={styles.loadingContent}>
               {posterUrl ? (
+                // Clean poster card — NO spinner over the artwork (that reads as a
+                // broken-image glitch). The spinner lives in the status row below.
                 <View style={styles.loadingThumbWrap}>
                   <Image
                     source={{ uri: posterUrl }}
@@ -589,17 +591,18 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
                     transition={250}
                     cachePolicy="memory-disk"
                   />
-                  <View style={styles.loadingThumbGlaze}>
-                    <ActivityIndicator size="large" color={colors.honey} />
-                  </View>
                 </View>
               ) : (
                 <View style={styles.loadingBadge}>
-                  <Ionicons name="paw" size={ms(30)} color={colors.honey} />
-                  <ActivityIndicator size="small" color={colors.honey} style={styles.loadingSpin} />
+                  <Image
+                    source={require("@/assets/images/brandmark.png")}
+                    style={styles.loadingBrandMark}
+                    contentFit="contain"
+                  />
                 </View>
               )}
-              <View style={styles.loadingTextCol}>
+              <View style={styles.loadingStatusRow}>
+                <ActivityIndicator size="small" color={colors.honey} />
                 <Text style={styles.loadingSub}>Getting your stream ready…</Text>
               </View>
             </View>
@@ -648,7 +651,7 @@ HijackPlayer.displayName = "HijackPlayer";
 
 // Vertical scrim over the blurred poster — lighter at the top, deepening toward the
 // bottom for text legibility (warm-charcoal, derived from colors.bg #100D0A).
-const LOADING_SCRIM = ["rgba(16,13,10,0.35)", "rgba(16,13,10,0.82)"] as const;
+const LOADING_SCRIM = ["rgba(16,13,10,0.62)", "rgba(16,13,10,0.94)"] as const;
 
 const styles = StyleSheet.create({
   web: { flex: 1, backgroundColor: colors.playerBg },
@@ -664,43 +667,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.bg, // solid base under the blurred poster (no poster → flat)
   },
-  loadingContent: { alignItems: "center", gap: ms(18), paddingHorizontal: 32 },
+  loadingContent: { alignItems: "center", gap: ms(20), paddingHorizontal: 32 },
   loadingThumbWrap: {
-    width: ms(132),
-    height: ms(198),
-    borderRadius: ms(16),
+    width: ms(112),
+    height: ms(168),
+    borderRadius: ms(14),
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honeyGlow,
+    borderColor: "rgba(255,255,255,0.14)", // hairline edge, not a hard honey outline
     // NO elevation/shadow — proven stutter rule on any video screen.
   },
   loadingThumb: { width: "100%", height: "100%" },
-  loadingThumbGlaze: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(16,13,10,0.42)", // darken the thumb so the honey spinner reads
-  },
   loadingBadge: {
-    width: ms(72),
-    height: ms(72),
-    borderRadius: ms(24),
+    width: ms(76),
+    height: ms(76),
+    borderRadius: ms(22),
     alignItems: "center",
     justifyContent: "center",
-    gap: ms(2),
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.honeyGlow,
   },
-  loadingSpin: {},
-  loadingTextCol: { alignItems: "center", gap: ms(4) },
-  loadingBrandRow: { flexDirection: "row", alignItems: "center", gap: ms(6) },
-  loadingTitle: {
-    color: colors.text,
-    fontFamily: font.headlineSemi,
-    fontSize: ms(17),
-  },
-  loadingSub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(13), textAlign: "center" },
+  loadingBrandMark: { width: ms(38), height: ms(38) },
+  loadingStatusRow: { flexDirection: "row", alignItems: "center", gap: ms(8) },
+  loadingSub: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13), letterSpacing: 0.2 },
   banner: {
     position: "absolute",
     bottom: 0,
