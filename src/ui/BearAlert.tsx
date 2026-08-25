@@ -2,10 +2,10 @@
  * BearAlert — themed replacement for React Native Alert.alert.
  */
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
-import { Frost } from "./Frost";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Frost } from "./Frost";
 
 // Ripple tints: dark reads on the bright honey button, light on the dark ghost/danger.
 const RIPPLE_LIGHT = "rgba(255,255,255,0.13)";
@@ -88,7 +88,6 @@ function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton
               .map((b, i) => (
                 <Pressable
                   key={i}
-                  android_ripple={{ color: RIPPLE_LIGHT }}
                   style={({ pressed }) => [styles.stackRow, pressed && styles.stackRowPressed]}
                   onPress={() => {
                     haptic(b.style);
@@ -100,7 +99,6 @@ function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton
               ))}
             {buttons.find((b) => b.style === "cancel") ? (
               <Pressable
-                android_ripple={{ color: RIPPLE_LIGHT }}
                 style={({ pressed }) => [styles.cancelBtn, pressed && styles.btnPressed]}
                 onPress={() => {
                   haptic("cancel");
@@ -119,7 +117,6 @@ function AlertCard({ state, run }: { state: AlertState; run: (b: BearAlertButton
               return (
                 <Pressable
                   key={i}
-                  android_ripple={{ color: !isCancel && !isDestructive ? RIPPLE_DARK : RIPPLE_LIGHT }}
                   style={({ pressed }) => [
                     styles.btn,
                     isCancel ? styles.btnGhost : isDestructive ? styles.btnDanger : styles.btnHoney,
