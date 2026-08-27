@@ -19,7 +19,7 @@ import {
   openAppSettings,
   requestNotificationPermission,
 } from "@/services/permissions/notifications";
-import { openLibrary } from "@/src/navigation/actions";
+import { openLibrary, openHomePrefs } from "@/src/navigation/actions";
 import { Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -222,6 +222,7 @@ export default function MoreScreen() {
         <Card>
           <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
           <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
+          <Row icon="sparkles-outline" label="Home" onPress={openHomePrefs} />
           <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
         </Card>
 

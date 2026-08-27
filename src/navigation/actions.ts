@@ -66,6 +66,10 @@ export function openLibrary(screen: LibraryScreen) {
   navigate(screen);
 }
 
+export function openHomePrefs() {
+  navigate("HomePrefs");
+}
+
 export function openSearchTab() {
   navigate("MainTabs", { screen: "Search" });
 }

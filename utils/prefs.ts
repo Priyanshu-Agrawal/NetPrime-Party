@@ -12,6 +12,7 @@ enum PrefKey {
   DataSaver = "pref.dataSaver",
   Audio = "pref.audioLang",
   Quality = "pref.quality",
+  PersonalRecs = "pref.personalRecs",
 }
 
 export function hasOnboarded(): boolean {
@@ -35,6 +36,14 @@ export function getDataSaver(): boolean {
 }
 export function setDataSaver(v: boolean): void {
   storage.set(PrefKey.DataSaver, v);
+}
+
+/** Show the personalized "Because you've been watching" home rail (default on). */
+export function getPersonalRecs(): boolean {
+  return storage.getBoolean(PrefKey.PersonalRecs) ?? true;
+}
+export function setPersonalRecs(v: boolean): void {
+  storage.set(PrefKey.PersonalRecs, v);
 }
 
 /**

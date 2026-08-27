@@ -43,6 +43,7 @@ export type RootStackParamList = {
   MyList: undefined;
   WatchHistory: undefined;
   TrendingShows: undefined;
+  HomePrefs: undefined;
 };
 
 declare global {
