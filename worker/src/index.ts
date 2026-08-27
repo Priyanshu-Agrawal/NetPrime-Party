@@ -117,6 +117,9 @@ const configRoute = createRoute({
 
 app.openapi(configRoute, async (c) => {
   const providers = await getProviders(c.env, c.executionCtx);
+  // `homeFeed` is intentionally omitted: AppConfigSchema allows it (optional),
+  // and the client falls back to its baked-in Home layout when absent. To
+  // server-drive Home, populate `homeFeed: FeedManifest` (see schemas.ts) here.
   return c.json(
     { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, providers },
     200,

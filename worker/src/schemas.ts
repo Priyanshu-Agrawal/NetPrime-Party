@@ -74,12 +74,61 @@ export type Provider = z.infer<typeof ProviderSchema>;
 /*  GET /config                                                               */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * One row in the server-driven Home feed manifest. Mirrors the app's
+ * `types/feed.ts` shape (NOT imported — the worker is a separate package, so
+ * the two are kept in sync by hand). Deliberately flatter than the app's
+ * discriminated union: the app narrows `path`/`kind` to `tmdbRail` sections at
+ * the type level, but the wire format just needs every field optional besides
+ * `id`/`type` so unrecognized or partial sections still parse — the client's
+ * `normalizeManifest()` is responsible for dropping anything it can't render
+ * (unknown `type`, or a `tmdbRail` missing `path`/`kind`).
+ */
+const FeedSectionSchema = z
+  .object({
+    id: z.string().openapi({ example: "trend-movie" }),
+    type: z
+      .enum([
+        "continueWatching",
+        "becauseYouWatched",
+        "tmdbRail",
+        "genreRow",
+        "franchises",
+        "editorialRow",
+      ])
+      .openapi({ example: "tmdbRail" }),
+    title: z.string().optional().openapi({ example: "Trending Movies" }),
+    enabled: z.boolean().optional(),
+    minAppVersion: z.string().optional(),
+    path: z.string().optional().openapi({ example: "movie/popular" }),
+    kind: z.enum(["movie", "tv"]).optional(),
+    icon: z.string().optional(),
+    seeAll: z.boolean().optional(),
+    limit: z.number().int().optional(),
+  })
+  .openapi("FeedSection");
+
+/**
+ * The full server-driven Home feed. Optional on `AppConfig` — D1 ships with
+ * it omitted, so the client renders its baked-in fallback layout unchanged.
+ * An operator can later populate this to reorder/add/remove Home rails
+ * without a client rebuild.
+ */
+export const FeedManifestSchema = z
+  .object({
+    version: z.number().int().openapi({ example: 1 }),
+    sections: z.array(FeedSectionSchema),
+  })
+  .openapi("FeedManifest");
+
 /** App-level configuration returned to the mobile/web client on launch. */
 export const AppConfigSchema = z
   .object({
     appVersion: z.string().openapi({ example: "2.0.0" }),
     maintenanceMode: z.boolean().openapi({ example: false }),
     providers: z.array(ProviderSchema),
+    /** Optional server-driven Home feed. Omitted → client renders its fallback. */
+    homeFeed: FeedManifestSchema.optional(),
   })
   .openapi("AppConfig");
 
