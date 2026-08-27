@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { Movie, MovieContextType } from "./types";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 // TMDB's API host (api.themoviedb.org) is blocked/RST on many Indian ISPs, so
 // data flows through YOUR OWN Cloudflare Worker proxy (tmdb-proxy-worker.js),
@@ -18,11 +19,13 @@ export const API_URL =
 // Deprecated: the proxy injects the token; nothing sensitive lives in the app.
 export const API_BEARER_TOKEN = "";
 
+// Only `accept`. We deliberately ALLOW gzip/br compression (React Native's native
+// fetch negotiates + decompresses transparently; the Cloudflare proxy compresses on
+// request) and normal HTTP caching. Do NOT re-add `Accept-Encoding: identity` or
+// `Cache-Control/Pragma: no-cache` — measured, they bloated every TMDB response
+// 2–5× (a details call was 244 KB vs 46 KB gzipped) and defeated caching.
 export const API_HEADERS = {
   accept: "application/json",
-  "Accept-Encoding": "identity",
-  "Cache-Control": "no-cache",
-  Pragma: "no-cache",
 };
 
 // Default context value for initial creation and for cases where it's used outside a Provider.
@@ -49,7 +52,7 @@ export const MovieContextProvider: React.FC<MovieContextProviderProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${API_URL}movie/now_playing?language=en-US&page=${page}`,
         {
           headers: API_HEADERS,

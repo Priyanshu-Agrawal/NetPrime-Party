@@ -3,6 +3,7 @@
  * the app's existing proxy token — powers the home-screen rails + hero.
  */
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 export interface MediaItem {
   id: number;
@@ -21,7 +22,7 @@ export interface MediaItem {
 
 export async function fetchList(path: string): Promise<MediaItem[]> {
   const sep = path.includes("?") ? "&" : "?";
-  const res = await fetch(`${API_URL}${path}${sep}language=en-US`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}${sep}language=en-US`, {
     headers: API_HEADERS,
   });
   if (!res.ok) return [];
@@ -40,7 +41,7 @@ export interface ListPageResult {
 /** Paginated TMDB list fetch — powers library "See all" screens. */
 export async function fetchListPage(path: string, page: number): Promise<ListPageResult> {
   const sep = path.includes("?") ? "&" : "?";
-  const res = await fetch(`${API_URL}${path}${sep}language=en-US&page=${page}`, {
+  const res = await fetchWithTimeout(`${API_URL}${path}${sep}language=en-US&page=${page}`, {
     headers: API_HEADERS,
   });
   if (!res.ok) {

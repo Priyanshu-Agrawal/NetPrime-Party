@@ -7,6 +7,7 @@ import {
     fetchListPage,
 } from "@/utils/tmdbLists";
 import { fetchDetails } from "@/utils/tmdbDetails";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 // TMDB `with_watch_providers` requires a `watch_region`. The audience is
 // India-first, so default to IN (was hardcoded US). Provider IDs (Netflix=8,
@@ -15,7 +16,7 @@ const WATCH_REGION = "IN";
 
 const raw = async (path: string): Promise<any> => {
     const sep = path.includes("?") ? "&" : "?";
-    const res = await fetch(`${API_URL}${path}${sep}language=en-US`, {
+    const res = await fetchWithTimeout(`${API_URL}${path}${sep}language=en-US`, {
         headers: API_HEADERS,
     });
     if (!res.ok) {
@@ -69,6 +70,23 @@ export const tmdbApi = createApi({
                 queryFn: async ({ type, id }) => {
                     try { return { data: await fetchDetails(type, String(id)) }; }
                     catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 600,
+            }),
+            // Recommendations only (light) — falls back to `similar` when empty.
+            // Much cheaper than `details` for the home "Recommended for you" blend,
+            // which just needs the rec list, not the full append_to_response payload.
+            recommendations: build.query<MediaItem[], { type: "movie" | "tv"; id: string | number }>({
+                queryFn: async ({ type, id }) => {
+                    try {
+                        const recs = await raw(`${type}/${id}/recommendations`);
+                        let results: MediaItem[] = recs?.results ?? [];
+                        if (results.length === 0) {
+                            const sim = await raw(`${type}/${id}/similar`);
+                            results = sim?.results ?? [];
+                        }
+                        return { data: results };
+                    } catch (e: any) { return { error: e.message }; }
                 },
                 keepUnusedDataFor: 600,
             }),
@@ -130,6 +148,7 @@ export const {
     useListPageQuery,
     useLazyListPageQuery,
     useDetailsQuery,
+    useRecommendationsQuery,
     useSeasonQuery,
     usePersonDetailsQuery,
     usePersonCreditsQuery,

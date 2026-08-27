@@ -5,6 +5,7 @@
  * beyond the app's existing TMDB proxy token.
  */
 import { API_HEADERS, API_URL } from "@/contexts/movieContext/movieContext";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 const IMG_BASE = "https://image.tmdb.org/t/p/";
 export function img(path?: string | null, size = "w500"): string | null {
@@ -44,7 +45,7 @@ export async function fetchDetails(
 ): Promise<any> {
   const append = type === "tv" ? TV_APPEND : MOVIE_APPEND;
   const url = `${API_URL}${type}/${id}?language=en-US&append_to_response=${append}&include_image_language=en,null`;
-  const res = await fetch(url, { headers: API_HEADERS });
+  const res = await fetchWithTimeout(url, { headers: API_HEADERS });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e.status_message || `HTTP ${res.status}`);
