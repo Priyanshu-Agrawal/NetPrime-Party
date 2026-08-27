@@ -1,4 +1,5 @@
 import type { HijackCapability } from "@/components/player/hijackCapabilities";
+import type { FeedManifest } from "@/types/feed";
 
 /**
  * Response shapes for the NetPrime edge worker (worker/src/index.ts).
@@ -30,6 +31,11 @@ export interface AppConfig {
     appVersion: string;
     maintenanceMode: boolean;
     providers: RemoteProviderRow[];
+    /**
+     * Optional server-driven Home feed manifest. Omitted (D1 default) → the
+     * client renders its baked-in fallback via `normalizeManifest(undefined)`.
+     */
+    homeFeed?: FeedManifest;
 }
 
 /** Per-provider resolution outcome from `GET /scrape`. */

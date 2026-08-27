@@ -36,6 +36,10 @@ export function openPlayer(params: PlayerStackParamList["Player"]) {
   navigate("PlayerStack", { screen: "Player", params });
 }
 
+export function openSeeAll(title: string, path: string, kind: "movie" | "tv") {
+  navigate("PlayerStack", { screen: "RailSeeAll", params: { title, path, kind } });
+}
+
 export function openPartyHost(params: PartyParams) {
   navigate("Party", params);
 }

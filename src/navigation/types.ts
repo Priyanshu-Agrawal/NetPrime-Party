@@ -4,6 +4,7 @@ export type PlayerStackParamList = {
   MovieDetails: { id: string; type?: "movie" };
   TvDetails: { id: string; type?: "tv" };
   PersonDetails: { id: string | number };
+  RailSeeAll: { title: string; path: string; kind: "movie" | "tv" };
   Player: {
     id: string;
     type: "movie" | "tv";

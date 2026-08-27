@@ -1,13 +1,14 @@
-import { ContinueWatching } from "@/components/home/ContinueWatching";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
-import { MediaRail } from "@/components/home/MediaRail";
 import AppHeader from "@/components/ui/AppHeader";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
-import { openJoinParty, openLibrary } from "@/src/navigation/actions";
+import { FeedSection } from "@/src/features/home/FeedSection";
+import { openJoinParty } from "@/src/navigation/actions";
+import { useGetConfigQuery } from "@/src/store/services/workerApi";
 import { GlassCard, Text } from "@/src/ui";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
+import { normalizeManifest } from "@/utils/normalizeManifest";
 import { Ionicons } from "@expo/vector-icons";
 import { Frost } from "@/src/ui/Frost";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,6 +26,9 @@ export default React.memo(function HomePage() {
     scrollY.value = e.contentOffset.y;
   });
   const headerBlurStyle = useFadeInStyle(scrollY, 24, 120);
+
+  const { data: config } = useGetConfigQuery();
+  const feed = normalizeManifest(config?.homeFeed);
 
   return (
     <View style={styles.root}>
@@ -71,22 +75,9 @@ export default React.memo(function HomePage() {
           </GlassCard>
         </View>
 
-        <ContinueWatching />
-
-        <MediaRail
-          title="Trending Shows"
-          path="trending/tv/week"
-          kind="tv"
-          icon="flame"
-          onSeeAll={() => openLibrary("TrendingShows")}
-        />
-        <MediaRail title="Now Playing" path="movie/now_playing" kind="movie" />
-        <MediaRail title="Popular Movies" path="movie/popular" kind="movie" />
-        <MediaRail title="Top Rated Movies" path="movie/top_rated" kind="movie" icon="star" />
-        <MediaRail title="Upcoming" path="movie/upcoming" kind="movie" />
-        <MediaRail title="Popular Series" path="tv/popular" kind="tv" />
-        <MediaRail title="Top Rated Series" path="tv/top_rated" kind="tv" icon="star" />
-        <MediaRail title="Airing Today" path="tv/airing_today" kind="tv" />
+        {feed.sections.map((s) => (
+          <FeedSection key={s.id} section={s} />
+        ))}
       </Animated.ScrollView>
 
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
