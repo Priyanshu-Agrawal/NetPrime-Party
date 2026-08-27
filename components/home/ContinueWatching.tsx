@@ -14,6 +14,7 @@ import { openPlayer } from "@/src/navigation/actions";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { RAIL_LIST_PROPS } from "@/utils/listPerf";
 
 const CARD_W = ms(210);
 const CARD_H = ms(118);
@@ -62,6 +63,7 @@ export function ContinueWatching() {
         keyExtractor={(i, idx) => `${i.id}-${i.season ?? ""}-${i.episode ?? ""}-${idx}`}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        {...RAIL_LIST_PROPS}
         renderItem={({ item }) => {
           const progress =
             item.durationSec && item.positionSec

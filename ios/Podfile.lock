@@ -1803,6 +1803,8 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - react-native-netinfo (11.4.1):
+    - React-Core
   - react-native-safe-area-context (5.4.0):
     - DoubleConversion
     - glog
@@ -2556,6 +2558,7 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - react-native-keyboard-controller (from `../node_modules/react-native-keyboard-controller`)
+  - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - react-native-webview (from `../node_modules/react-native-webview`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
@@ -2743,6 +2746,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-get-random-values"
   react-native-keyboard-controller:
     :path: "../node_modules/react-native-keyboard-controller"
+  react-native-netinfo:
+    :path: "../node_modules/@react-native-community/netinfo"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   react-native-webview:
@@ -2895,6 +2900,7 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: ff05e894231c44c21135d1d23a82b87656d98eeb
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
   react-native-keyboard-controller: d28f64fe84f1a2df657f66063f042858566002c2
+  react-native-netinfo: cec9c4e86083cb5b6aba0e0711f563e2fbbff187
   react-native-safe-area-context: 562163222d999b79a51577eda2ea8ad2c32b4d06
   react-native-webview: 520bcb79c3f2af91e157cdd695732a34ab5f25c8
   React-NativeModulesApple: d94850b316446b0c39a82eb278d6efaa1a634055

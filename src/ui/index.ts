@@ -18,6 +18,8 @@ export { default as FloatingTabBar } from "./FloatingTabBar";
 export { AppHeader } from "./AppHeader";
 export { GlassButton } from "./GlassButton";
 export { AlertHost, bearAlert } from "./BearAlert";
+export { ConnectivityBanner } from "./ConnectivityBanner";
+export { Appear } from "./Appear";
 export type { BearAlertButton } from "./BearAlert";
 export { BrandWordmark } from "./BrandWordmark";
 export { useCollapsingHeader, useFadeInStyle } from "./useCollapsingHeader";

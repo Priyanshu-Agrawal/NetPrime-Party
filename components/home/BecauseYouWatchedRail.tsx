@@ -18,6 +18,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
+import { RAIL_LIST_PROPS } from "@/utils/listPerf";
 
 const POSTER_W = ms(112);
 const MAX_SEEDS = 4;
@@ -88,6 +89,7 @@ export function BecauseYouWatchedRail() {
         showsHorizontalScrollIndicator={false}
         keyExtractor={(m) => String(m.id)}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}
+        {...RAIL_LIST_PROPS}
         renderItem={({ item }) => {
           const kind = item.media_type === "tv" ? "tv" : "movie";
           return (

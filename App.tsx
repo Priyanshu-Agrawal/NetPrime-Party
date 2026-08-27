@@ -2,6 +2,7 @@ import "./devtools/execbro";
 import "react-native-get-random-values";
 import "react-native-url-polyfill/auto";
 import { AlertHost } from "@/components/ui/BearAlert";
+import { ConnectivityBanner } from "@/src/ui/ConnectivityBanner";
 import { MovieContextProvider } from "@/contexts/movieContext";
 import RootNavigator from "@/src/navigation/RootNavigator";
 import { linking } from "@/src/navigation/linking";
@@ -31,6 +32,7 @@ import React, { useCallback, useEffect } from "react";
 import { Appearance, Platform, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 
 if (Platform.OS !== "web") {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -107,8 +109,9 @@ export default function App() {
         style={{ flex: 1, backgroundColor: colors.bg }}
         onLayout={onLayoutRootView}
       >
-        <KeyboardProvider preload={false}>
-          <BottomSheetModalProvider>
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <KeyboardProvider preload={false}>
+            <BottomSheetModalProvider>
             <MovieContextProvider>
               <ConfigBootstrap />
               <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme} onStateChange={handleNavStateChange}>
@@ -117,11 +120,15 @@ export default function App() {
                   translucent
                 />
                 <RootNavigator />
+                {/* App-global offline strip — rendered after RootNavigator so
+                    it paints above every screen (insets from SafeAreaProvider). */}
+                <ConnectivityBanner />
               </NavigationContainer>
               <AlertHost />
             </MovieContextProvider>
           </BottomSheetModalProvider>
-        </KeyboardProvider>
+          </KeyboardProvider>
+        </SafeAreaProvider>
       </GestureHandlerRootView>
     </ReduxProvider>
   );

@@ -33,6 +33,10 @@ const raw = async (path: string): Promise<any> => {
 export const tmdbApi = createApi({
     reducerPath: "tmdbApi",
     baseQuery: fakeBaseQuery<string>(),
+    // Re-pull rails/hero/details when the device regains connectivity. The
+    // NetInfo → onOnline bridge (src/store/index.ts) dispatches the reconnect
+    // action; this opts every endpoint here into refetching on it.
+    refetchOnReconnect: true,
     endpoints: (build) => {
         const wrapQuery = (pathFn: (arg: any) => string | Promise<string>) => async (arg: any) => {
             try {

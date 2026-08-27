@@ -4,7 +4,9 @@ import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { FeedSection } from "@/src/features/home/FeedSection";
 import { openJoinParty } from "@/src/navigation/actions";
 import { useGetConfigQuery } from "@/src/store/services/workerApi";
-import { GlassCard, Text } from "@/src/ui";
+import { Appear, GlassCard, Text } from "@/src/ui";
+import { OfflineState } from "@/src/ui/OfflineState";
+import { useBrowseOfflineGate } from "@/hooks/useBrowseOfflineGate";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -13,8 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Frost } from "@/src/ui/Frost";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -30,6 +32,31 @@ export default React.memo(function HomePage() {
   const { data: config } = useGetConfigQuery();
   const feed = normalizeManifest(config?.homeFeed);
 
+  // `hero` is our "the app has connectivity-loaded content" signal: present ⇒
+  // we've been online and have a feed to show (offline just shows it cached +
+  // the slim banner); absent while offline ⇒ nothing to show ⇒ full offline page.
+  const { offline, showOffline, reload } = useBrowseOfflineGate();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Pull-to-refresh / "Try again": reload the WHOLE feed (see the hook).
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    reload();
+    // Spinner is cosmetic; content streams back in as each query resolves.
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [reload]);
+
+  // Offline with nothing cached to show → full-screen offline page (not a wall
+  // of broken rails). Recovers on reconnect (queries refetch) or via "Try again".
+  if (showOffline) {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" translucent />
+        <OfflineState offline={offline} onRetry={onRefresh} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" translucent />
@@ -40,10 +67,19 @@ export default React.memo(function HomePage() {
         onScroll={onScroll}
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: ms(108) }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.honey}
+            colors={[colors.honey]}
+            progressViewOffset={insets.top + ms(8)}
+          />
+        }
       >
         <HeroCarousel />
 
-        <View style={styles.ctaWrap}>
+        <Appear variant="rise" style={styles.ctaWrap}>
           <GlassCard
             blur={false}
             rounded={radius.lg}
@@ -73,10 +109,12 @@ export default React.memo(function HomePage() {
               </Pressable>
             </View>
           </GlassCard>
-        </View>
+        </Appear>
 
-        {feed.sections.map((s) => (
-          <FeedSection key={s.id} section={s} />
+        {feed.sections.map((s, i) => (
+          <Appear key={s.id} index={i + 1}>
+            <FeedSection section={s} />
+          </Appear>
         ))}
       </Animated.ScrollView>
 

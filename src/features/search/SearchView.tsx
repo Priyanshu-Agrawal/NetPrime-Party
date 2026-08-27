@@ -4,7 +4,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import AppHeader from "@/components/ui/AppHeader";
-import { PosterSkeleton, Text, BouncyPressable, Chip } from "@/src/ui";
+import { Appear, PosterSkeleton, Text, BouncyPressable, Chip } from "@/src/ui";
+import { OfflineState } from "@/src/ui/OfflineState";
+import { useBrowseOfflineGate } from "@/hooks/useBrowseOfflineGate";
 import { colors, ms, spacing, radius } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import type { MediaItem } from "@/utils/tmdbLists";
@@ -46,6 +48,15 @@ const SearchView: React.FC = () => {
   const handleClearSearch = useCallback(() => {
     handleSearch("");
   }, [handleSearch]);
+
+  // Browse tab: show the full offline/error page (never an inline retry button)
+  // whenever we're offline OR the search/browse fetch failed.
+  const { offline, reload } = useBrowseOfflineGate();
+  const showOffline = offline || !!error;
+  const handleOfflineRetry = useCallback(() => {
+    reload();
+    retry();
+  }, [reload, retry]);
 
   type ListItem = MediaItem | { id: string; isSkeleton: true };
 
@@ -89,16 +100,20 @@ const SearchView: React.FC = () => {
   }, []);
 
   const ListEmptyComponent = isInitialLoading ? (
-    <View style={styles.gridContainer}>
-      {SKELETON_DATA.map((sk) => (
-        <PosterSkeleton key={sk.id} style={styles.skeletonItem} />
-      ))}
-    </View>
+    <Appear variant="fade">
+      <View style={styles.gridContainer}>
+        {SKELETON_DATA.map((sk) => (
+          <PosterSkeleton key={sk.id} style={styles.skeletonItem} />
+        ))}
+      </View>
+    </Appear>
   ) : mode === "search" ? (
-    <View style={styles.center}>
-      <Ionicons name="search" size={40} color={colors.textFaint} />
-      <Text variant="bodyDim">{`No results for “${searchQuery}”`}</Text>
-    </View>
+    <Appear variant="rise">
+      <View style={styles.center}>
+        <Ionicons name="search" size={40} color={colors.textFaint} />
+        <Text variant="bodyDim">{`No results for “${searchQuery}”`}</Text>
+      </View>
+    </Appear>
   ) : null;
 
   const ListHeaderComponent = (
@@ -111,26 +126,28 @@ const SearchView: React.FC = () => {
           onSelectProvider={selectProvider}
         />
       ) : (
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={[
-            { id: "multi", label: "All" },
-            { id: "movie", label: "Movies" },
-            { id: "tv", label: "TV Shows" },
-            { id: "person", label: "People" },
-          ]}
-          keyExtractor={(item) => item.id}
-          style={styles.filterList}
-          contentContainerStyle={styles.filterRow}
-          renderItem={({ item }) => (
-            <Chip
-              label={item.label}
-              active={searchType === item.id}
-              onPress={() => selectSearchType(item.id as any)}
-            />
-          )}
-        />
+        <Appear variant="drop">
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={[
+              { id: "multi", label: "All" },
+              { id: "movie", label: "Movies" },
+              { id: "tv", label: "TV Shows" },
+              { id: "person", label: "People" },
+            ]}
+            keyExtractor={(item) => item.id}
+            style={styles.filterList}
+            contentContainerStyle={styles.filterRow}
+            renderItem={({ item }) => (
+              <Chip
+                label={item.label}
+                active={searchType === item.id}
+                onPress={() => selectSearchType(item.id as any)}
+              />
+            )}
+          />
+        </Appear>
       )}
     </View>
   );
@@ -161,6 +178,14 @@ const SearchView: React.FC = () => {
     ...(mode === "search" ? styles.gridResults : styles.gridBrowse),
   }), [mode]);
 
+  if (showOffline) {
+    return (
+      <View style={styles.safe}>
+        <OfflineState offline={offline} onRetry={handleOfflineRetry} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.safe, { paddingTop: insets.top }]}>
       <AppHeader showSearch={false} style={styles.header} />
@@ -171,43 +196,28 @@ const SearchView: React.FC = () => {
         onClear={handleClearSearch}
       />
 
-      {error ? (
-        <View style={styles.center}>
-          <Ionicons name="cloud-offline-outline" size={40} color={colors.textFaint} />
-          <Text variant="body" danger>
-            {error}
-          </Text>
-          <BouncyPressable onPress={retry} style={styles.retryBtn}>
-            <Ionicons name="refresh" size={ms(16)} color={colors.honeyBright} />
-            <Text variant="body" style={styles.retryText}>
-              Retry
-            </Text>
-          </BouncyPressable>
-        </View>
-      ) : (
-        <View style={styles.flex1}>
-          <FlashList
-            data={listData}
-            renderItem={renderItem}
-            keyExtractor={(item) => 
-              "isSkeleton" in item 
-                ? item.id 
-                : `${item.media_type || "media"}:${item.id}`
-            }
-            numColumns={COLS}
-            estimatedItemSize={183}
-            getItemType={(item) => ("isSkeleton" in item ? "skeleton" : "poster")}
-            contentContainerStyle={contentContainerStyle}
-            ListHeaderComponent={ListHeaderComponent}
-            ListEmptyComponent={ListEmptyComponent}
-            ListFooterComponent={ListFooterComponent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.75}
-          />
-        </View>
-      )}
+      <View style={styles.flex1}>
+        <FlashList
+          data={listData}
+          renderItem={renderItem}
+          keyExtractor={(item) =>
+            "isSkeleton" in item
+              ? item.id
+              : `${item.media_type || "media"}:${item.id}`
+          }
+          numColumns={COLS}
+          estimatedItemSize={183}
+          getItemType={(item) => ("isSkeleton" in item ? "skeleton" : "poster")}
+          contentContainerStyle={contentContainerStyle}
+          ListHeaderComponent={ListHeaderComponent}
+          ListEmptyComponent={ListEmptyComponent}
+          ListFooterComponent={ListFooterComponent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.75}
+        />
+      </View>
     </View>
   );
 };
