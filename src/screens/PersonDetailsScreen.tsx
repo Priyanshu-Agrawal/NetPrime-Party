@@ -1,4 +1,4 @@
-import { Badge, PosterCard, PosterSkeleton, Screen, Text, useCollapsingHeader, useFadeInStyle } from "@/src/ui";
+import { Appear, Badge, PosterCard, PosterSkeleton, Screen, Text, useCollapsingHeader, useFadeInStyle } from "@/src/ui";
 import { GlassIconButton } from "@/src/ui/IconButton";
 import { Frost } from "@/src/ui/Frost";
 import { colors, ms, spacing, font } from "@/theme/bearoom";
@@ -157,6 +157,7 @@ export default function PersonDetailsScreen({ route }: Props) {
 
         {/* Biography */}
         {details.biography ? (
+          <Appear index={0}>
           <Animated.View layout={LinearTransition.springify().damping(18).stiffness(150)}>
             <Pressable onPress={() => setBioExpanded(!bioExpanded)} style={styles.bioContainer}>
               <Text style={styles.sectionTitle}>Biography</Text>
@@ -171,6 +172,7 @@ export default function PersonDetailsScreen({ route }: Props) {
               )}
             </Pressable>
           </Animated.View>
+          </Appear>
         ) : null}
 
         {/* Known For */}
@@ -186,6 +188,7 @@ export default function PersonDetailsScreen({ route }: Props) {
             </View>
           </View>
         ) : knownFor.length > 0 ? (
+          <Appear index={1}>
           <View style={styles.creditsContainer}>
             <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.lg }]}>
               Known For
@@ -210,6 +213,7 @@ export default function PersonDetailsScreen({ route }: Props) {
               )}
             />
           </View>
+          </Appear>
         ) : null}
       </Animated.ScrollView>
     </Screen>

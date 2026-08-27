@@ -12,7 +12,8 @@ const PlayerStack = createNativeStackNavigator<PlayerStackParamList>();
 
 const playerScreenOptions = {
   headerShown: false,
-  animation: "none" as const,
+  // Details/see-all push in from the right (native, with swipe-back).
+  animation: "slide_from_right" as const,
   contentStyle: { backgroundColor: colors.bg },
 };
 
@@ -21,7 +22,14 @@ export default function PlayerNavigator() {
     <PlayerStack.Navigator screenOptions={playerScreenOptions}>
       <PlayerStack.Screen name="MovieDetails" component={MovieDetailsScreen} />
       <PlayerStack.Screen name="TvDetails" component={TvDetailsScreen} />
-      <PlayerStack.Screen name="Player" component={PlayerScreen} />
+      {/* Player fades in — gentle on the WebView, no hard cut. Swipe-back is
+          disabled so an accidental edge-swipe can't dismiss the player (and
+          trigger orientation re-lock churn) mid-playback; use its own back control. */}
+      <PlayerStack.Screen
+        name="Player"
+        component={PlayerScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
       <PlayerStack.Screen name="PersonDetails" component={PersonDetailsScreen} />
       <PlayerStack.Screen name="RailSeeAll" component={RailSeeAllScreen} />
     </PlayerStack.Navigator>

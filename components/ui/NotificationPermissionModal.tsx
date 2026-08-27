@@ -7,6 +7,7 @@
 import BearAvatar from "@/components/avatar/BearAvatar";
 import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { requestNotificationPermission } from "@/services/permissions/notifications";
+import { Appear } from "@/src/ui";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -45,21 +46,24 @@ export default function NotificationPermissionModal({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           {/* Top Emblem */}
-          <View style={styles.emblemWrap}>
-            <View style={styles.glow} />
-            <View style={styles.iconCircle}>
-              <Ionicons name="headset" size={ms(32)} color={colors.honey} />
+          <Appear variant="rise" index={0} style={styles.appearFull}>
+            <View style={styles.emblemWrap}>
+              <View style={styles.glow} />
+              <View style={styles.iconCircle}>
+                <Ionicons name="headset" size={ms(32)} color={colors.honey} />
+              </View>
             </View>
-          </View>
 
-          {/* Headline */}
-          <Text style={styles.title}>Keep the sound going</Text>
-          <Text style={styles.subtitle}>
-            Enable controls so you can listen and manage playback seamlessly.
-          </Text>
+            {/* Headline */}
+            <Text style={styles.title}>Keep the sound going</Text>
+            <Text style={styles.subtitle}>
+              Enable controls so you can listen and manage playback seamlessly.
+            </Text>
+          </Appear>
 
           {/* Benefits */}
-          <View style={styles.benefitsList}>
+          <Appear variant="rise" index={1} style={styles.appearFull}>
+            <View style={styles.benefitsList}>
             <View style={styles.benefitRow}>
               <View style={styles.bulletIcon}>
                 <Ionicons name="play-circle" size={ms(18)} color={colors.honey} />
@@ -83,18 +87,21 @@ export default function NotificationPermissionModal({
                 </Text>
               </View>
             </View>
-          </View>
+            </View>
+          </Appear>
 
           {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.allowBtn} onPress={handleAllow} activeOpacity={0.8}>
-              <Text style={styles.allowBtnText}>Enable Controls</Text>
-            </TouchableOpacity>
+          <Appear variant="rise" index={2} style={styles.appearFull}>
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.allowBtn} onPress={handleAllow} activeOpacity={0.8}>
+                <Text style={styles.allowBtnText}>Enable Controls</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.laterBtn} onPress={handleDismiss} activeOpacity={0.7}>
-              <Text style={styles.laterBtnText}>Maybe Later</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity style={styles.laterBtn} onPress={handleDismiss} activeOpacity={0.7}>
+                <Text style={styles.laterBtnText}>Maybe Later</Text>
+              </TouchableOpacity>
+            </View>
+          </Appear>
         </View>
       </View>
     </Modal>
@@ -116,6 +123,10 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     borderRadius: radius.xxl,
     padding: ms(24),
+    alignItems: "center",
+  },
+  appearFull: {
+    width: "100%",
     alignItems: "center",
   },
   emblemWrap: {

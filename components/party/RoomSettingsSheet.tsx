@@ -8,6 +8,7 @@
  * only render three buttons, which would silently drop Remove/Cancel.
  */
 import { bearAlert } from "@/components/ui/BearAlert";
+import { Appear } from "@/src/ui";
 import type { Member, RoomAccess, RoomConfig } from "@/services/party/protocol";
 import { colors, font, glow, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
@@ -107,21 +108,23 @@ export function RoomSettingsSheet({
           <Text style={styles.title}>Room settings</Text>
 
           <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-            <Text style={styles.overline}>ROOM ACCESS</Text>
-            <View style={styles.segment}>
-              {ACCESS.map((a) => {
-                const active = access === a.key;
-                return (
-                  <Pressable
-                    key={a.key}
-                    style={[styles.segItem, active && styles.segItemActive]}
-                    onPress={() => pickAccess(a.key)}
-                  >
-                    <Text style={[styles.segText, active && styles.segTextActive]}>{a.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Appear variant="rise" index={0}>
+              <Text style={styles.overline}>ROOM ACCESS</Text>
+              <View style={styles.segment}>
+                {ACCESS.map((a) => {
+                  const active = access === a.key;
+                  return (
+                    <Pressable
+                      key={a.key}
+                      style={[styles.segItem, active && styles.segItemActive]}
+                      onPress={() => pickAccess(a.key)}
+                    >
+                      <Text style={[styles.segText, active && styles.segTextActive]}>{a.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Appear>
 
             {access === "password" ? (
               <View style={styles.pwRow}>
@@ -145,16 +148,19 @@ export function RoomSettingsSheet({
               </View>
             ) : null}
 
-            <View style={styles.card}>
-              <ToggleRow label="Anyone can chat" value={config.chatEnabled} onValueChange={(v) => onSetConfig({ chatEnabled: v })} />
-              <ToggleRow label="Reactions & GIFs" value={config.gifsEnabled} onValueChange={(v) => onSetConfig({ gifsEnabled: v })} />
-              <ToggleRow label="Guests can control playback" value={config.guestControlDefault} onValueChange={(v) => onSetConfig({ guestControlDefault: v })} />
-              <ToggleRow label="Approve guests before joining" value={config.approveGuests} onValueChange={(v) => onSetConfig({ approveGuests: v })} last />
-            </View>
+            <Appear variant="rise" index={1}>
+              <View style={styles.card}>
+                <ToggleRow label="Anyone can chat" value={config.chatEnabled} onValueChange={(v) => onSetConfig({ chatEnabled: v })} />
+                <ToggleRow label="Reactions & GIFs" value={config.gifsEnabled} onValueChange={(v) => onSetConfig({ gifsEnabled: v })} />
+                <ToggleRow label="Guests can control playback" value={config.guestControlDefault} onValueChange={(v) => onSetConfig({ guestControlDefault: v })} />
+                <ToggleRow label="Approve guests before joining" value={config.approveGuests} onValueChange={(v) => onSetConfig({ approveGuests: v })} last />
+              </View>
+            </Appear>
 
-            <Text style={styles.overline}>MEMBERS ({members.length})</Text>
-            <View style={styles.card}>
-              {members.map((m, i) => {
+            <Appear variant="rise" index={2}>
+              <Text style={styles.overline}>MEMBERS ({members.length})</Text>
+              <View style={styles.card}>
+                {members.map((m, i) => {
                 const isHostRow = m.userId === hostId;
                 const isSelf = m.userId === selfId;
                 const muted = m.permissions?.canChat === false;
@@ -192,8 +198,9 @@ export function RoomSettingsSheet({
                     )}
                   </View>
                 );
-              })}
-            </View>
+                })}
+              </View>
+            </Appear>
           </ScrollView>
 
           <Pressable style={styles.done} onPress={onClose}>

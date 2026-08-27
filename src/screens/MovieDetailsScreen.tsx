@@ -11,11 +11,12 @@ import {
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
-import { Button } from "@/src/ui";
+import { Appear, Button } from "@/src/ui";
 import { DetailsSkeleton } from "@/src/ui";
 import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
+import { RAIL_LIST_PROPS } from "@/utils/listPerf";
 import { genRoomCode } from "@/utils/roomCode";
 import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import {
@@ -219,6 +220,7 @@ const MovieDetailsScreen: React.FC = () => {
         </View>
 
         {/* Primary actions */}
+        <Appear index={0}>
         <View style={styles.actions}>
           <Button
             label="Play"
@@ -237,8 +239,10 @@ const MovieDetailsScreen: React.FC = () => {
             style={styles.flexBtn}
           />
         </View>
+        </Appear>
 
         {/* Quick actions */}
+        <Appear index={1}>
         <View style={styles.quickRow}>
           <Pressable style={styles.quick} onPress={toggleSave}>
             <View style={styles.quickIcon}>
@@ -259,8 +263,10 @@ const MovieDetailsScreen: React.FC = () => {
             <Text style={styles.quickLabel}>Share</Text>
           </Pressable>
         </View>
+        </Appear>
 
         {d.overview ? (
+          <Appear index={2}>
           <View style={styles.overviewWrap}>
             <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
               {d.overview}
@@ -271,21 +277,26 @@ const MovieDetailsScreen: React.FC = () => {
               </Pressable>
             ) : null}
           </View>
+          </Appear>
         ) : null}
 
         {derived!.cast.length ? (
+          <Appear index={3}>
           <Section title="Cast">
             <PeopleRow people={derived!.cast} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.clips.length ? (
+          <Appear index={4}>
           <Section title="Trailers & Clips">
             <FlatList
               data={derived!.clips}
               horizontal
               keyExtractor={(v: any) => v.id}
               showsHorizontalScrollIndicator={false}
+              {...RAIL_LIST_PROPS}
               ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
               renderItem={({ item }: any) => (
                 <Pressable style={styles.clip} onPress={() => openTrailer(item.key)}>
@@ -306,49 +317,64 @@ const MovieDetailsScreen: React.FC = () => {
               )}
             />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.crew.length ? (
+          <Appear index={5}>
           <Section title="Crew">
             <PeopleRow people={derived!.crew} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.providers ? (
+          <Appear index={6}>
           <Section title="Where to Watch">
             <ProvidersRow providers={derived!.providers} />
           </Section>
+          </Appear>
         ) : null}
 
+        <Appear index={7}>
         <Section title="Details">
           <FactGrid facts={derived!.facts} />
         </Section>
+        </Appear>
 
         {derived!.keywords.length ? (
+          <Appear index={8}>
           <Section title="Keywords">
             <Pills items={derived!.keywords} />
           </Section>
+          </Appear>
         ) : null}
 
         {d.reviews?.results?.length ? (
+          <Appear index={9}>
           <Section title="Reviews">
             <Reviews reviews={d.reviews.results} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.links.length ? (
+          <Appear index={10}>
           <Section title="Links">
             <LinksRow links={derived!.links} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.recs.length ? (
+          <Appear index={11}>
           <Section title="More Like This">
             <FlatList
               data={derived!.recs}
               horizontal
               keyExtractor={(m: any) => String(m.id)}
               showsHorizontalScrollIndicator={false}
+              {...RAIL_LIST_PROPS}
               ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
               renderItem={({ item }: any) => (
                 <Pressable
@@ -378,6 +404,7 @@ const MovieDetailsScreen: React.FC = () => {
               )}
             />
           </Section>
+          </Appear>
         ) : null}
       </Animated.ScrollView>
     </View>

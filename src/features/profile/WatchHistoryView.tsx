@@ -1,6 +1,6 @@
 import { openPlayer, goBack } from "@/src/navigation/actions";
 import type { PlayerStackParamList } from "@/src/navigation/types";
-import { Badge, Screen, Text, BouncyPressable, IconButton, LibraryScreenHeader } from "@/src/ui";
+import { Appear, Badge, Screen, Text, BouncyPressable, IconButton, LibraryScreenHeader } from "@/src/ui";
 import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { getWatchHistory } from "@/utils/history";
@@ -41,7 +41,9 @@ export default function WatchHistory() {
 
   return (
     <Screen edges={["top"]}>
-      <LibraryScreenHeader title="Watch History" />
+      <Appear index={0} variant="drop">
+        <LibraryScreenHeader title="Watch History" />
+      </Appear>
 
       <FlatList
         data={items}
@@ -91,7 +93,7 @@ export default function WatchHistory() {
           );
         }}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
+          <Appear index={1} style={styles.emptyState}>
             <View style={styles.heroWrap}>
               <View style={styles.heroGlow} />
               <View style={styles.heroRing}>
@@ -102,7 +104,7 @@ export default function WatchHistory() {
             <Text variant="bodyDim" style={styles.emptyText}>
               Your recently watched movies and shows will appear here.
             </Text>
-          </View>
+          </Appear>
         }
       />
     </Screen>

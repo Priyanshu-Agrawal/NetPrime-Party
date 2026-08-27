@@ -1,7 +1,7 @@
 import React from "react";
 import { View, FlatList, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Chip, Text } from "@/src/ui";
+import { Appear, Chip, Text } from "@/src/ui";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -36,53 +36,59 @@ const BrowseHeader = React.memo(({ searchQuery, onSearch, selectedProvider, onSe
   return (
     <View>
       {/* Trending searches */}
-      <Text variant="h3" style={[styles.sectionTitle, styles.firstSectionTitle]}>
-        Trending searches
-      </Text>
-      <View style={styles.trendWrap}>
-        {TRENDING.map((t) => (
-          <Chip key={t} label={t} active={searchQuery === t} onPress={() => onSearch(t)} />
-        ))}
-      </View>
+      <Appear index={0}>
+        <Text variant="h3" style={[styles.sectionTitle, styles.firstSectionTitle]}>
+          Trending searches
+        </Text>
+        <View style={styles.trendWrap}>
+          {TRENDING.map((t) => (
+            <Chip key={t} label={t} active={searchQuery === t} onPress={() => onSearch(t)} />
+          ))}
+        </View>
+      </Appear>
 
-      <Text variant="h3" style={styles.sectionTitle}>
-        Browse by mood
-      </Text>
-      <View style={styles.moodGrid}>
-        {MOODS.map((m) => (
-          <Pressable
-            key={m.label}
-            style={({ pressed }) => [styles.moodTile, pressed && pressedStyle]}
-            onPress={() => (m.party ? openJoinParty() : onSearch(m.query))}
-          >
-            <View style={styles.moodIcon}>
-              <Ionicons name={m.icon} size={ms(20)} color={colors.honey} />
-            </View>
-            <Text variant="h3" style={styles.moodLabel}>
-              {m.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Appear index={1}>
+        <Text variant="h3" style={styles.sectionTitle}>
+          Browse by mood
+        </Text>
+        <View style={styles.moodGrid}>
+          {MOODS.map((m) => (
+            <Pressable
+              key={m.label}
+              style={({ pressed }) => [styles.moodTile, pressed && pressedStyle]}
+              onPress={() => (m.party ? openJoinParty() : onSearch(m.query))}
+            >
+              <View style={styles.moodIcon}>
+                <Ionicons name={m.icon} size={ms(20)} color={colors.honey} />
+              </View>
+              <Text variant="h3" style={styles.moodLabel}>
+                {m.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Appear>
 
-      <Text variant="h3" style={styles.sectionTitle}>
-        {selectedProvider ? "Popular on this service" : "Trending today"}
-      </Text>
-      <FlatList
-        horizontal
-        data={PROVIDERS}
-        keyExtractor={(p) => p.name}
-        showsHorizontalScrollIndicator={false}
-        style={styles.provList}
-        contentContainerStyle={styles.provRow}
-        renderItem={({ item: p }) => (
-          <Chip
-            label={p.name}
-            active={selectedProvider === p.id}
-            onPress={() => onSelectProvider(p.id)}
-          />
-        )}
-      />
+      <Appear index={2}>
+        <Text variant="h3" style={styles.sectionTitle}>
+          {selectedProvider ? "Popular on this service" : "Trending today"}
+        </Text>
+        <FlatList
+          horizontal
+          data={PROVIDERS}
+          keyExtractor={(p) => p.name}
+          showsHorizontalScrollIndicator={false}
+          style={styles.provList}
+          contentContainerStyle={styles.provRow}
+          renderItem={({ item: p }) => (
+            <Chip
+              label={p.name}
+              active={selectedProvider === p.id}
+              onPress={() => onSelectProvider(p.id)}
+            />
+          )}
+        />
+      </Appear>
     </View>
   );
 });

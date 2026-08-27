@@ -19,7 +19,7 @@ import {
   requestNotificationPermission,
 } from "@/services/permissions/notifications";
 import { finishOnboarding } from "@/src/navigation/actions";
-import { Button, Text } from "@/src/ui";
+import { Appear, Button, Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { setOnboarded } from "@/utils/prefs";
@@ -163,7 +163,7 @@ export default function OnboardingView() {
         scrollEventThrottle={16}
         style={styles.pager}
       >
-        {SLIDES.map((s) => (
+        {SLIDES.map((s, i) => (
           <View key={s.key} style={[styles.slide, { width }]}>
             {s.key === "name" ? (
               <View style={styles.avatarSlideWrap}>
@@ -233,38 +233,47 @@ export default function OnboardingView() {
               </View>
             ) : (
               <View style={styles.slideContent}>
-                <View style={styles.heroWrap}>
-                  {s.key === "welcome" ? (
-                    <Image
-                      source={require("../../../assets/images/brandmark.png")}
-                      style={styles.heroMark}
-                      resizeMode="contain"
-                    />
+                {/* Only the first (mount-visible) slide animates its entrance;
+                    later slides are revealed by the paging swipe itself, so their
+                    entrance wouldn't be seen (it would fire off-screen at mount). */}
+                <Appear index={0} disabled={i !== 0}>
+                  <View style={styles.heroWrap}>
+                    {s.key === "welcome" ? (
+                      <Image
+                        source={require("../../../assets/images/brandmark.png")}
+                        style={styles.heroMark}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <>
+                        <View style={styles.heroGlow} />
+                        <View style={styles.heroRing}>
+                          {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
+                        </View>
+                      </>
+                    )}
+                  </View>
+                </Appear>
+
+                <Appear index={1} disabled={i !== 0}>
+                  {s.titleAccent ? (
+                    <Text variant="display" style={styles.title}>
+                      {s.titleTop}
+                      {"\n"}
+                      <Text honey>{s.titleAccent}</Text>
+                    </Text>
                   ) : (
-                    <>
-                      <View style={styles.heroGlow} />
-                      <View style={styles.heroRing}>
-                        {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
-                      </View>
-                    </>
+                    <Text variant="display" style={styles.title}>
+                      {s.title}
+                    </Text>
                   )}
-                </View>
+                </Appear>
 
-                {s.titleAccent ? (
-                  <Text variant="display" style={styles.title}>
-                    {s.titleTop}
-                    {"\n"}
-                    <Text honey>{s.titleAccent}</Text>
+                <Appear index={2} disabled={i !== 0}>
+                  <Text variant="bodyDim" style={styles.body}>
+                    {s.body}
                   </Text>
-                ) : (
-                  <Text variant="display" style={styles.title}>
-                    {s.title}
-                  </Text>
-                )}
-
-                <Text variant="bodyDim" style={styles.body}>
-                  {s.body}
-                </Text>
+                </Appear>
               </View>
             )}
           </View>
@@ -272,17 +281,21 @@ export default function OnboardingView() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + ms(16) }]}>
-        <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <View key={i} style={[styles.dot, i === page && styles.dotActive]} />
-          ))}
-        </View>
-        <Button
-          label={page >= last ? "Get Started" : "Next"}
-          icon="arrow-forward"
-          onPress={next}
-          full
-        />
+        <Appear index={3}>
+          <View style={styles.dots}>
+            {SLIDES.map((_, i) => (
+              <View key={i} style={[styles.dot, i === page && styles.dotActive]} />
+            ))}
+          </View>
+        </Appear>
+        <Appear index={4}>
+          <Button
+            label={page >= last ? "Get Started" : "Next"}
+            icon="arrow-forward"
+            onPress={next}
+            full
+          />
+        </Appear>
       </View>
 
       {/* Avatar Customizer Sheet */}

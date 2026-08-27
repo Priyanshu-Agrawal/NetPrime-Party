@@ -2,7 +2,7 @@
  * My List — saved titles from Details (bookmark / + My List).
  */
 import { bearAlert } from "@/components/ui/BearAlert";
-import { LibraryScreenHeader, PosterCard, Screen, Text } from "@/src/ui";
+import { Appear, LibraryScreenHeader, PosterCard, Screen, Text } from "@/src/ui";
 import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gridColumnWidth, layout } from "@/theme/styles/layout";
 import { img } from "@/utils/tmdbDetails";
@@ -47,10 +47,12 @@ export default function MyListScreen() {
 
   return (
     <Screen edges={["top"]}>
-      <LibraryScreenHeader title="My List" />
+      <Appear index={0} variant="drop">
+        <LibraryScreenHeader title="My List" />
+      </Appear>
 
       {items.length === 0 ? (
-        <View style={styles.empty}>
+        <Appear index={1} style={styles.empty}>
           <View style={styles.heroWrap}>
             <View style={styles.heroGlow} />
             <View style={styles.heroRing}>
@@ -61,7 +63,7 @@ export default function MyListScreen() {
           <Text variant="bodyDim" style={styles.emptySub}>
             Save movies & shows from their details page to find them here.
           </Text>
-        </View>
+        </Appear>
       ) : (
         <FlatList
           data={items}

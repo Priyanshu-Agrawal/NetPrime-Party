@@ -1,6 +1,6 @@
 import { goBack } from "@/src/navigation/actions";
 import type { RootNavigation } from "@/src/navigation/helpers";
-import { Button, IconButton, Text, BouncyPressable } from "@/src/ui";
+import { Appear, Button, IconButton, Text, BouncyPressable } from "@/src/ui";
 import { colors, glow, ms, radius, spacing, font } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { layout } from "@/theme/styles/layout";
@@ -72,21 +72,28 @@ export default function JoinParty() {
         removeClippedSubviews
         onTouchStart={() => Keyboard.dismiss()}
       >
-        <View style={styles.heroWrap}>
-          <View style={styles.heroGlow} />
-          <View style={styles.heroRing}>
-            <Ionicons name="paw" size={ms(44)} color={colors.honey} />
+        <Appear index={0}>
+          <View style={styles.heroWrap}>
+            <View style={styles.heroGlow} />
+            <View style={styles.heroRing}>
+              <Ionicons name="paw" size={ms(44)} color={colors.honey} />
+            </View>
           </View>
-        </View>
+        </Appear>
 
-        <Text variant="display" style={styles.title}>
-          Join the watch party
-        </Text>
-        <Text variant="bodyDim" style={styles.subtitle}>
-          Enter the room code your pack shared with you.
-        </Text>
+        <Appear index={1}>
+          <Text variant="display" style={styles.title}>
+            Join the watch party
+          </Text>
+        </Appear>
+        <Appear index={2}>
+          <Text variant="bodyDim" style={styles.subtitle}>
+            Enter the room code your pack shared with you.
+          </Text>
+        </Appear>
 
-        <Animated.View style={[styles.cellRow, rShakeStyle]}>
+        <Appear index={3} style={styles.cellRow}>
+          <Animated.View style={[styles.cellRow, rShakeStyle]}>
           <Pressable style={styles.cellRowInner} onPress={() => inputRef.current?.focus()}>
             {cells.map((i) => {
               const char = code[i] ?? "";
@@ -130,7 +137,8 @@ export default function JoinParty() {
               onSubmitEditing={join}
             />
           </Pressable>
-        </Animated.View>
+          </Animated.View>
+        </Appear>
 
         {error ? (
           <Animated.Text entering={FadeIn} style={styles.errorText}>
@@ -140,14 +148,18 @@ export default function JoinParty() {
           <View style={styles.errorPlaceholder} />
         )}
 
-        <Button label="Join Party" onPress={join} disabled={!valid} full style={styles.joinBtn} />
+        <Appear index={4} style={{ alignSelf: "stretch" }}>
+          <Button label="Join Party" onPress={join} disabled={!valid} full style={styles.joinBtn} />
+        </Appear>
 
-        <BouncyPressable onPress={host} hitSlop={8} style={styles.hostLink}>
-          <Text variant="label" honey>
-            or browse to start a party
-          </Text>
-          <Ionicons name="arrow-forward" size={ms(15)} color={colors.honey} />
-        </BouncyPressable>
+        <Appear index={5}>
+          <BouncyPressable onPress={host} hitSlop={8} style={styles.hostLink}>
+            <Text variant="label" honey>
+              or browse to start a party
+            </Text>
+            <Ionicons name="arrow-forward" size={ms(15)} color={colors.honey} />
+          </BouncyPressable>
+        </Appear>
       </KeyboardAvoidingView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + ms(14) }]}>

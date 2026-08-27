@@ -1,5 +1,10 @@
 /**
  * FloatingTabBar — Bearoom floating glass bottom bar: Home · Search · Party · Profile.
+ *
+ * Static by design: the frosted-glass blur stays (it's core to the design
+ * system), but there is NO per-tab animation — the active tab is a plain honey
+ * pill, no sliding indicator / animated nodes. A moving indicator on top of the
+ * blur was frame-eating; the blur alone is the intended look.
  */
 import { openJoinParty } from "@/src/navigation/actions";
 import GlassCard from "@/components/ui/GlassCard";

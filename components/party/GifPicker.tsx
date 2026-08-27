@@ -16,14 +16,14 @@ import {
   useKlipyShareMutation,
 } from "@/src/store/services/klipyApi";
 import { bearAlert } from "@/components/ui/BearAlert";
+import { Appear } from "@/src/ui";
 import { colors, font, ms, radius } from "@/theme/bearoom";
+import { duration, easing } from "@/theme/motion";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
   Dimensions,
-  Easing,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -34,6 +34,13 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
@@ -145,41 +152,45 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
       >
         <View style={styles.grabber} />
 
-        <View style={styles.header}>
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={ms(16)} color={colors.textDim} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={`Search ${sticker ? "stickers" : "KLIPY"}`}
-              placeholderTextColor={colors.textFaint}
-              style={styles.searchInput}
-              selectionColor={colors.honey}
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-            {query ? (
-              <Pressable onPress={() => setQuery("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={ms(16)} color={colors.textDim} />
-              </Pressable>
-            ) : null}
+        <Appear variant="rise" index={0}>
+          <View style={styles.header}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={ms(16)} color={colors.textDim} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={`Search ${sticker ? "stickers" : "KLIPY"}`}
+                placeholderTextColor={colors.textFaint}
+                style={styles.searchInput}
+                selectionColor={colors.honey}
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {query ? (
+                <Pressable onPress={() => setQuery("")} hitSlop={8}>
+                  <Ionicons name="close-circle" size={ms(16)} color={colors.textDim} />
+                </Pressable>
+              ) : null}
+            </View>
+            <Pressable onPress={onClose} hitSlop={8} style={styles.close}>
+              <Text style={styles.closeText}>Done</Text>
+            </Pressable>
           </View>
-          <Pressable onPress={onClose} hitSlop={8} style={styles.close}>
-            <Text style={styles.closeText}>Done</Text>
-          </Pressable>
-        </View>
+        </Appear>
 
         {/* Tabs */}
-        <View style={styles.tabs}>
-          {TABS.map((t) => {
-            const active = kind === t.key;
-            return (
-              <Pressable key={t.key} style={[styles.tab, active && styles.tabActive]} onPress={() => setKind(t.key)}>
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Appear variant="rise" index={1}>
+          <View style={styles.tabs}>
+            {TABS.map((t) => {
+              const active = kind === t.key;
+              return (
+                <Pressable key={t.key} style={[styles.tab, active && styles.tabActive]} onPress={() => setKind(t.key)}>
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Appear>
 
         {/* Watch-party reaction chips (discovery when not searching) */}
         {!query.trim() ? (
@@ -246,21 +257,22 @@ export function GifPicker({ visible, onClose, onPick, customerId }: Props) {
 
 /** Shimmering skeleton tiles for the first load. */
 function SkeletonGrid() {
-  const pulse = useRef(new Animated.Value(0.4)).current;
+  const pulse = useSharedValue(0.4);
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]),
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: duration.slow, easing: easing.standard }),
+        withTiming(0.4, { duration: duration.slow, easing: easing.standard }),
+      ),
+      -1,
+      false,
     );
-    loop.start();
-    return () => loop.stop();
   }, [pulse]);
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return (
     <View style={[styles.grid, styles.skeletonWrap]}>
       {Array.from({ length: 9 }).map((_, i) => (
-        <Animated.View key={i} style={[styles.skeleton, { opacity: pulse }]} />
+        <Animated.View key={i} style={[styles.skeleton, pulseStyle]} />
       ))}
     </View>
   );

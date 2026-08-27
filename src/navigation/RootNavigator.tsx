@@ -17,7 +17,9 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 const stackScreenOptions = {
   headerShown: false,
-  animation: "none" as const,
+  // Native iOS-style push (also restores the native swipe-back gesture). Runs on
+  // the native thread — no JS/perf cost. Per-screen overrides below.
+  animation: "slide_from_right" as const,
   contentStyle: { backgroundColor: colors.bg },
 };
 
@@ -26,11 +28,12 @@ export default function RootNavigator() {
 
   return (
     <RootStack.Navigator initialRouteName={initialRouteName} screenOptions={stackScreenOptions}>
-      <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
-      <RootStack.Screen name="MainTabs" component={MainTabsNavigator} />
+      <RootStack.Screen name="Onboarding" component={OnboardingScreen} options={{ animation: "fade" }} />
+      <RootStack.Screen name="MainTabs" component={MainTabsNavigator} options={{ animation: "fade" }} />
       <RootStack.Screen name="PlayerStack" component={PlayerNavigator} />
-      <RootStack.Screen name="Party" component={PartyScreen} />
-      <RootStack.Screen name="JoinParty" component={JoinPartyScreen} />
+      {/* Watch-party entry points rise like a modal sheet. */}
+      <RootStack.Screen name="Party" component={PartyScreen} options={{ animation: "slide_from_bottom" }} />
+      <RootStack.Screen name="JoinParty" component={JoinPartyScreen} options={{ animation: "slide_from_bottom" }} />
       <RootStack.Screen name="MyList" component={MyListScreen} />
       <RootStack.Screen name="WatchHistory" component={WatchHistoryScreen} />
       <RootStack.Screen name="TrendingShows" component={TrendingShowsScreen} />

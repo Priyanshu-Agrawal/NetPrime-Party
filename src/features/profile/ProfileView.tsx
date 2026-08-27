@@ -20,7 +20,7 @@ import {
   requestNotificationPermission,
 } from "@/services/permissions/notifications";
 import { openLibrary, openHomePrefs } from "@/src/navigation/actions";
-import { Text } from "@/src/ui";
+import { Appear, Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { checkGithubRelease } from "@/utils/checkGithubRelease";
@@ -102,7 +102,7 @@ export default function MoreScreen() {
         "Notifications active",
         "You will receive watch party invites, pack updates, and lock screen media controls.",
         [
-          { text: "Settings", onPress: openAppSettings },
+          { text: "Settings", onPress: openAppSettings, style: "cancel" },
           { text: "OK" },
         ]
       );
@@ -174,73 +174,89 @@ export default function MoreScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + ms(56) }]}
       >
         {/* Identity */}
-        <View style={styles.identity}>
-          <Pressable style={styles.avatarWrap} onPress={openEdit}>
-            <BearAvatar config={avatarConfig} size={ms(96)} showGlow />
-            <View style={styles.editBadge}>
-              <Ionicons name="pencil" size={ms(13)} color={colors.onHoney} />
-            </View>
-          </Pressable>
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.handle}>{handle}</Text>
-        </View>
+        <Appear index={0} variant="drop">
+          <View style={styles.identity}>
+            <Pressable style={styles.avatarWrap} onPress={openEdit}>
+              <BearAvatar config={avatarConfig} size={ms(96)} showGlow />
+              <View style={styles.editBadge}>
+                <Ionicons name="pencil" size={ms(13)} color={colors.onHoney} />
+              </View>
+            </Pressable>
+            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.handle}>{handle}</Text>
+          </View>
+        </Appear>
 
         {/* Stats (real, from local history) */}
-        <View style={styles.statStrip}>
-          <Stat value={stats.watched} label="Watched" />
-          <View style={styles.statDivider} />
-          <Stat value={stats.hours} label="Hours" />
-          <View style={styles.statDivider} />
-          <Stat value={stats.inProgress} label="In progress" />
-        </View>
+        <Appear index={1}>
+          <View style={styles.statStrip}>
+            <Stat value={stats.watched} label="Watched" />
+            <View style={styles.statDivider} />
+            <Stat value={stats.hours} label="Hours" />
+            <View style={styles.statDivider} />
+            <Stat value={stats.inProgress} label="In progress" />
+          </View>
+        </Appear>
 
         {/* Your pack */}
-        <View style={styles.packCard}>
-          <Text style={styles.overline}>YOUR PACK</Text>
-          <View style={styles.packRow}>
-            <View style={styles.packHint}>
-              <View style={styles.packIcon}>
-                <Ionicons name="people" size={ms(18)} color={colors.honey} />
+        <Appear index={2}>
+          <View style={styles.packCard}>
+            <Text style={styles.overline}>YOUR PACK</Text>
+            <View style={styles.packRow}>
+              <View style={styles.packHint}>
+                <View style={styles.packIcon}>
+                  <Ionicons name="people" size={ms(18)} color={colors.honey} />
+                </View>
+                <Text style={styles.packText}>Invite friends to watch together</Text>
               </View>
-              <Text style={styles.packText}>Invite friends to watch together</Text>
+              <Pressable style={styles.inviteBtn} onPress={invite} hitSlop={6}>
+                <Ionicons name="person-add" size={ms(14)} color={colors.honey} />
+                <Text style={styles.inviteText}>Invite</Text>
+              </Pressable>
             </View>
-            <Pressable style={styles.inviteBtn} onPress={invite} hitSlop={6}>
-              <Ionicons name="person-add" size={ms(14)} color={colors.honey} />
-              <Text style={styles.inviteText}>Invite</Text>
-            </Pressable>
           </View>
-        </View>
+        </Appear>
 
         {/* Library */}
-        <Card>
-          <Row icon="time-outline" label="Watch history" onPress={() => openLibrary("WatchHistory")} />
-          <Row icon="bookmark-outline" label="My list" onPress={() => openLibrary("MyList")} />
-          <Row icon="download-outline" label="Downloads" onPress={() => comingSoon("Downloads")} last />
-        </Card>
+        <Appear index={3}>
+          <Card>
+            <Row icon="time-outline" label="Watch history" onPress={() => openLibrary("WatchHistory")} />
+            <Row icon="bookmark-outline" label="My list" onPress={() => openLibrary("MyList")} />
+            <Row icon="download-outline" label="Downloads" onPress={() => comingSoon("Downloads")} last />
+          </Card>
+        </Appear>
 
         {/* Preferences */}
-        <Card>
-          <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
-          <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
-          <Row icon="sparkles-outline" label="Home" onPress={openHomePrefs} />
-          <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
-        </Card>
+        <Appear index={4}>
+          <Card>
+            <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
+            <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
+            <Row icon="sparkles-outline" label="Home" onPress={openHomePrefs} />
+            <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
+          </Card>
+        </Appear>
 
-        <Card>
-          <Row icon="chatbubble-ellipses-outline" label="Chat & reactions" onPress={() => comingSoon("Chat & reactions")} last />
-        </Card>
+        <Appear index={5}>
+          <Card>
+            <Row icon="chatbubble-ellipses-outline" label="Chat & reactions" onPress={() => comingSoon("Chat & reactions")} last />
+          </Card>
+        </Appear>
 
         {/* Maintenance / about */}
-        <Card>
-          <Row icon="color-palette-outline" label="Appearance" onPress={() => comingSoon("Appearance")} />
-          <Row icon="trash-outline" label="Clear watch history" onPress={confirmClearHistory} />
-          <Row icon="refresh-outline" label="Clear cache" onPress={confirmClearCache} />
-          <Row icon="help-circle-outline" label="Help & about" onPress={() => setAboutVisible(true)} last />
-        </Card>
+        <Appear index={6}>
+          <Card>
+            <Row icon="color-palette-outline" label="Appearance" onPress={() => comingSoon("Appearance")} />
+            <Row icon="trash-outline" label="Clear watch history" onPress={confirmClearHistory} />
+            <Row icon="refresh-outline" label="Clear cache" onPress={confirmClearCache} />
+            <Row icon="help-circle-outline" label="Help & about" onPress={() => setAboutVisible(true)} last />
+          </Card>
+        </Appear>
 
-        <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
-          <Text style={styles.signOutText}>Sign out</Text>
-        </TouchableOpacity>
+        <Appear index={7}>
+          <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </Appear>
       </Animated.ScrollView>
 
       {/* Persistent brand header — gains a frosted-glass background once content

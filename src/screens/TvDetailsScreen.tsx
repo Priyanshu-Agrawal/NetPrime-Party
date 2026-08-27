@@ -11,11 +11,12 @@ import {
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { useProviders } from "@/src/store/features/providers/hooks";
 import { GlassIconButton } from "@/components/ui/GlassIconButton";
-import { Button } from "@/src/ui";
+import { Appear, Button } from "@/src/ui";
 import { DetailsSkeleton, EpisodeRowSkeleton } from "@/src/ui";
 import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
+import { RAIL_LIST_PROPS } from "@/utils/listPerf";
 import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import { genRoomCode } from "@/utils/roomCode";
 import {
@@ -250,6 +251,7 @@ const TvDetailsScreen: React.FC = () => {
         </View>
 
         {/* Primary actions */}
+        <Appear index={0}>
         <View style={styles.actions}>
           <Button
             label="Play"
@@ -268,8 +270,10 @@ const TvDetailsScreen: React.FC = () => {
             style={styles.flexBtn}
           />
         </View>
+        </Appear>
 
         {/* Quick actions */}
+        <Appear index={1}>
         <View style={styles.quickRow}>
           <Pressable
             style={styles.quick}
@@ -295,17 +299,21 @@ const TvDetailsScreen: React.FC = () => {
             <Text style={styles.quickLabel}>Share</Text>
           </Pressable>
         </View>
+        </Appear>
 
         {next ? (
+          <Appear index={2}>
           <View style={styles.nextBanner}>
             <Ionicons name="calendar-outline" size={14} color={colors.honey} />
             <Text style={styles.nextText}>
               Next: S{next.season_number}E{next.episode_number} “{next.name}” · {next.air_date}
             </Text>
           </View>
+          </Appear>
         ) : null}
 
         {d.overview ? (
+          <Appear index={3}>
           <View style={styles.overviewWrap}>
             <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
               {d.overview}
@@ -316,10 +324,12 @@ const TvDetailsScreen: React.FC = () => {
               </Pressable>
             ) : null}
           </View>
+          </Appear>
         ) : null}
 
         {/* Seasons + Episodes */}
         {seasons.length ? (
+          <Appear index={4}>
           <Section title="Episodes">
             <FlatList
               data={seasons}
@@ -386,55 +396,72 @@ const TvDetailsScreen: React.FC = () => {
               <EpisodeRowSkeleton />
             )}
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.cast.length ? (
+          <Appear index={5}>
           <Section title="Cast">
             <PeopleRow people={derived!.cast} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.crew.length ? (
+          <Appear index={6}>
           <Section title="Creators & Crew">
             <PeopleRow people={derived!.crew} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.providers ? (
+          <Appear index={7}>
           <Section title="Where to Watch">
             <ProvidersRow providers={derived!.providers} />
           </Section>
+          </Appear>
         ) : null}
 
+        <Appear index={8}>
         <Section title="Details">
           <FactGrid facts={derived!.facts} />
         </Section>
+        </Appear>
 
         {derived!.keywords.length ? (
+          <Appear index={9}>
           <Section title="Keywords">
             <Pills items={derived!.keywords} />
           </Section>
+          </Appear>
         ) : null}
 
         {d.reviews?.results?.length ? (
+          <Appear index={10}>
           <Section title="Reviews">
             <Reviews reviews={d.reviews.results} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.links.length ? (
+          <Appear index={11}>
           <Section title="Links">
             <LinksRow links={derived!.links} />
           </Section>
+          </Appear>
         ) : null}
 
         {derived!.recs.length ? (
+          <Appear index={12}>
           <Section title="More Like This">
             <FlatList
               data={derived!.recs}
               horizontal
               keyExtractor={(m: any) => String(m.id)}
               showsHorizontalScrollIndicator={false}
+              {...RAIL_LIST_PROPS}
               ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
               renderItem={({ item }: any) => (
                 <Pressable
@@ -457,6 +484,7 @@ const TvDetailsScreen: React.FC = () => {
               )}
             />
           </Section>
+          </Appear>
         ) : null}
       </Animated.ScrollView>
     </View>
