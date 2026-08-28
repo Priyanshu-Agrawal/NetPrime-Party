@@ -1,11 +1,12 @@
 import React from "react";
-import { View, FlatList, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, FlatList, StyleSheet } from "react-native";
 import { Appear, Chip, Text } from "@/src/ui";
-import { colors, ms, radius, spacing } from "@/theme/bearoom";
+import { ms, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
-import { pressedStyle } from "@/theme/styles/interaction";
-import { openGenre, openJoinParty } from "@/src/navigation/actions";
+import { useGenreListQuery } from "@/src/store/services/tmdbApi";
+
+// Free-text quick searches (kept — these drive a text search, not the catalog).
+const TRENDING = ["Sci-Fi", "Cozy nights", "A24", "Comedy", "New & hot", "Feel-good"];
 
 const PROVIDERS = [
   { name: "Trending", id: null as number | null },
@@ -16,15 +17,11 @@ const PROVIDERS = [
   { name: "Max", id: 1899 },
 ];
 
-const TRENDING = ["Sci-Fi", "Cozy nights", "A24", "Comedy", "New & hot", "Feel-good"];
-
-// Real genre shortcuts (D3) — each opens a discover-by-genre grid; the party tile
-// keeps its watch-together CTA. (Fuller genre-in-search filtering is D4.)
-const MOODS: { label: string; icon: keyof typeof Ionicons.glyphMap; genreId?: number; kind?: "movie" | "tv"; party?: boolean }[] = [
-  { label: "Action-packed", icon: "flame", genreId: 28, kind: "movie" },
-  { label: "Feel-good", icon: "happy", genreId: 35, kind: "movie" },
-  { label: "Watch with friends", icon: "people", party: true },
-  { label: "Sci-Fi & fantasy", icon: "planet", genreId: 878, kind: "movie" },
+// D4 sort presets → mapped to per-kind TMDB sort_by in tmdbApi's DISCOVER_SORT.
+const SORTS = [
+  { key: "popular", label: "Popular" },
+  { key: "rating", label: "Top Rated" },
+  { key: "newest", label: "Newest" },
 ];
 
 interface Props {
@@ -32,62 +29,83 @@ interface Props {
   onSearch: (query: string) => void;
   selectedProvider: number | null;
   onSelectProvider: (providerId: number | null) => void;
+  selectedGenre: number | null;
+  onSelectGenre: (genreId: number | null) => void;
+  sort: string;
+  onSelectSort: (sort: string) => void;
 }
 
-const BrowseHeader = React.memo(({ searchQuery, onSearch, selectedProvider, onSelectProvider }: Props) => {
+const BrowseHeader = React.memo((props: Props) => {
+  const {
+    searchQuery, onSearch,
+    selectedProvider, onSelectProvider,
+    selectedGenre, onSelectGenre,
+    sort, onSelectSort,
+  } = props;
+  // Movie genres drive the catalog filter (ids differ movie vs tv, so browse
+  // skews movie — fine here; TV-genre browse lives on the Home genre row).
+  const { data: genres } = useGenreListQuery("movie");
+
   return (
     <View>
-      {/* Trending searches */}
+      {/* Trending searches (free text) */}
       <Appear index={0}>
         <Text variant="h3" style={[styles.sectionTitle, styles.firstSectionTitle]}>
           Trending searches
         </Text>
-        <View style={styles.trendWrap}>
+        <View style={styles.wrap}>
           {TRENDING.map((t) => (
             <Chip key={t} label={t} active={searchQuery === t} onPress={() => onSearch(t)} />
           ))}
         </View>
       </Appear>
 
-      <Appear index={1}>
-        <Text variant="h3" style={styles.sectionTitle}>
-          Browse by mood
-        </Text>
-        <View style={styles.moodGrid}>
-          {MOODS.map((m) => (
-            <Pressable
-              key={m.label}
-              style={({ pressed }) => [styles.moodTile, pressed && pressedStyle]}
-              onPress={() => (m.party ? openJoinParty() : openGenre(m.genreId!, m.label, m.kind ?? "movie"))}
-            >
-              <View style={styles.moodIcon}>
-                <Ionicons name={m.icon} size={ms(20)} color={colors.honey} />
-              </View>
-              <Text variant="h3" style={styles.moodLabel}>
-                {m.label}
-              </Text>
-            </Pressable>
+      {/* Browse by genre — filters the grid IN PLACE (tap active to clear). */}
+      {genres && genres.length > 0 ? (
+        <Appear index={1}>
+          <Text variant="h3" style={styles.sectionTitle}>Browse by genre</Text>
+          <FlatList
+            horizontal
+            data={genres}
+            keyExtractor={(g) => String(g.id)}
+            showsHorizontalScrollIndicator={false}
+            style={styles.hList}
+            contentContainerStyle={styles.hRow}
+            renderItem={({ item }) => (
+              <Chip
+                label={item.name}
+                active={selectedGenre === item.id}
+                onPress={() => onSelectGenre(item.id)}
+              />
+            )}
+          />
+        </Appear>
+      ) : null}
+
+      {/* Sort */}
+      <Appear index={2}>
+        <Text variant="h3" style={styles.sectionTitle}>Sort by</Text>
+        <View style={styles.wrap}>
+          {SORTS.map((s) => (
+            <Chip key={s.key} label={s.label} active={sort === s.key} onPress={() => onSelectSort(s.key)} />
           ))}
         </View>
       </Appear>
 
-      <Appear index={2}>
+      {/* Streaming service */}
+      <Appear index={3}>
         <Text variant="h3" style={styles.sectionTitle}>
-          {selectedProvider ? "Popular on this service" : "Trending today"}
+          {selectedProvider ? "Popular on this service" : "Streaming service"}
         </Text>
         <FlatList
           horizontal
           data={PROVIDERS}
           keyExtractor={(p) => p.name}
           showsHorizontalScrollIndicator={false}
-          style={styles.provList}
-          contentContainerStyle={styles.provRow}
+          style={styles.hList}
+          contentContainerStyle={styles.hRow}
           renderItem={({ item: p }) => (
-            <Chip
-              label={p.name}
-              active={selectedProvider === p.id}
-              onPress={() => onSelectProvider(p.id)}
-            />
+            <Chip label={p.name} active={selectedProvider === p.id} onPress={() => onSelectProvider(p.id)} />
           )}
         />
       </Appear>
@@ -105,32 +123,9 @@ const styles = StyleSheet.create({
     fontSize: ms(17),
   },
   firstSectionTitle: { marginTop: 0 },
-  trendWrap: { flexDirection: "row", flexWrap: "wrap", gap: layout.railGap, paddingHorizontal: spacing.lg },
-
-  moodGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, paddingHorizontal: spacing.lg },
-  moodTile: {
-    flexGrow: 1,
-    flexBasis: "47%",
-    height: ms(100),
-    borderRadius: radius.lg,
-    backgroundColor: colors.bgElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.md + 2,
-    justifyContent: "space-between",
-  },
-  moodIcon: {
-    width: ms(40),
-    height: ms(40),
-    borderRadius: radius.pill,
-    backgroundColor: colors.honeySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  moodLabel: { fontSize: ms(15) },
-
-  provList: { flexGrow: 0, marginBottom: ms(18) },
-  provRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: layout.railGap, paddingHorizontal: spacing.lg },
+  hList: { flexGrow: 0, marginBottom: ms(4) },
+  hRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
 });
 
 export default BrowseHeader;

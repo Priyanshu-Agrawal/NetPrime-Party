@@ -18,6 +18,13 @@ const WATCH_REGION = "IN";
 // hits, not long-tail daily serials. IN → Hindi (Bollywood). Unmapped regions use
 // origin-country only (all local languages).
 const REGION_LANG: Record<string, string> = { IN: "hi" };
+// D4 catalog-browse sort presets → per-kind TMDB `sort_by` (release-date fields
+// differ movie vs tv). "rating" also gets a vote_count floor at the call site.
+const DISCOVER_SORT: Record<string, { movie: string; tv: string }> = {
+  popular: { movie: "popularity.desc", tv: "popularity.desc" },
+  rating: { movie: "vote_average.desc", tv: "vote_average.desc" },
+  newest: { movie: "primary_release_date.desc", tv: "first_air_date.desc" },
+};
 
 const raw = async (path: string): Promise<any> => {
     const sep = path.includes("?") ? "&" : "?";
@@ -143,6 +150,31 @@ export const tmdbApi = createApi({
                 },
                 keepUnusedDataFor: 120,
             }),
+            // D4: catalog browse — discover with optional genre + provider + a sort
+            // preset, movie+tv fetched in parallel (client merges, like discoverByProvider).
+            // Genre ids differ movie vs tv, so a movie-genre id yields few TV rows —
+            // genre-filtered browse skews movie, which is fine for a browse surface.
+            discoverCatalog: build.query<
+                { tv: any; movie: any },
+                { providerId: number | null; genreId: number | null; sort: string; page: number }
+            >({
+                queryFn: async ({ providerId, genreId, sort, page }) => {
+                    try {
+                        const parts: string[] = [`page=${page}`];
+                        if (providerId) parts.push(`with_watch_providers=${providerId}`, `watch_region=${WATCH_REGION}`);
+                        if (genreId) parts.push(`with_genres=${genreId}`);
+                        if (sort === "rating") parts.push("vote_count.gte=100");
+                        const q = parts.join("&");
+                        const sm = DISCOVER_SORT[sort] ?? DISCOVER_SORT.popular;
+                        const [tv, movie] = await Promise.all([
+                            raw(`discover/tv?${q}&sort_by=${sm.tv}`),
+                            raw(`discover/movie?${q}&sort_by=${sm.movie}`),
+                        ]);
+                        return { data: { tv, movie } };
+                    } catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 120,
+            }),
             trendingAllDay: build.query<any, { page: number }>({
                 queryFn: wrapQuery(({ page }) => `trending/all/day?page=${page}`),
                 keepUnusedDataFor: 120,
@@ -251,6 +283,7 @@ export const {
     useLazySearchTvQuery,
     useLazySearchPersonQuery,
     useLazyDiscoverByProviderQuery,
+    useLazyDiscoverCatalogQuery,
     useLazyTrendingAllDayQuery,
     useCollectionQuery,
     useCollectionsQuery,

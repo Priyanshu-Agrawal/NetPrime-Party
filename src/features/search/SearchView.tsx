@@ -36,12 +36,16 @@ const SearchView: React.FC = () => {
     searchQuery,
     selectedProvider,
     searchType,
+    browseGenre,
+    browseSort,
     mode,
     hasMore,
     loadMore,
     handleSearch,
     selectProvider,
     selectSearchType,
+    selectGenre,
+    selectSort,
     retry,
   } = useSearchData();
 
@@ -124,6 +128,10 @@ const SearchView: React.FC = () => {
           onSearch={handleSearch}
           selectedProvider={selectedProvider}
           onSelectProvider={selectProvider}
+          selectedGenre={browseGenre}
+          onSelectGenre={selectGenre}
+          sort={browseSort}
+          onSelectSort={selectSort}
         />
       ) : (
         <Appear variant="drop">
