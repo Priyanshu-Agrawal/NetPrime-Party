@@ -15,11 +15,17 @@ interface ProvidersState {
      * @description Whether the maintenance mode is enabled
      */
     maintenanceMode: boolean;
+    /**
+     * @description Server-detected client country (ISO 3166-1) from /config, or
+     * null. Drives the "Popular in your region" rail; consumers default it (IN).
+     */
+    region: string | null;
 }
 
 const initialState: ProvidersState = {
     providers: [],
     maintenanceMode: false,
+    region: null,
 };
 
 const providersSlice = createSlice({
@@ -42,6 +48,7 @@ const providersSlice = createSlice({
             (state, { payload }) => {
                 state.providers = remoteToProviders(payload.providers ?? []);
                 state.maintenanceMode = payload.maintenanceMode;
+                state.region = payload.region ?? null;
             },
         );
     },

@@ -94,6 +94,7 @@ const FeedSectionSchema = z
         "tmdbRail",
         "genreRow",
         "franchises",
+        "regionPopular",
         "editorialRow",
       ])
       .openapi({ example: "tmdbRail" }),
@@ -101,10 +102,14 @@ const FeedSectionSchema = z
     enabled: z.boolean().optional(),
     minAppVersion: z.string().optional(),
     path: z.string().optional().openapi({ example: "movie/popular" }),
-    kind: z.enum(["movie", "tv"]).optional(),
+    kind: z.enum(["movie", "tv"]).optional(), // tmdbRail + genreRow (D3)
     icon: z.string().optional(),
     seeAll: z.boolean().optional(),
     limit: z.number().int().optional(),
+    // franchises (D2): mirror FranchisesSection so a served franchises row keeps
+    // its ids — Zod's default object-strip would otherwise drop unknown keys.
+    collectionIds: z.array(z.number().int()).optional(),
+    dynamic: z.boolean().optional(),
   })
   .openapi("FeedSection");
 
@@ -126,6 +131,9 @@ export const AppConfigSchema = z
   .object({
     appVersion: z.string().openapi({ example: "2.0.0" }),
     maintenanceMode: z.boolean().openapi({ example: false }),
+    /** Cloudflare-detected client country (ISO 3166-1), or null. Drives the
+     *  client's "Popular in your region" rail; client defaults it when absent. */
+    region: z.string().nullable().optional().openapi({ example: "IN" }),
     providers: z.array(ProviderSchema),
     /** Optional server-driven Home feed. Omitted → client renders its fallback. */
     homeFeed: FeedManifestSchema.optional(),

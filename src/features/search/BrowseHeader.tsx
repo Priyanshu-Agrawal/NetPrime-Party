@@ -5,7 +5,7 @@ import { Appear, Chip, Text } from "@/src/ui";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { pressedStyle } from "@/theme/styles/interaction";
-import { openJoinParty } from "@/src/navigation/actions";
+import { openGenre, openJoinParty } from "@/src/navigation/actions";
 
 const PROVIDERS = [
   { name: "Trending", id: null as number | null },
@@ -18,11 +18,13 @@ const PROVIDERS = [
 
 const TRENDING = ["Sci-Fi", "Cozy nights", "A24", "Comedy", "New & hot", "Feel-good"];
 
-const MOODS: { label: string; icon: keyof typeof Ionicons.glyphMap; query: string; party?: boolean }[] = [
-  { label: "Movie night", icon: "film", query: "adventure" },
-  { label: "Something cozy", icon: "cafe", query: "romance" },
-  { label: "Watch with friends", icon: "people", query: "", party: true },
-  { label: "Critically acclaimed", icon: "ribbon", query: "award" },
+// Real genre shortcuts (D3) — each opens a discover-by-genre grid; the party tile
+// keeps its watch-together CTA. (Fuller genre-in-search filtering is D4.)
+const MOODS: { label: string; icon: keyof typeof Ionicons.glyphMap; genreId?: number; kind?: "movie" | "tv"; party?: boolean }[] = [
+  { label: "Action-packed", icon: "flame", genreId: 28, kind: "movie" },
+  { label: "Feel-good", icon: "happy", genreId: 35, kind: "movie" },
+  { label: "Watch with friends", icon: "people", party: true },
+  { label: "Sci-Fi & fantasy", icon: "planet", genreId: 878, kind: "movie" },
 ];
 
 interface Props {
@@ -56,7 +58,7 @@ const BrowseHeader = React.memo(({ searchQuery, onSearch, selectedProvider, onSe
             <Pressable
               key={m.label}
               style={({ pressed }) => [styles.moodTile, pressed && pressedStyle]}
-              onPress={() => (m.party ? openJoinParty() : onSearch(m.query))}
+              onPress={() => (m.party ? openJoinParty() : openGenre(m.genreId!, m.label, m.kind ?? "movie"))}
             >
               <View style={styles.moodIcon}>
                 <Ionicons name={m.icon} size={ms(20)} color={colors.honey} />

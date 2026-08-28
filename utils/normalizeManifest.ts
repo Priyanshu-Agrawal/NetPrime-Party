@@ -3,7 +3,7 @@ import { FEED_SCHEMA_VERSION } from "@/types/feed";
 import { HOME_FEED_FALLBACK } from "@/data/homeFeedFallback";
 
 const KNOWN: FeedSectionType[] = [
-  "continueWatching", "becauseYouWatched", "tmdbRail", "genreRow", "franchises", "editorialRow",
+  "continueWatching", "becauseYouWatched", "tmdbRail", "genreRow", "franchises", "regionPopular", "editorialRow",
 ];
 
 function normalizeSection(raw: any, i: number): FeedSection | null {

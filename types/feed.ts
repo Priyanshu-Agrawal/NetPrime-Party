@@ -1,7 +1,7 @@
 // types/feed.ts — shared shape for the server-driven Home feed (mirrored by worker Zod).
 export type FeedSectionType =
   | "continueWatching" | "becauseYouWatched"
-  | "tmdbRail" | "genreRow" | "franchises" | "editorialRow"; // last 3 reserved (D2/D3/P5)
+  | "tmdbRail" | "genreRow" | "franchises" | "regionPopular" | "editorialRow"; // franchises=D2, genreRow=D3, regionPopular live; editorialRow reserved (P5)
 
 export interface FeedSectionBase {
   id: string;
@@ -24,9 +24,17 @@ export interface FranchisesSection extends FeedSectionBase {
   dynamic?: boolean;       // merge in the TMDB-popular harvest + the user's opened collections
 }
 export interface SimpleSection extends FeedSectionBase {
-  type: "continueWatching" | "becauseYouWatched" | "genreRow" | "editorialRow";
+  type: "continueWatching" | "becauseYouWatched" | "editorialRow";
 }
-export type FeedSection = TmdbRailSection | FranchisesSection | SimpleSection;
+export interface GenreRowSection extends FeedSectionBase {
+  type: "genreRow";
+  kind?: "movie" | "tv";   // which TMDB genre set the chips browse (default movie) — D3
+}
+export interface RegionPopularSection extends FeedSectionBase {
+  type: "regionPopular";   // a mixed movie+TV "Popular in {country}" rail; region resolved on-device
+}
+export type FeedSection =
+  | TmdbRailSection | FranchisesSection | GenreRowSection | RegionPopularSection | SimpleSection;
 
 export interface FeedManifest {
   version: number;         // schema version; bump only on a breaking shape change

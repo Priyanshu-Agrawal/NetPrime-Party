@@ -15,3 +15,9 @@ export function useHijackableProviders(): Provider[] {
 export function useMaintenanceMode(): boolean {
     return useAppSelector((s) => s.providers.maintenanceMode);
 }
+
+/** Client country (ISO 3166-1) for the "Popular in your region" rail. Server
+ *  (CF)-detected via /config; defaults to India-first "IN" when absent. */
+export function useRegion(): string {
+    return useAppSelector((s) => s.providers.region) ?? "IN";
+}

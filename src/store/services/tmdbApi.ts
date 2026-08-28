@@ -13,6 +13,11 @@ import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 // India-first, so default to IN (was hardcoded US). Provider IDs (Netflix=8,
 // etc.) are global; only availability filtering is region-scoped.
 const WATCH_REGION = "IN";
+// Per-region "hits" language for the "Popular in your region" rail (regionPopular):
+// bias to the region's flagship film language so the rail reads as recognizable
+// hits, not long-tail daily serials. IN → Hindi (Bollywood). Unmapped regions use
+// origin-country only (all local languages).
+const REGION_LANG: Record<string, string> = { IN: "hi" };
 
 const raw = async (path: string): Promise<any> => {
     const sep = path.includes("?") ? "&" : "?";
@@ -175,6 +180,46 @@ export const tmdbApi = createApi({
                 queryFn: wrapQuery(({ query, page }) => `search/collection?query=${encodeURIComponent(query)}&page=${page}`),
                 keepUnusedDataFor: 120,
             }),
+            // --- Genres (D3) ------------------------------------------------
+            // TMDB's genre id↔name map for a kind (genres are ~static → cache long).
+            // Powers the Home "Browse by Genre" chips; each chip opens a
+            // discover-by-genre grid (RailSeeAll) via openGenre().
+            genreList: build.query<{ id: number; name: string }[], "movie" | "tv">({
+                queryFn: async (kind) => {
+                    try {
+                        const r = await raw(`genre/${kind}/list`);
+                        return { data: (r?.genres ?? []) as { id: number; name: string }[] };
+                    } catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 86400,
+            }),
+            // "Popular in your region" (local content) — a MIXED movie+TV rail:
+            // discover-by-origin-country for both types, tag media_type, merge and
+            // re-sort by TMDB popularity. Region (ISO 3166-1) comes from /config's
+            // CF-detected country, defaulted client-side. See RegionPopularRail.
+            regionPopular: build.query<MediaItem[], string>({
+                queryFn: async (region) => {
+                    try {
+                        const cc = region.toUpperCase();
+                        const lang = REGION_LANG[cc];
+                        // A: `vote_count.gte` drops the long-tail (0-vote daily serials);
+                        // B: the per-region language (when mapped) biases to flagship hits.
+                        const path = (kind: string) =>
+                            `discover/${kind}?with_origin_country=${encodeURIComponent(cc)}` +
+                            (lang ? `&with_original_language=${lang}` : "") +
+                            `&vote_count.gte=50&sort_by=popularity.desc`;
+                        const [movie, tv] = await Promise.all([raw(path("movie")), raw(path("tv"))]);
+                        const merged: MediaItem[] = [
+                            ...((movie?.results ?? []) as MediaItem[]).map((m) => ({ ...m, media_type: "movie" as const })),
+                            ...((tv?.results ?? []) as MediaItem[]).map((t) => ({ ...t, media_type: "tv" as const })),
+                        ]
+                            .filter((m) => m.poster_path)
+                            .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+                        return { data: merged };
+                    } catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 600,
+            }),
             // NOTE: the TMDB-popular franchise harvest (discovery source "A") moved
             // SERVER-SIDE to the worker's GET /franchises (see worker/src/franchises.ts
             // + workerApi `franchises`), so the ~15 client-side detail fetches are gone.
@@ -211,4 +256,6 @@ export const {
     useCollectionsQuery,
     useSearchCollectionQuery,
     useLazySearchCollectionQuery,
+    useGenreListQuery,
+    useRegionPopularQuery,
 } = tmdbApi;

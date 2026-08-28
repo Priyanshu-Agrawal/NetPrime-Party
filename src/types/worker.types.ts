@@ -30,6 +30,9 @@ export interface RemoteProviderRow {
 export interface AppConfig {
     appVersion: string;
     maintenanceMode: boolean;
+    /** Server-detected client country (ISO 3166-1) for the "Popular in your
+     *  region" rail; null/absent → the client uses its default region. */
+    region?: string | null;
     providers: RemoteProviderRow[];
     /**
      * Optional server-driven Home feed manifest. Omitted (D1 default) → the

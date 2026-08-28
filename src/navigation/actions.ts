@@ -44,6 +44,13 @@ export function openCollection(id: number | string) {
   navigate("PlayerStack", { screen: "Collection", params: { id } });
 }
 
+export function openGenre(id: number | string, name: string, kind: "movie" | "tv") {
+  navigate("PlayerStack", {
+    screen: "RailSeeAll",
+    params: { title: name, path: `discover/${kind}?with_genres=${id}&sort_by=popularity.desc`, kind },
+  });
+}
+
 export function openPartyHost(params: PartyParams) {
   navigate("Party", params);
 }

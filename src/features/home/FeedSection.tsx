@@ -8,6 +8,8 @@ import { MediaRail } from "@/components/home/MediaRail";
 import { ContinueWatching } from "@/components/home/ContinueWatching";
 import { BecauseYouWatchedRail } from "@/components/home/BecauseYouWatchedRail";
 import { FranchisesRail } from "@/components/home/FranchisesRail";
+import { GenreChipsRow } from "@/components/home/GenreChipsRow";
+import { RegionPopularRail } from "@/components/home/RegionPopularRail";
 import { openSeeAll } from "@/src/navigation/actions";
 import React from "react";
 
@@ -35,7 +37,11 @@ export function FeedSection({ section }: { section: Section }) {
           dynamic={section.dynamic}
         />
       );
-    // genreRow (D3), editorialRow (P5): not yet rendered.
+    case "regionPopular":
+      return <RegionPopularRail />;
+    case "genreRow":
+      return <GenreChipsRow title={section.title} kind={section.kind} />;
+    // editorialRow (P5): not yet rendered.
     default:
       return null; // forward-compat
   }

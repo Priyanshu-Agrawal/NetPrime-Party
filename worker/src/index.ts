@@ -120,11 +120,15 @@ const configRoute = createRoute({
 
 app.openapi(configRoute, async (c) => {
   const providers = await getProviders(c.env, c.executionCtx);
+  // Cloudflare-detected client country (ISO 3166-1), for the client's "Popular in
+  // your region" rail. Same accessor as /report. Null when cf is absent (local
+  // `wrangler dev`) — the client then falls back to its own default region.
+  const region = (c.req.raw as unknown as { cf?: { country?: string } }).cf?.country ?? null;
   // `homeFeed` is intentionally omitted: AppConfigSchema allows it (optional),
   // and the client falls back to its baked-in Home layout when absent. To
   // server-drive Home, populate `homeFeed: FeedManifest` (see schemas.ts) here.
   return c.json(
-    { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, providers },
+    { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, region, providers },
     200,
   );
 });
