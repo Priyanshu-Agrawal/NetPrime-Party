@@ -121,8 +121,9 @@ export const PlayerScreen: React.FC = () => {
   const [fallbackBanner, setFallbackBanner] = useState(false); // actionable "try another source"
   const [excludedIds, setExcludedIds] = useState<string[]>([]); // providers that failed this session
   const providers = useProviders();
-  // Bias the initial/default source away from providers that recently failed for
-  // THIS title (cross-session, MMKV). Never strands — falls back to the top one.
+  // Pick the initial/default source: prefer a provider that binds our skin
+  // (party-capable), biasing away from ones that recently failed for THIS title
+  // (cross-session, MMKV). Never strands — always yields a provider for a non-empty list.
   const pickInitialProvider = useCallback(
     (list: Provider[]): Provider | undefined => {
       if (!list.length) return undefined;
@@ -136,7 +137,18 @@ export const PlayerScreen: React.FC = () => {
       );
       const requested = providerId ? list.find((p) => p.id === providerId) : undefined;
       if (requested && !failed.has(requested.id)) return requested;
-      return list.find((p) => !failed.has(p.id)) ?? requested ?? list[0];
+      // Prefer a provider that actually binds our skin (party-capable). Failure
+      // memory biases WITHIN a tier (pickFresh) but never demotes a bindable
+      // provider below a script-less one — a transient videasy blip must not strand
+      // the title under the provider's own web controls. Script-less providers are
+      // auto-picked only when none bind (the user can still hand-pick one via "Try
+      // another source"). pickFresh([]) is undefined, so an empty tier falls through.
+      const pickFresh = (arr: Provider[]) => arr.find((p) => !failed.has(p.id)) ?? arr[0];
+      return (
+        pickFresh(list.filter(isPartyCapable)) ??
+        pickFresh(list.filter((p) => !isPartyCapable(p))) ??
+        list[0]
+      );
     },
     [id, type, season, ep, providerId],
   );
