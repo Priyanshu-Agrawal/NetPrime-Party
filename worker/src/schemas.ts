@@ -132,6 +132,17 @@ export const AppConfigSchema = z
   })
   .openapi("AppConfig");
 
+/**
+ * Response of GET /franchises — TMDB-popular collection ids harvested from
+ * `belongs_to_collection` (see franchises.ts). The client merges these with its
+ * curated seed + the user's opened collections to render the Franchises rail.
+ */
+export const FranchisesResponseSchema = z
+  .object({
+    collectionIds: z.array(z.number()).openapi({ example: [263, 2344, 556] }),
+  })
+  .openapi("FranchisesResponse");
+
 /* -------------------------------------------------------------------------- */
 /*  GET /scrape                                                               */
 /* -------------------------------------------------------------------------- */

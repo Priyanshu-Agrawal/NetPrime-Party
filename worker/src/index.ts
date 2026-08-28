@@ -14,6 +14,7 @@
  * API endpoints:
  *   GET  /health        Liveness probe.
  *   GET  /config        App config + provider registry (edge-cached 60s).
+ *   GET  /franchises    TMDB-popular collection ids for the Home rail (cached ~12h).
  *   GET  /scrape        Per-title provider resolution (mock scraper for now).
  *   POST /cache/purge   Invalidate the provider cache after editing Supabase.
  */
@@ -24,9 +25,11 @@ import { cors } from "hono/cors";
 
 import type { Bindings } from "./supabase";
 import { getProviders, getScripts, hashIp, insertReport, purgeProviders } from "./supabase";
+import { getFranchiseCollections } from "./franchises";
 import {
   AppConfigSchema,
   ErrorSchema,
+  FranchisesResponseSchema,
   HealthSchema,
   ProviderScriptSchema,
   PurgeResponseSchema,
@@ -124,6 +127,30 @@ app.openapi(configRoute, async (c) => {
     { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, providers },
     200,
   );
+});
+
+/* -------------------------------------------------------------------------- */
+/*  GET /franchises                                                           */
+/* -------------------------------------------------------------------------- */
+
+const franchisesRoute = createRoute({
+  method: "get",
+  path: "/franchises",
+  tags: ["App"],
+  summary: "Dynamic franchise collection ids (TMDB-popular harvest)",
+  description:
+    "Collection ids derived from the `belongs_to_collection` of popular + top-rated movies, edge-cached ~12h. The client merges these with its curated seed and the user's opened collections to render the Home Franchises rail.",
+  responses: {
+    200: {
+      content: { "application/json": { schema: FranchisesResponseSchema } },
+      description: "Harvested TMDB-popular collection ids.",
+    },
+  },
+});
+
+app.openapi(franchisesRoute, async (c) => {
+  const collectionIds = await getFranchiseCollections(c.env, c.executionCtx);
+  return c.json({ collectionIds }, 200);
 });
 
 /* -------------------------------------------------------------------------- */

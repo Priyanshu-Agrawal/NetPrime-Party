@@ -37,6 +37,13 @@ export type Bindings = {
   /** Server-only salt so `client_hash` is a keyed HMAC, not a brute-forceable
    *  bare SHA-256 of the IP (M7). Set with `wrangler secret put IP_HASH_SALT`. */
   IP_HASH_SALT?: string;
+  /** TMDB proxy base URL used by the franchise harvest in LOCAL dev only (a plain
+   *  fetch). Non-secret; defaults to the app's proxy. */
+  TMDB_PROXY_URL?: string;
+  /** Service binding to the TMDB proxy worker (same account). Prod reaches TMDB
+   *  through this — same-zone workers.dev HTTP subrequests are blocked. See
+   *  wrangler.toml [[services]]. Absent in local dev → falls back to a plain fetch. */
+  TMDB_PROXY?: { fetch: (req: Request) => Promise<Response> };
 };
 
 /**

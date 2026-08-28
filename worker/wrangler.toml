@@ -21,3 +21,12 @@ compatibility_date = "2024-03-20"
 name = "REPORT_LIMITER"
 namespace_id = "1001"
 simple = { limit = 30, period = 60 }
+
+# Service binding to the TMDB proxy worker (same account). GET /franchises reaches
+# TMDB through this — a Worker cannot subrequest another Worker on the same
+# workers.dev zone over HTTP, so the plain-fetch path only works in local dev. The
+# proxy injects the TMDB token, so no secret is needed here. `service` is the proxy
+# worker's name (tmdb.spiderfan-no1.workers.dev → "tmdb").
+[[services]]
+binding = "TMDB_PROXY"
+service = "tmdb"
