@@ -18,6 +18,17 @@ import GridItem from "./GridItem";
 
 const COLS = 3;
 
+const SEARCH_SORTS = [
+  { key: "popular", label: "Popular" },
+  { key: "rating", label: "Top Rated" },
+  { key: "newest", label: "Newest" },
+];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS: { value: number | null; label: string }[] = [
+  { value: null, label: "Any year" },
+  ...Array.from({ length: 8 }, (_, i) => ({ value: CURRENT_YEAR - i, label: String(CURRENT_YEAR - i) })),
+];
+
 import { FlashList } from "@shopify/flash-list";
 
 // We need an array of dummy skeleton objects for the initial loading empty state
@@ -38,6 +49,9 @@ const SearchView: React.FC = () => {
     searchType,
     browseGenre,
     browseSort,
+    searchSort,
+    searchYear,
+    filtersActive,
     mode,
     hasMore,
     loadMore,
@@ -46,8 +60,12 @@ const SearchView: React.FC = () => {
     selectSearchType,
     selectGenre,
     selectSort,
+    selectSearchSort,
+    selectSearchYear,
     retry,
   } = useSearchData();
+
+  const [showFilters, setShowFilters] = React.useState(false);
 
   const handleClearSearch = useCallback(() => {
     handleSearch("");
@@ -134,29 +152,70 @@ const SearchView: React.FC = () => {
           onSelectSort={selectSort}
         />
       ) : (
-        <Appear variant="drop">
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={[
-              { id: "multi", label: "All" },
-              { id: "movie", label: "Movies" },
-              { id: "tv", label: "TV Shows" },
-              { id: "person", label: "People" },
-              { id: "collection", label: "Collections" },
-            ]}
-            keyExtractor={(item) => item.id}
-            style={styles.filterList}
-            contentContainerStyle={styles.filterRow}
-            renderItem={({ item }) => (
-              <Chip
-                label={item.label}
-                active={searchType === item.id}
-                onPress={() => selectSearchType(item.id as any)}
-              />
-            )}
-          />
-        </Appear>
+        <View>
+          <Appear variant="drop">
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={[
+                { id: "multi", label: "All" },
+                { id: "movie", label: "Movies" },
+                { id: "tv", label: "TV Shows" },
+                { id: "person", label: "People" },
+                { id: "collection", label: "Collections" },
+              ]}
+              keyExtractor={(item) => item.id}
+              style={styles.filterList}
+              contentContainerStyle={styles.filterRow}
+              renderItem={({ item }) => (
+                <Chip
+                  label={item.label}
+                  active={searchType === item.id}
+                  onPress={() => selectSearchType(item.id as any)}
+                />
+              )}
+            />
+          </Appear>
+
+          {showFilters ? (
+            <Appear variant="drop">
+              <View style={styles.filterPanel}>
+                <Text variant="caption" style={styles.filterLabel}>Sort</Text>
+                <View style={styles.filterChips}>
+                  {SEARCH_SORTS.map((s) => (
+                    <Chip
+                      key={s.key}
+                      label={s.label}
+                      active={searchSort === s.key}
+                      onPress={() => selectSearchSort(s.key)}
+                    />
+                  ))}
+                </View>
+
+                {searchType === "movie" || searchType === "tv" ? (
+                  <>
+                    <Text variant="caption" style={styles.filterLabel}>Year</Text>
+                    <FlatList
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      data={YEAR_OPTIONS}
+                      keyExtractor={(y) => String(y.value ?? "any")}
+                      style={styles.filterList}
+                      contentContainerStyle={styles.filterRow}
+                      renderItem={({ item: y }) => (
+                        <Chip
+                          label={y.label}
+                          active={searchYear === y.value}
+                          onPress={() => selectSearchYear(y.value)}
+                        />
+                      )}
+                    />
+                  </>
+                ) : null}
+              </View>
+            </Appear>
+          ) : null}
+        </View>
       )}
     </View>
   );
@@ -203,6 +262,8 @@ const SearchView: React.FC = () => {
         value={searchQuery}
         onChangeText={handleSearch}
         onClear={handleClearSearch}
+        onFilterPress={() => setShowFilters((v) => !v)}
+        filterActive={filtersActive}
       />
 
       <View style={styles.flex1}>
@@ -248,6 +309,9 @@ const styles = StyleSheet.create({
   },
   filterList: { flexGrow: 0, marginBottom: spacing.md },
   filterRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  filterPanel: { paddingTop: spacing.xs },
+  filterLabel: { paddingHorizontal: spacing.lg, marginBottom: spacing.xs, color: colors.textDim },
+  filterChips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   skeletonItem: {
     marginBottom: spacing.lg,
   },

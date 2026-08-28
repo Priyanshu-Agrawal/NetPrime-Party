@@ -15,9 +15,11 @@ interface Props {
   value: string;
   onChangeText: (text: string) => void;
   onClear: () => void;
+  onFilterPress?: () => void;
+  filterActive?: boolean;
 }
 
-const SearchInput = React.memo(({ value, onChangeText, onClear }: Props) => {
+const SearchInput = React.memo(({ value, onChangeText, onClear, onFilterPress, filterActive }: Props) => {
   const inputRef = useRef<TextInput>(null);
 
   // Subtle focus polish: spring the border toward honey + a hair of scale.
@@ -50,12 +52,18 @@ const SearchInput = React.memo(({ value, onChangeText, onClear }: Props) => {
         selectionColor={colors.honey}
       />
       {value ? (
-        <Pressable onPress={onClear} hitSlop={8}>
-          <Ionicons name="close-circle" size={18} color={colors.textDim} />
-        </Pressable>
-      ) : (
-        <Ionicons name="options-outline" size={20} color={colors.textDim} />
-      )}
+        <>
+          {/* Filters apply to search RESULTS → the trigger lives here, only while
+              searching (browse filters live in BrowseHeader). Honey + dot = active. */}
+          <Pressable onPress={onFilterPress} hitSlop={8} style={styles.filterBtn}>
+            <Ionicons name="options-outline" size={20} color={filterActive ? colors.honey : colors.textDim} />
+            {filterActive ? <View style={styles.filterDot} /> : null}
+          </Pressable>
+          <Pressable onPress={onClear} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.textDim} />
+          </Pressable>
+        </>
+      ) : null}
     </Animated.View>
   );
 });
@@ -78,6 +86,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
   },
   input: { flex: 1, ...textVariant("body"), fontSize: ms(15) },
+  filterBtn: { position: "relative", padding: 2 },
+  filterDot: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: ms(7),
+    height: ms(7),
+    borderRadius: ms(4),
+    backgroundColor: colors.honey,
+  },
 });
 
 export default SearchInput;

@@ -122,12 +122,12 @@ export const tmdbApi = createApi({
                 queryFn: wrapQuery(({ query, page }) => `search/multi?query=${encodeURIComponent(query)}&page=${page}`),
                 keepUnusedDataFor: 120,
             }),
-            searchMovie: build.query<any, { query: string; page: number }>({
-                queryFn: wrapQuery(({ query, page }) => `search/movie?query=${encodeURIComponent(query)}&page=${page}`),
+            searchMovie: build.query<any, { query: string; page: number; year?: number | null }>({
+                queryFn: wrapQuery(({ query, page, year }) => `search/movie?query=${encodeURIComponent(query)}&page=${page}${year ? `&primary_release_year=${year}` : ""}`),
                 keepUnusedDataFor: 120,
             }),
-            searchTv: build.query<any, { query: string; page: number }>({
-                queryFn: wrapQuery(({ query, page }) => `search/tv?query=${encodeURIComponent(query)}&page=${page}`),
+            searchTv: build.query<any, { query: string; page: number; year?: number | null }>({
+                queryFn: wrapQuery(({ query, page, year }) => `search/tv?query=${encodeURIComponent(query)}&page=${page}${year ? `&first_air_date_year=${year}` : ""}`),
                 keepUnusedDataFor: 120,
             }),
             searchPerson: build.query<any, { query: string; page: number }>({

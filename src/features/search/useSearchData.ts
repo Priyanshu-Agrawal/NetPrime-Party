@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import {
   useLazyDiscoverCatalogQuery,
   useLazySearchMultiQuery,
@@ -11,7 +11,7 @@ import {
 import type { MediaItem } from "@/utils/tmdbLists";
 
 export type SearchType = "multi" | "movie" | "tv" | "person" | "collection";
-/** Default browse sort preset — see DISCOVER_SORT in tmdbApi. */
+/** Default browse/search sort preset — see DISCOVER_SORT in tmdbApi. */
 export const DEFAULT_SORT = "popular";
 
 function filterResults(items: unknown[], searchType: SearchType): MediaItem[] {
@@ -32,6 +32,12 @@ function mergeProviderResults(tvData: any, movieData: any): MediaItem[] {
     .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
 }
 
+/** Release timestamp for the "newest" client-side sort (movie or tv). */
+function dateMs(m: MediaItem): number {
+  const d = (m as any).release_date || (m as any).first_air_date;
+  return d ? new Date(d).getTime() : 0;
+}
+
 export function useSearchData() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<number | null>(null);
@@ -39,6 +45,10 @@ export function useSearchData() {
   // D4 browse catalog filters (browse-only; a text query bypasses them).
   const [browseGenre, setBrowseGenre] = useState<number | null>(null);
   const [browseSort, setBrowseSort] = useState<string>(DEFAULT_SORT);
+  // D4+ search-result filters (search-only): sort is client-side over the loaded
+  // results; year is server-side (movie/tv only — TMDB search takes no genre/sort).
+  const [searchSort, setSearchSort] = useState<string>(DEFAULT_SORT);
+  const [searchYear, setSearchYear] = useState<number | null>(null);
 
   // API Hooks
   const [fetchCatalog] = useLazyDiscoverCatalogQuery();
@@ -66,6 +76,7 @@ export function useSearchData() {
   const providerRef = useRef<number | null>(null);
   const genreRef = useRef<number | null>(null);
   const sortRef = useRef<string>(DEFAULT_SORT);
+  const yearRef = useRef<number | null>(null);
 
   // Debounce and race-condition refs
   const latestCallIdRef = useRef<number>(0);
@@ -141,9 +152,9 @@ export function useSearchData() {
 
       let data: any;
       if (type === "movie") {
-        data = await fetchMovie({ query, page: pageNum }).unwrap();
+        data = await fetchMovie({ query, page: pageNum, year: yearRef.current }).unwrap();
       } else if (type === "tv") {
-        data = await fetchTv({ query, page: pageNum }).unwrap();
+        data = await fetchTv({ query, page: pageNum, year: yearRef.current }).unwrap();
       } else if (type === "person") {
         data = await fetchPerson({ query, page: pageNum }).unwrap();
       } else if (type === "collection") {
@@ -181,6 +192,7 @@ export function useSearchData() {
       type: SearchType = searchType,
       genreId: number | null = browseGenre,
       sort: string = browseSort,
+      year: number | null = searchYear,
     ): Promise<void> => {
       const thisCallId = ++latestCallIdRef.current;
 
@@ -196,6 +208,7 @@ export function useSearchData() {
       queryRef.current = query;
       genreRef.current = genreId;
       sortRef.current = sort;
+      yearRef.current = year;
 
       try {
         if (query) {
@@ -223,18 +236,21 @@ export function useSearchData() {
         }
       }
     },
-    [applyPageMeta, fetchBrowse, fetchSearchPage, searchQuery, searchType, selectedProvider, browseGenre, browseSort],
+    [applyPageMeta, fetchBrowse, fetchSearchPage, searchQuery, searchType, selectedProvider, browseGenre, browseSort, searchYear],
   );
 
   const selectSearchType = useCallback(
     (type: SearchType) => {
       if (type === searchType) return;
       setSearchType(type);
+      // Year is movie/tv-only; drop it when moving to a type that ignores it.
+      const nextYear = type === "movie" || type === "tv" ? searchYear : null;
+      if (nextYear !== searchYear) setSearchYear(nextYear);
       if (searchQuery) {
-        fetchInitial(selectedProvider, searchQuery, type);
+        fetchInitial(selectedProvider, searchQuery, type, browseGenre, browseSort, nextYear);
       }
     },
-    [fetchInitial, searchQuery, searchType, selectedProvider],
+    [fetchInitial, searchQuery, searchType, selectedProvider, browseGenre, browseSort, searchYear],
   );
 
   const loadMore = useCallback(async () => {
@@ -280,12 +296,12 @@ export function useSearchData() {
         return;
       }
 
-      // Debounce the actual fetch
+      // Debounce the actual fetch (carry the active year filter).
       searchTimeoutRef.current = setTimeout(() => {
-        fetchInitial(null, query);
+        fetchInitial(null, query, searchType, browseGenre, browseSort, searchYear);
       }, 450);
     },
-    [fetchInitial, selectedProvider, searchType, browseGenre, browseSort],
+    [fetchInitial, selectedProvider, searchType, browseGenre, browseSort, searchYear],
   );
 
   const selectProvider = useCallback(
@@ -319,6 +335,21 @@ export function useSearchData() {
     [fetchInitial, searchQuery, selectedProvider, searchType, browseGenre],
   );
 
+  // Search-result sort is client-side (TMDB search has no sort_by) — no refetch.
+  const selectSearchSort = useCallback((sort: string) => setSearchSort(sort), []);
+
+  // Search-result year IS server-side (movie/tv) → refetch with the year param.
+  const selectSearchYear = useCallback(
+    (year: number | null) => {
+      setSearchYear(year);
+      yearRef.current = year;
+      if (searchQuery) {
+        fetchInitial(selectedProvider, searchQuery, searchType, browseGenre, browseSort, year);
+      }
+    },
+    [fetchInitial, searchQuery, selectedProvider, searchType, browseGenre, browseSort],
+  );
+
   // Initial mount load
   useEffect(() => {
     fetchInitial(selectedProvider, searchQuery);
@@ -349,11 +380,21 @@ export function useSearchData() {
 
   // Re-run the current (browse or search) fetch — for the error view's Retry.
   const retry = useCallback(() => {
-    fetchInitial(providerRef.current, queryRef.current, searchType, genreRef.current, sortRef.current);
+    fetchInitial(providerRef.current, queryRef.current, searchType, genreRef.current, sortRef.current, yearRef.current);
   }, [fetchInitial, searchType]);
 
+  // Client-side sort of the loaded search results (server keeps them relevance-
+  // ordered; "popular" = leave as-is). Browse already sorts server-side.
+  const displayItems = useMemo(() => {
+    if (!searchQuery || searchSort === DEFAULT_SORT) return items;
+    const arr = [...items];
+    if (searchSort === "rating") arr.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0));
+    else if (searchSort === "newest") arr.sort((a, b) => dateMs(b) - dateMs(a));
+    return arr;
+  }, [items, searchQuery, searchSort]);
+
   return {
-    items,
+    items: displayItems,
     isInitialLoading,
     isLoadingMore,
     hasMore: hasMoreRef.current,
@@ -363,12 +404,17 @@ export function useSearchData() {
     searchType,
     browseGenre,
     browseSort,
+    searchSort,
+    searchYear,
+    filtersActive: searchSort !== DEFAULT_SORT || searchYear != null,
     loadMore,
     handleSearch,
     selectProvider,
     selectSearchType,
     selectGenre,
     selectSort,
+    selectSearchSort,
+    selectSearchYear,
     retry,
     mode: searchQuery ? ("search" as const) : ("browse" as const),
   };
