@@ -2,6 +2,7 @@ import { colors } from "@/theme/bearoom";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import RailSeeAllScreen from "@/src/features/discovery/RailSeeAllScreen";
+import CollectionScreen from "../screens/CollectionScreen";
 import MovieDetailsScreen from "../screens/MovieDetailsScreen";
 import PersonDetailsScreen from "../screens/PersonDetailsScreen";
 import { PlayerScreen } from "../screens/PlayerScreen";
@@ -32,6 +33,7 @@ export default function PlayerNavigator() {
       />
       <PlayerStack.Screen name="PersonDetails" component={PersonDetailsScreen} />
       <PlayerStack.Screen name="RailSeeAll" component={RailSeeAllScreen} />
+      <PlayerStack.Screen name="Collection" component={CollectionScreen} />
     </PlayerStack.Navigator>
   );
 }

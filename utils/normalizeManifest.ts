@@ -15,6 +15,9 @@ function normalizeSection(raw: any, i: number): FeedSection | null {
     if (typeof raw.path !== "string" || !raw.path) return null;  // missing required prop → drop
     if (raw.kind !== "movie" && raw.kind !== "tv") return null;
   }
+  if (type === "franchises") {
+    if (!Array.isArray(raw.collectionIds) || raw.collectionIds.length === 0) return null;
+  }
   return {
     ...raw,
     id: typeof raw.id === "string" && raw.id ? raw.id : `s${i}`,

@@ -1,6 +1,6 @@
 # Discovery UX Overhaul — Design Spec
 
-**Status:** DESIGN (approved direction 2026-08-27; not started). **Owner gate:** review this spec → per-phase `writing-plans` → implement.
+**Status:** IN PROGRESS. **D1** (feed foundation) + **D1.1** (For-You rail) **shipped & committed**; perf/resilience + connectivity/offline UX shipped. **D2 (Collections) — core done & device-verified, UNCOMMITTED** (endpoints, `Collection` screen, "Part of X" chip, Franchises rail, curated fallback; collections-in-search deferred to D4). Plan: `docs/superpowers/plans/2026-08-27-discovery-d2-collections.md`. **D3 (genre browse) next**, then D4 (search rework, absorbs collections-in-search). **Owner gate:** per-phase `writing-plans` → implement.
 
 ## 1. Context & goal
 

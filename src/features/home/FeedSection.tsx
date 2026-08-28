@@ -7,6 +7,7 @@ import type { FeedSection as Section } from "@/types/feed";
 import { MediaRail } from "@/components/home/MediaRail";
 import { ContinueWatching } from "@/components/home/ContinueWatching";
 import { BecauseYouWatchedRail } from "@/components/home/BecauseYouWatchedRail";
+import { FranchisesRail } from "@/components/home/FranchisesRail";
 import { openSeeAll } from "@/src/navigation/actions";
 import React from "react";
 
@@ -26,7 +27,15 @@ export function FeedSection({ section }: { section: Section }) {
           onSeeAll={section.seeAll ? () => openSeeAll(section.title ?? "", section.path, section.kind) : undefined}
         />
       );
-    // genreRow (D3), franchises (D2), editorialRow (P5): not yet rendered.
+    case "franchises":
+      return (
+        <FranchisesRail
+          ids={section.collectionIds}
+          title={section.title}
+          dynamic={section.dynamic}
+        />
+      );
+    // genreRow (D3), editorialRow (P5): not yet rendered.
     default:
       return null; // forward-compat
   }

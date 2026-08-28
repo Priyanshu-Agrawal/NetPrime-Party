@@ -68,6 +68,19 @@ export const workerApi = createApi({
         reportOutcome: build.mutation<{ accepted: boolean }, ReportArgs>({
             query: (body) => ({ url: "/report", method: "POST", body }),
         }),
+
+        /**
+         * Dynamic franchise harvest (discovery source "A"). The worker derives
+         * TMDB-popular collection ids from `belongs_to_collection` and edge-caches
+         * them ~12h, so this replaces the old client-side harvest (~15 TMDB
+         * round-trips). The Franchises rail merges these with its curated seed +
+         * the user's opened collections. Fails soft → `[]` (rail shows seed + own).
+         */
+        franchises: build.query<number[], void>({
+            query: () => "/franchises",
+            transformResponse: (r: { collectionIds?: number[] }) => r?.collectionIds ?? [],
+            keepUnusedDataFor: 3600, // 1h client cache (worker holds it ~12h)
+        }),
     }),
 });
 
@@ -78,4 +91,5 @@ export const {
     useLazyScrapeTitleQuery,
     usePurgeCacheMutation,
     useReportOutcomeMutation,
+    useFranchisesQuery,
 } = workerApi;

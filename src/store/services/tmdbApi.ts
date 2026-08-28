@@ -142,9 +142,53 @@ export const tmdbApi = createApi({
                 queryFn: wrapQuery(({ page }) => `trending/all/day?page=${page}`),
                 keepUnusedDataFor: 120,
             }),
+
+            // --- Collections (D2) -------------------------------------------
+            // Full collection incl. `parts[]` — powers the Collection screen.
+            collection: build.query<any, number | string>({
+                queryFn: wrapQuery((id) => `collection/${id}`),
+                keepUnusedDataFor: 600,
+            }),
+            // Light batch: fetch several collections in parallel, keep only the
+            // ones with a poster. Powers the Home "Franchises" rail (cards only,
+            // no `parts` needed). One hook instead of N — see FranchisesRail.
+            collections: build.query<CollectionCard[], number[]>({
+                queryFn: async (ids) => {
+                    try {
+                        const results = await Promise.all(
+                            ids.map((id) => raw(`collection/${id}`).catch(() => null)),
+                        );
+                        const cards: CollectionCard[] = results
+                            .filter((c: any) => c && c.poster_path)
+                            .map((c: any) => ({
+                                id: c.id,
+                                name: c.name,
+                                poster_path: c.poster_path,
+                                backdrop_path: c.backdrop_path ?? null,
+                            }));
+                        return { data: cards };
+                    } catch (e: any) { return { error: e.message }; }
+                },
+                keepUnusedDataFor: 600,
+            }),
+            searchCollection: build.query<any, { query: string; page: number }>({
+                queryFn: wrapQuery(({ query, page }) => `search/collection?query=${encodeURIComponent(query)}&page=${page}`),
+                keepUnusedDataFor: 120,
+            }),
+            // NOTE: the TMDB-popular franchise harvest (discovery source "A") moved
+            // SERVER-SIDE to the worker's GET /franchises (see worker/src/franchises.ts
+            // + workerApi `franchises`), so the ~15 client-side detail fetches are gone.
         };
     },
 });
+
+/** A collection reduced to what a rail/search card needs. */
+export interface CollectionCard {
+    id: number;
+    name: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+}
 
 export const {
     useListQuery,
@@ -163,4 +207,8 @@ export const {
     useLazySearchPersonQuery,
     useLazyDiscoverByProviderQuery,
     useLazyTrendingAllDayQuery,
+    useCollectionQuery,
+    useCollectionsQuery,
+    useSearchCollectionQuery,
+    useLazySearchCollectionQuery,
 } = tmdbApi;

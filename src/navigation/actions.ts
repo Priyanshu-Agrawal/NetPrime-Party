@@ -40,6 +40,10 @@ export function openSeeAll(title: string, path: string, kind: "movie" | "tv") {
   navigate("PlayerStack", { screen: "RailSeeAll", params: { title, path, kind } });
 }
 
+export function openCollection(id: number | string) {
+  navigate("PlayerStack", { screen: "Collection", params: { id } });
+}
+
 export function openPartyHost(params: PartyParams) {
   navigate("Party", params);
 }
@@ -83,6 +87,17 @@ export function exitMedia() {
       routes: [{ name: "MainTabs" }],
     }),
   );
+}
+
+/** Leave the player back to where the user actually came from — a real stack pop
+ *  (Player → Details → Collection → …), so closing a title opened from a Collection
+ *  returns to that Collection, not Home. Falls back to the hard reset only when
+ *  there is no history to pop (e.g. a param-less `bearoom://player` deep link that
+ *  opened straight into the Player). */
+export function exitMediaBack() {
+  if (!navigationRef.isReady()) return;
+  if (navigationRef.canGoBack()) navigationRef.goBack();
+  else exitMedia();
 }
 
 export function finishOnboarding() {

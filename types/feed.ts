@@ -18,10 +18,15 @@ export interface TmdbRailSection extends FeedSectionBase {
   seeAll?: boolean;
   limit?: number;
 }
-export interface SimpleSection extends FeedSectionBase {
-  type: "continueWatching" | "becauseYouWatched" | "genreRow" | "franchises" | "editorialRow";
+export interface FranchisesSection extends FeedSectionBase {
+  type: "franchises";
+  collectionIds: number[]; // curated TMDB collection ids — editable server-side (D2)
+  dynamic?: boolean;       // merge in the TMDB-popular harvest + the user's opened collections
 }
-export type FeedSection = TmdbRailSection | SimpleSection;
+export interface SimpleSection extends FeedSectionBase {
+  type: "continueWatching" | "becauseYouWatched" | "genreRow" | "editorialRow";
+}
+export type FeedSection = TmdbRailSection | FranchisesSection | SimpleSection;
 
 export interface FeedManifest {
   version: number;         // schema version; bump only on a breaking shape change
