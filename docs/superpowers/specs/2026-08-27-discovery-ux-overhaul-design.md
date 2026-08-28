@@ -1,6 +1,6 @@
 # Discovery UX Overhaul — Design Spec
 
-**Status:** IN PROGRESS. **D1** (feed foundation) + **D1.1** (For-You rail) **shipped & committed**; perf/resilience + connectivity/offline UX shipped. **D2 (Collections) — core done & device-verified, UNCOMMITTED** (endpoints, `Collection` screen, "Part of X" chip, Franchises rail, curated fallback; collections-in-search deferred to D4). Plan: `docs/superpowers/plans/2026-08-27-discovery-d2-collections.md`. **D3 (genre browse) next**, then D4 (search rework, absorbs collections-in-search). **Owner gate:** per-phase `writing-plans` → implement.
+**Status:** IN PROGRESS. **D1** (feed foundation) + **D1.1** (For-You rail) **shipped & committed**; perf/resilience + connectivity/offline UX shipped. **D2 (Collections) shipped & committed** (`c34d1ed` + worker `/franchises` `8309d28`): endpoints, `Collection` screen, "Part of X" chip, Franchises rail, curated fallback; collections-in-search deferred to D4. Plan: `docs/superpowers/plans/2026-08-27-discovery-d2-collections.md`. **D3 (Genre browse) + Home rework shipped & device-verified 2026-08-28, UNCOMMITTED**: `genreList(kind)` endpoint; `GenreChipsRow` = ONE row with an **animated Movie/TV toggle** (shared `components/home/KindToggle.tsx`); discover-by-genre grid **reusing `RailSeeAll`** (no separate `GenreBrowse` screen — see §8); `BrowseHeader` moods → real genre IDs. **Home arrangement reworked** so discovery sits high, and a **new "Popular in {country}" rail** added at feed **position 3** (`regionPopular` — mixed local movie+TV via CF-detected region, with a Movies/Series toggle; §8.5). Worker Zod `FeedSection` completed for `genreRow`/`franchises`/`regionPopular`; `/config` now returns CF `region` (`AppConfig.region`, worker change local/undeployed; client `useRegion()` defaults `IN`). **D4 (search rework)** next (absorbs collections-in-search + genre filters). **Owner gate:** per-phase `writing-plans` → implement.
 
 ## 1. Context & goal
 
@@ -139,6 +139,12 @@ No renderer changes, no navigation rewiring, no manifest-format migration for ad
 - **`GenreChipsRow`** (the `genreRow` section) → taps open **`GenreBrowse`** screen (new route `{ id, name, kind }`) = the `TrendingShowsView` grid fed by `discover/{kind}?with_genres={id}&sort_by=popularity.desc`.
 - Replaces the fake "mood" *text* queries in `BrowseHeader` with real genre IDs.
 
+**SHIPPED 2026-08-28 (device-verified, uncommitted):** `genreList(kind)` (`genre/{movie|tv}/list`) + `useGenreListQuery`; `GenreChipsRow` renders the `genreRow` section as **ONE row with an animated Movie/TV toggle** — the shared `components/home/KindToggle.tsx` (a Reanimated sliding-thumb segmented control, `withTiming` + selection haptic; NOT a layout animation) — switching which TMDB genre set the chips show. `openGenre(id,name,kind)` builds `discover/{kind}?with_genres={id}&sort_by=popularity.desc` and routes to the **existing `RailSeeAll` grid** — a **deliberate deviation** from the "new `GenreBrowse` screen" above (reuse/YAGNI; a dedicated screen stays trivial to split out later). `BrowseHeader` mood tiles now open genre browse (Action 28 / Comedy 35 / Sci-Fi 878) instead of literal text search. `GenreRowSection { kind? }` promoted in `types/feed.ts` (D1 had stubbed genreRow into `SimpleSection`, which has no `kind`). NOTE: the earlier "movie + TV genreRow rows" were collapsed into the single toggle row during the Home-arrangement rework.
+
+## 8.5 Popular in your region (local content) — SHIPPED 2026-08-28 (uncommitted)
+
+A **"Popular in {country}"** rail of locally-produced content at feed **position 3** (right after the personalized rails, above the content tail). TMDB has NO region-ranked popularity (verified), so it approximates via `discover/{movie|tv}?with_origin_country={CC}&vote_count.gte=50&sort_by=popularity.desc` — the `vote_count` floor drops the long-tail (0-vote daily serials), and a **per-region flagship language** biases to hits (`IN → &with_original_language=hi`, Bollywood-forward; unmapped regions use origin-country only). A new `regionPopular` feed section → `RegionPopularRail` fetches BOTH kinds, and a **Movies/Series toggle** (the same shared `KindToggle`) filters which shows — films and serials browsed SEPARATELY, not mixed. Region = Cloudflare `request.cf.country` returned in `/config` (`AppConfig.region`; worker change **local/undeployed**) with a **client `useRegion()` default of `IN`**, so the rail runs on-device without a deploy. Global "Popular Movies/Series" rails stay untouched (purely additive). New surfaces: `tmdbApi.regionPopular`, `components/home/RegionPopularRail.tsx`, `components/home/KindToggle.tsx`, `providersSlice.region` + `useRegion()`, worker Zod `regionPopular` + `AppConfig.region`.
+
 ## 9. Search rework (D4)
 
 - Add **catalog filters** (genre / year / `sort_by`) to `useSearchData` (drive `discover` in browse, keep `search/*` for text) + the `Collections` results section from D2.
@@ -165,8 +171,8 @@ No renderer changes, no navigation rewiring, no manifest-format migration for ad
 
 - **D1 — Server-driven feed foundation:** `types/feed.ts`, `data/homeFeedFallback.ts`, `utils/normalizeManifest.ts`, `<FeedSection>`, `HomeView` rewrite, extend `AppConfig` + `AppConfigSchema` with `homeFeed` (in the existing `/config`), a generic `RailSeeAll` screen (for `tmdbRail.seeAll`), `BecauseYouWatchedRail`, `GenreChipsRow` (chips inert until D3). *Ships: today's Home, now fallback-rendered + server-drivable, + 2 new rails.*
 - **D2 — Collections:** endpoints, "Part of X" chip, `Collection` screen, `Franchises` rail, collections-in-search.
-- **D3 — Genre browse:** genre endpoint, `GenreBrowse` screen, wire `GenreChipsRow`, retire mood-text queries.
-- **D4 — Search rework:** catalog filters + collections section.
+- **D3 — Genre browse + Home rework:** ✅ SHIPPED 2026-08-28 (device-verified, uncommitted). genre endpoint; `GenreChipsRow` = animated Movie/TV toggle (shared `KindToggle`); reused `RailSeeAll` (no `GenreBrowse` screen); retire mood-text queries. **+ Home arrangement rework + new "Popular in {region}" rail — `regionPopular`, Movies/Series toggle (§8.5).**
+- **D4 — Search rework:** catalog filters + collections section. NEXT.
 
 ## 13. Verification
 

@@ -28,7 +28,7 @@ Dependency-ordered, each phase independently shippable:
 
 | Phase | Scope | Notes |
 |---|---|---|
-| **P0** | TMDB-utilization deltas | `collection/{id}`, `search/collection`, next-episode helper, genre list; wire recommendations/similar into "Up Next". Small, unblocks queue sources. |
+| **P0** | TMDB-utilization deltas | ✅ `collection/{id}`, `search/collection` (Discovery D2), **genre list** (`genreList`) + **region-popular discover** (`with_origin_country`, "Popular in your region" rail) (Discovery D3 · 2026-08-28); next-episode helper + recommendations/similar into "Up Next" still open. Small, unblocks queue sources. |
 | **P1** | Queue + medialess room + floating tray | The spine. Party schema single-media → queue. Provable with today's TMDB playback. Absorbs "play-next queue" + "episode selector". |
 | **P2** | Unified native player + `direct` source | `expo-video` behind the player interface; paste a direct link → queue → play → sync. |
 | **P3** | YouTube source + playlists + TMDB-videos bridge | Extractor adapter (or IFrame — open decision); playlists expand into items. |
