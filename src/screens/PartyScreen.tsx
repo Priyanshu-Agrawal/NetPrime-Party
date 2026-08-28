@@ -41,7 +41,7 @@ import { Image } from "expo-image";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { img } from "@/utils/tmdbDetails";
-import { exitMedia } from "@/src/navigation/actions";
+import { exitMedia, exitMediaBack } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "@/src/navigation/types";
@@ -266,7 +266,11 @@ export default function Party() {
     title: "Leave the party?",
     message: "You'll leave this watch room and stop syncing with everyone.",
     confirmLabel: "Leave",
-    onConfirm: exitMedia,
+    // Pop back to where the party was launched from (the title's details) instead
+    // of resetting to Home — same real-back fix as the solo player. Falls back to
+    // the reset only when there's no history (e.g. a deep-linked join). Kicked-out
+    // (below) stays a hard reset — that's a forced, terminal exit.
+    onConfirm: exitMediaBack,
     enabled: hasMedia,
   });
 
