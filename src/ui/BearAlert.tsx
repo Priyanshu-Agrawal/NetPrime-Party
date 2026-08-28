@@ -7,9 +7,6 @@ import React, { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Frost } from "./Frost";
 
-// Ripple tints: dark reads on the bright honey button, light on the dark ghost/danger.
-const RIPPLE_LIGHT = "rgba(255,255,255,0.13)";
-const RIPPLE_DARK = "rgba(0,0,0,0.16)";
 
 /** Crisp tactile tick on button press — a destructive action gets a heavier bump
  *  so a "Close/Delete" feels weightier than a "Stay". Best-effort (no-op if the
