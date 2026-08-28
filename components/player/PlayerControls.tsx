@@ -304,11 +304,14 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               {topBar}
             </View>
           ) : onBack || title ? (
-            // The solo player sits inside a SafeAreaView (already padded by the status-bar
-            // inset), and in landscape the status bar is hidden — so DON'T add insets.top
-            // again here (that double-inset pushed the header too far down). A flat offset
-            // lands it right under the status bar, matching the detail-screen header.
-            <View style={[styles.topRow, { top: ms(14) }]} pointerEvents="box-none">
+            // The player is now full-bleed (its SafeAreaView drops the top edge so the
+            // video/loading backdrop reaches behind the status bar), so the header adds the
+            // top inset ITSELF — same as topBarCustom above. Landscape hides the status bar
+            // → flat ms(10). Matches the detail-screen header offset.
+            <View
+              style={[styles.topRow, { top: fullscreen ? ms(10) : Math.max(insets.top, ms(10)) }]}
+              pointerEvents="box-none"
+            >
               {onBack ? (
                 <Pressable
                   style={({ pressed }) => [styles.topBackBtn, pressed && styles.pressed]}

@@ -50,7 +50,7 @@ import { img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useKeepAwake } from "expo-keep-awake";
-import { exitMedia, openPartyHost } from "@/src/navigation/actions";
+import { exitMediaBack, openPartyHost } from "@/src/navigation/actions";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -59,7 +59,7 @@ import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "@/hooks/useResponsive";
 
 /**
@@ -79,6 +79,7 @@ export const PlayerScreen: React.FC = () => {
     route.params ?? ({} as (typeof route)["params"]);
 
   const navigation = useNavigation<NativeStackNavigationProp<PlayerStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   // Hardware back is handled contextually first (exit fullscreen before prompting
   // "Stop watching?"), mirroring the overlay back button. Assigned live below, once
@@ -89,7 +90,7 @@ export const PlayerScreen: React.FC = () => {
     title: "Stop watching?",
     message: "This will close the player.",
     confirmLabel: "Close",
-    onConfirm: exitMedia,
+    onConfirm: exitMediaBack,
     beforeClose: () => backInterceptRef.current(),
   });
 
@@ -588,7 +589,10 @@ export const PlayerScreen: React.FC = () => {
   return (
     <>
       <StatusBar style="light" translucent hidden={isImmersive} />
-      <SafeAreaView style={styles.container}>
+      {/* Immersive: the player + its loading backdrop go full-bleed to the top (behind
+          the translucent status bar), like the detail screens — only the floating back
+          button and the bottom control bar respect the safe area (top edge dropped). */}
+      <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
         <View style={isImmersive ? styles.playerFs : styles.playerArea}>
           {id && selected ? (
             <>
@@ -685,6 +689,24 @@ export const PlayerScreen: React.FC = () => {
         {selected ? <HijackHint provider={selected} /> : null}
       </SafeAreaView>
 
+      {/* Pre-playback escape hatch. The branded loading cover is pointer-through and
+          PlayerControls (with its own back) only mounts once the video binds — so
+          during loading / a not-found wall / an error there'd otherwise be no way
+          back (the Player also has swipe-back disabled). A plain no-blur chip
+          (video-screen-safe); taps go straight back with no "Stop watching?" confirm
+          since nothing is playing yet. Hidden in immersive/landscape (chrome-free). */}
+      {!playerBound && !isImmersive ? (
+        <TouchableOpacity
+          style={[styles.loadingBack, { top: insets.top + ms(8) }]}
+          onPress={exitMediaBack}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        </TouchableOpacity>
+      ) : null}
+
       {/* Fullscreen-rotation cover — a sibling of the whole screen so it hides the WebView
           reflow, the OS rotation, AND the UI that re-appears on collapse. Mounted only
           during a toggle; opaque on mount (same commit as the layout change → no leak),
@@ -760,6 +782,20 @@ export const PlayerScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.black },
+  loadingBack: {
+    position: "absolute",
+    left: ms(12),
+    width: ms(38),
+    height: ms(38),
+    borderRadius: ms(19),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.14)",
+    zIndex: 60,
+    elevation: 60,
+  },
   playerArea: { flex: 1, backgroundColor: colors.black },
   // Portrait: a 16:9 pane pinned to the top, so the overlay header sits ON the video
   // (not floating in the black margin above a centered video).

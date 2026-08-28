@@ -3,6 +3,7 @@
  */
 import { defaultHijackProvider } from "@/components/player/providerRegistry";
 import { itemTitle, itemType, itemYear, type MediaItem } from "@/utils/tmdbLists";
+import { isReleased } from "@/utils/release";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -136,6 +137,7 @@ export function HeroCarousel() {
         onMomentumScrollEnd={onScrollEnd}
         renderItem={({ item }) => {
           const type = itemType(item, "movie");
+          const released = isReleased(item, type);
 
           return (
             <Pressable style={styles.slide} onPress={() => openDetails(item, "movie")}>
@@ -173,7 +175,12 @@ export function HeroCarousel() {
                   </Text>
                 ) : null}
                 <View style={styles.actions}>
-                  <Button label="Play" icon="play" onPress={() => play(item)} size="xs" />
+                  <Button
+                    label={released ? "Play" : "Coming soon"}
+                    icon={released ? "play" : "time-outline"}
+                    onPress={() => (released ? play(item) : openDetails(item, "movie"))}
+                    size="xs"
+                  />
                   <Button
                     label="Details"
                     icon="information-circle-outline"

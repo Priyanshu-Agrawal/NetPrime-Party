@@ -17,6 +17,8 @@ import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsi
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { RAIL_LIST_PROPS } from "@/utils/listPerf";
+import { isReleased, releaseLabel } from "@/utils/release";
+import { recordCollection } from "@/utils/collectionMemory";
 import { genRoomCode } from "@/utils/roomCode";
 import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import {
@@ -36,7 +38,7 @@ import { Frost } from "@/src/ui/Frost";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
-import { goBack, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
+import { goBack, openCollection, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { PlayerStackParamList } from "@/src/navigation/types";
@@ -82,6 +84,15 @@ const MovieDetailsScreen: React.FC = () => {
     setSaved(isInWatchlist(id!, "movie"));
   }, [id]);
 
+  // Personalized franchise harvest (source "B"): remember this movie's collection
+  // so the Home Franchises rail grows toward the sagas the user actually opens
+  // (merged with the curated seed + the TMDB-popular harvest). See collectionMemory.
+  // Keyed on the collection id (not the object) so it records once, not per render.
+  useEffect(() => {
+    recordCollection(d?.belongs_to_collection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d?.belongs_to_collection?.id]);
+
   const toggleSave = () => {
     if (!d) return;
     setSaved(toggleWatchlist({ id: id!, type: "movie", title: d.title, poster_path: d.poster_path }));
@@ -126,7 +137,13 @@ const MovieDetailsScreen: React.FC = () => {
     );
   }
 
+  // A title can sit in lists/collections (e.g. "Upcoming", an announced sequel)
+  // long before it exists to stream — playing it just hits the provider's dead-end
+  // wall. Gate the Play affordance on real release status (date + TMDB status).
+  const released = isReleased(d, "movie");
+
   const handlePlay = () => {
+    if (!released) return;
     void addToWatchHistory({
       id: id?.toString(),
       title: d.title,
@@ -222,22 +239,36 @@ const MovieDetailsScreen: React.FC = () => {
         {/* Primary actions */}
         <Appear index={0}>
         <View style={styles.actions}>
-          <Button
-            label="Play"
-            icon="play"
-            variant="honey"
-            size="sm"
-            onPress={handlePlay}
-            style={styles.flexBtn}
-          />
-          <Button
-            label="Watch together"
-            icon="paw"
-            variant="glass"
-            size="sm"
-            onPress={handleWatchTogether}
-            style={styles.flexBtn}
-          />
+          {released ? (
+            <>
+              <Button
+                label="Play"
+                icon="play"
+                variant="honey"
+                size="sm"
+                onPress={handlePlay}
+                style={styles.flexBtn}
+              />
+              <Button
+                label="Watch together"
+                icon="paw"
+                variant="glass"
+                size="sm"
+                onPress={handleWatchTogether}
+                style={styles.flexBtn}
+              />
+            </>
+          ) : (
+            <Button
+              label={releaseLabel(d, "movie")}
+              icon="time-outline"
+              variant="glass"
+              size="sm"
+              disabled
+              onPress={() => {}}
+              style={styles.flexBtn}
+            />
+          )}
         </View>
         </Appear>
 
@@ -278,6 +309,20 @@ const MovieDetailsScreen: React.FC = () => {
             ) : null}
           </View>
           </Appear>
+        ) : null}
+
+        {d.belongs_to_collection ? (
+          <Pressable
+            style={({ pressed }) => [styles.collectionChip, pressed && styles.collectionChipPressed]}
+            onPress={() => openCollection(d.belongs_to_collection.id)}
+            hitSlop={6}
+          >
+            <Ionicons name="albums-outline" size={ms(15)} color={colors.honey} />
+            <Text style={styles.collectionChipText} numberOfLines={1}>
+              Part of {d.belongs_to_collection.name}
+            </Text>
+            <Ionicons name="chevron-forward" size={ms(14)} color={colors.textDim} />
+          </Pressable>
         ) : null}
 
         {derived!.cast.length ? (
@@ -469,6 +514,21 @@ const styles = StyleSheet.create({
   overviewWrap: { paddingHorizontal: 16, marginTop: 20 },
   overview: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14), lineHeight: 21 },
   moreLink: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(13), marginTop: 4 },
+  collectionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(8),
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(14),
+    borderRadius: radius.md,
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honey,
+  },
+  collectionChipPressed: { opacity: 0.72 },
+  collectionChipText: { flex: 1, color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
 
   clip: {
     width: 240,

@@ -59,7 +59,8 @@ export type PlayerEventType =
   | "exitfullscreen"
   | "quality"
   | "audio"
-  | "gesture"; // first user interaction inside the WebView (play-intent signal)
+  | "gesture" // first user interaction inside the WebView (play-intent signal)
+  | "notFound"; // provider "we couldn't find that" wall — no <video> will ever bind
 
 /** A fatal, main-frame playback failure surfaced to the host for fallback. */
 export interface FatalError {
@@ -158,6 +159,30 @@ const RELAY_FAN_JS =
 // (worker /scripts) and cached in MMKV. Source of truth: src/scripts/legacy-videasy.ts
 // (uploaded via scripts/upload-bridge.ts). Injected per-provider in the WebView below.
 
+// Not-found wall watcher — a SMALL, BUNDLED (non-OTA) scanner injected alongside the
+// bridge. Providers answer "no such title" with an HTTP-200 branded wall (e.g. videasy's
+// "We couldn't find that / We have searched through our providers…"), so no <video> ever
+// binds and no HTTP error fires — the player would otherwise just spin, then reveal that
+// raw wall. This polls the page text for the wall signature (ONLY while no <video>
+// exists, so it can't fire over a playing-but-unbound frame) and posts a nonce-stamped
+// `notFound`, letting the host show its OWN skinned overlay instead of the raw wall.
+// Injected into every frame (the wall may live in a provider sub-frame) and captures the
+// nonce synchronously BEFORE the bridge deletes window.__vlMsgNonce (bridge runs next).
+const WALL_WATCH_JS = `(function(){try{
+var N=window.__vlMsgNonce;
+if(window.__vlWall)return;window.__vlWall=1;
+var S=["couldn't find that","couldnt find that","could not find that","we couldn't find","we could not find","searched through"];
+var n=0;
+var iv=setInterval(function(){
+n++;
+try{if(document.getElementsByTagName('video').length){clearInterval(iv);return;}}catch(e){}
+var t='';try{t=((document.body&&(document.body.innerText||document.body.textContent))||'').toLowerCase();}catch(e){}
+for(var i=0;i<S.length;i++){if(t.indexOf(S[i])!==-1){clearInterval(iv);
+try{window.ReactNativeWebView.postMessage(JSON.stringify({event:'notFound',__n:N}));}catch(e){}return;}}
+if(n>=40)clearInterval(iv);
+},1000);
+}catch(e){}})();`;
+
 export const HijackPlayer = forwardRef<PlayerHandle, Props>(
   (
     {
@@ -198,6 +223,10 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const nonceStrictRef = useRef(false);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
+    // A provider "we couldn't find that" wall (detected by WALL_WATCH_JS) — no <video>
+    // will ever bind, so we show our own skinned "no stream" overlay instead of leaving
+    // the spinner up forever / revealing the raw provider wall.
+    const [noSource, setNoSource] = useState(false);
     // The "still syncing" banner appears at the 30s bind timeout. Some providers
     // (e.g. videasy on iOS) autoplay in a frame our bridge can't reach — the video
     // is PLAYING even though we never bound — so the banner is misleading and must
@@ -241,6 +270,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const reloadNow = useCallback(() => {
       setBound(false);
       setSlow(false);
+      setNoSource(false);
       boundRef.current = false;
       setFatalError(null);
       setRemountNonce((n) => n + 1); // remount the WebView → fresh renderer + load
@@ -480,6 +510,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       boundRef.current = false;
       setBound(false);
       setSlow(false);
+      setNoSource(false);
       setBannerRetired(false);
       const t = setTimeout(() => {
         if (!boundRef.current) {
@@ -519,6 +550,12 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         // isn't broken by a not-yet-redeployed bridge.
         if (e.__n === relayNonce) nonceStrictRef.current = true;
         else if (nonceStrictRef.current) return;
+        // Provider not-found wall (WALL_WATCH_JS): no <video> will ever bind, so surface
+        // our own skinned "no stream" overlay. Ignore once a real video has bound.
+        if (e.event === "notFound") {
+          if (!boundRef.current) setNoSource(true);
+          return;
+        }
         // Drop duplicates posted by a SECOND injected frame (the bridge runs in every
         // frame). Two mechanisms because the two event kinds duplicate differently:
         const now = Date.now();
@@ -539,6 +576,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           boundRef.current = true;
           setBound(true);
           setSlow(false);
+          setNoSource(false);
           onBound?.();
         }
         onPlayerEvent?.(e);
@@ -582,6 +620,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             // can capture + delete it at documentStart, before any page/ad script
             // runs. Then the cached bridge, then the command-relay listener.
             `;window.__vlMsgNonce=${JSON.stringify(relayNonce)};` +
+            WALL_WATCH_JS +
             (getCachedScript(providerId) ?? "") +
             relayListenerJs
           }
@@ -619,7 +658,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             The blurred poster uses expo-image's STATIC blurRadius (a Glide/CoreImage
             transform, NOT a live backdrop capture) — safe over the player, and it
             unmounts before the video plays, so it never touches the stutter rule. */}
-        {!bound && !slow && !fatalError && (
+        {!bound && !slow && !noSource && !fatalError && (
           // Cover lifts on BIND (the bridge found the <video> — the proven, reliable,
           // cross-platform signal), NOT on a fragile "first painted frame" signal that
           // could leave the video masked behind "Loading" forever. Also lifts once the
@@ -672,11 +711,34 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           </View>
         )}
         {/* Slow to bind — keep the WebView mounted (finder keeps polling), just warn. */}
-        {!bound && slow && !fatalError && !bannerRetired && (
+        {!bound && slow && !noSource && !fatalError && !bannerRetired && (
           <View style={styles.banner} pointerEvents="none">
             <Text style={styles.bannerText}>
               Still syncing {provider.name}… if it doesn’t start, try another server.
             </Text>
+          </View>
+        )}
+        {/* Provider not-found wall → our OWN skinned overlay (never the raw provider
+            HTML). Opaque + tappable — a terminal "no stream on this source" state. The
+            screen-level back chip (PlayerScreen) sits above for "go back". */}
+        {!bound && noSource && !fatalError && (
+          <View style={styles.errorOverlay}>
+            <Ionicons name="film-outline" size={46} color={colors.textDim} />
+            <Text style={styles.errorTitle}>No stream found</Text>
+            <Text style={styles.errorSub} numberOfLines={2}>
+              {provider.name} couldn’t find this title. Try a different source.
+            </Text>
+            <View style={styles.errorBtns}>
+              {onSwitchSource ? (
+                <TouchableOpacity onPress={switchSource} style={styles.errorPrimary} hitSlop={8}>
+                  <Ionicons name="swap-horizontal" size={16} color={colors.onHoney} />
+                  <Text style={styles.errorPrimaryText}>Try another source</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity onPress={manualRetry} style={styles.errorGhost} hitSlop={8}>
+                <Text style={styles.errorGhostText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
         {/* Branded fatal-error overlay — covers the WebView's raw net::ERR page.

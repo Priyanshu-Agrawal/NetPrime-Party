@@ -17,6 +17,7 @@ import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
 import { addToWatchHistory } from "@/utils/history";
 import { RAIL_LIST_PROPS } from "@/utils/listPerf";
+import { isReleased, releaseLabel } from "@/utils/release";
 import { isInWatchlist, toggleWatchlist } from "@/utils/watchlist";
 import { genRoomCode } from "@/utils/roomCode";
 import {
@@ -136,6 +137,11 @@ const TvDetailsScreen: React.FC = () => {
     );
   }
 
+  // Gate playback on real release status (see MovieDetails). A future first_air_date
+  // / pre-release status → no Play; the per-episode rows below additionally gate on
+  // each episode's air_date so unaired episodes of a live show aren't playable either.
+  const released = isReleased(d, "tv");
+
   const playEpisode = (ep: number, sea = season) => {
     void addToWatchHistory({
       id: id?.toString(),
@@ -159,6 +165,7 @@ const TvDetailsScreen: React.FC = () => {
   };
 
   const handlePlay = () => {
+    if (!released) return;
     const firstEp = seasonData?.episodes?.[0]?.episode_number ?? 1;
     playEpisode(firstEp);
   };
@@ -253,22 +260,36 @@ const TvDetailsScreen: React.FC = () => {
         {/* Primary actions */}
         <Appear index={0}>
         <View style={styles.actions}>
-          <Button
-            label="Play"
-            icon="play"
-            variant="honey"
-            size="sm"
-            onPress={handlePlay}
-            style={styles.flexBtn}
-          />
-          <Button
-            label="Watch together"
-            icon="paw"
-            variant="glass"
-            size="sm"
-            onPress={handleWatchTogether}
-            style={styles.flexBtn}
-          />
+          {released ? (
+            <>
+              <Button
+                label="Play"
+                icon="play"
+                variant="honey"
+                size="sm"
+                onPress={handlePlay}
+                style={styles.flexBtn}
+              />
+              <Button
+                label="Watch together"
+                icon="paw"
+                variant="glass"
+                size="sm"
+                onPress={handleWatchTogether}
+                style={styles.flexBtn}
+              />
+            </>
+          ) : (
+            <Button
+              label={releaseLabel(d, "tv")}
+              icon="time-outline"
+              variant="glass"
+              size="sm"
+              disabled
+              onPress={() => {}}
+              style={styles.flexBtn}
+            />
+          )}
         </View>
         </Appear>
 
@@ -352,10 +373,13 @@ const TvDetailsScreen: React.FC = () => {
               }}
             />
             {seasonData ? (
-              (seasonData.episodes ?? []).map((ep: any) => (
+              (seasonData.episodes ?? []).map((ep: any) => {
+                const aired = isReleased({ first_air_date: ep.air_date }, "tv");
+                return (
                 <Pressable
                   key={ep.id}
-                  style={styles.episode}
+                  style={[styles.episode, !aired && { opacity: 0.5 }]}
+                  disabled={!aired}
                   onPress={() => playEpisode(ep.episode_number)}
                 >
                   <View style={styles.epStillWrap}>
@@ -367,7 +391,11 @@ const TvDetailsScreen: React.FC = () => {
                       </View>
                     )}
                     <View style={styles.epPlay}>
-                      <Ionicons name="play" size={18} color={colors.text} />
+                      <Ionicons
+                        name={aired ? "play" : "time-outline"}
+                        size={18}
+                        color={aired ? colors.text : colors.textDim}
+                      />
                     </View>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -391,7 +419,8 @@ const TvDetailsScreen: React.FC = () => {
                     ) : null}
                   </View>
                 </Pressable>
-              ))
+                );
+              })
             ) : (
               <EpisodeRowSkeleton />
             )}
