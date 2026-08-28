@@ -83,7 +83,9 @@ export const LEGACY_VIDEASY_BRIDGE: string = `
     return null;
   }
   function keepAlive(){
-    if (!vid) vid = findVideo(document);
+    // bind() (not a bare vid= assignment): setting vid without binding would leave the
+    // finder's guard thinking the video is already handled, so ready never posts.
+    if (!vid) { var __kv = findVideo(document); if (__kv) bind(__kv); }
     if (!vid) return;
     if (document.hidden && wasPlaying && vid.paused) {
       markApplying();
@@ -108,8 +110,13 @@ export const LEGACY_VIDEASY_BRIDGE: string = `
   // Persistent finder (NOT one-shot): videasy tears the <video> down when it reverts
   // to its poster on pause and mounts a FRESH element on resume, so a bind-once finder
   // would leave the vid ref pointing at a detached, dead element (resume no-ops). Keep
-  // polling: drop a detached vid, and (re)bind whenever the live <video> differs from
-  // the bound one. bind() is idempotent (guards on v.__vlBound).
+  // polling: drop a detached vid, and (re)bind any UNBOUND <video> we find. The guard is
+  // !v.__vlBound, NOT v!==vid: keepAlive / a tick could set vid to a freshly created
+  // video WITHOUT binding it, and then v!==vid is false so bind() -- and the ready it
+  // posts -- never fires, leaving the video playing under the provider's OWN controls
+  // (the intermittent no-bind race, caught via HJDBG logs: gesture + ticks but no ready).
+  // bind() is idempotent, so testing __vlBound each tick is safe and also rebinds the
+  // fresh element videasy mounts on resume.
   setInterval(function(){
     // isConnected (not document.contains): findVideo may bind a <video> inside a
     // same-origin sub-iframe, which the TOP document doesn't "contain" — isConnected
@@ -117,7 +124,7 @@ export const LEGACY_VIDEASY_BRIDGE: string = `
     // videasy actually removes it.
     if (vid && vid.isConnected === false) vid = null;
     var v = findVideo(document);
-    if (v && v !== vid) bind(v);
+    if (v && !v.__vlBound) bind(v);
   }, 700);
   document.addEventListener('visibilitychange', function(){
     if (!document.hidden) return;

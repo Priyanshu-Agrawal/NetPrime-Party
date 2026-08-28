@@ -661,6 +661,17 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           // can't reach (contentDocument throws) → never binds. Running the bridge in
           // each frame lets the finder bind the video from inside its own frame.
           injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}
+          // Redundant AFTER-load re-injection of the bridge — a backstop for the
+          // intermittent "plays under the provider's OWN controls, never binds" bug.
+          // injectedJavaScriptBeforeContentLoaded occasionally doesn't run for a load
+          // (a known WebView race); when it doesn't, the bridge never injects, no
+          // <video> is ever found, AND no `gesture` fires — so the no-bind fallback is
+          // gated off and the title just plays under the provider's UI. This after-load
+          // pass (which RN runs far more reliably) re-injects the bridge for the top
+          // frame; idempotent — a no-op when the pre-load injection already ran (the
+          // bridge guards on window.__vlBridge). Empty during a grace-window scriptless
+          // load (getCachedScript null) — same graceful degrade as before.
+          injectedJavaScript={getCachedScript(providerId) ?? ""}
           onMessage={(ev) => handleMessage(ev.nativeEvent.data)}
           onLoadStart={(ev) => {
             erroredThisLoadRef.current = false; // fresh load — clear the per-load error flag
