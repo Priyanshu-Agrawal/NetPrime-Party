@@ -135,6 +135,7 @@ const SearchView: React.FC = () => {
               { id: "movie", label: "Movies" },
               { id: "tv", label: "TV Shows" },
               { id: "person", label: "People" },
+              { id: "collection", label: "Collections" },
             ]}
             keyExtractor={(item) => item.id}
             style={styles.filterList}

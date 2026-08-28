@@ -5,11 +5,12 @@ import {
   useLazySearchMovieQuery,
   useLazySearchTvQuery,
   useLazySearchPersonQuery,
+  useLazySearchCollectionQuery,
   useLazyTrendingAllDayQuery,
 } from "@/src/store/services/tmdbApi";
 import type { MediaItem } from "@/utils/tmdbLists";
 
-export type SearchType = "multi" | "movie" | "tv" | "person";
+export type SearchType = "multi" | "movie" | "tv" | "person" | "collection";
 
 function filterResults(items: unknown[], searchType: SearchType): MediaItem[] {
   return (items ?? []).filter((item: any) => {
@@ -43,6 +44,7 @@ export function useSearchData() {
   const [fetchMovie] = useLazySearchMovieQuery();
   const [fetchTv] = useLazySearchTvQuery();
   const [fetchPerson] = useLazySearchPersonQuery();
+  const [fetchCollection] = useLazySearchCollectionQuery();
 
   // Data State
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -131,6 +133,8 @@ export function useSearchData() {
         data = await fetchTv({ query, page: pageNum }).unwrap();
       } else if (type === "person") {
         data = await fetchPerson({ query, page: pageNum }).unwrap();
+      } else if (type === "collection") {
+        data = await fetchCollection({ query, page: pageNum }).unwrap();
       } else {
         data = await fetchMulti({ query, page: pageNum }).unwrap();
       }
@@ -154,7 +158,7 @@ export function useSearchData() {
 
       applyPageMeta(data.page ?? pageNum, data.total_pages ?? 1);
     },
-    [applyPageMeta, fetchMulti, fetchMovie, fetchTv, fetchPerson, searchType]
+    [applyPageMeta, fetchMulti, fetchMovie, fetchTv, fetchPerson, fetchCollection, searchType]
   );
 
   const fetchInitial = useCallback(

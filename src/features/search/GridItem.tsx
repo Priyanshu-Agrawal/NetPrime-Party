@@ -4,7 +4,7 @@ import { PosterCard } from "@/src/ui";
 import { spacing } from "@/theme/bearoom";
 import { gridColumnWidth } from "@/theme/styles/layout";
 import { itemTitle, type MediaItem } from "@/utils/tmdbLists";
-import { openDetails, openPerson } from "@/src/navigation/actions";
+import { openDetails, openPerson, openCollection } from "@/src/navigation/actions";
 
 const COLS = 3;
 const CARD_W = gridColumnWidth(COLS);
@@ -17,6 +17,7 @@ interface Props {
 const GridItem = React.memo(
   ({ item, index }: Props) => {
     const isPerson = (item as any).media_type === "person";
+    const isCollection = (item as any).media_type === "collection";
     const imagePath = item.poster_path || (item as any).profile_path;
     const uri = imagePath
       ? `https://image.tmdb.org/t/p/w342${imagePath}`
@@ -39,9 +40,15 @@ const GridItem = React.memo(
           width={CARD_W}
           poster={uri}
           title={itemTitle(item)}
-          rating={isPerson ? undefined : item.vote_average ?? undefined}
-          kind={isPerson ? "person" : isTv ? "tv" : "movie"}
-          onPress={() => (isPerson ? openPerson(item.id) : openDetails(item, isTv ? "tv" : "movie"))}
+          rating={isPerson || isCollection ? undefined : item.vote_average ?? undefined}
+          kind={isPerson ? "person" : isCollection ? "collection" : isTv ? "tv" : "movie"}
+          onPress={() =>
+            isPerson
+              ? openPerson(item.id)
+              : isCollection
+                ? openCollection(item.id)
+                : openDetails(item, isTv ? "tv" : "movie")
+          }
         />
       </View>
     );
