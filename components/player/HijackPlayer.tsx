@@ -227,6 +227,13 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // will ever bind, so we show our own skinned "no stream" overlay instead of leaving
     // the spinner up forever / revealing the raw provider wall.
     const [noSource, setNoSource] = useState(false);
+    // The hijack bridge is OTA-served (bridgeCache) with NO bundled fallback, filled
+    // async by syncScripts after /config. The solo player mounts this the instant a
+    // provider is selected — often BEFORE the cache is warm — and a scriptless WebView
+    // never binds (the <video> plays under the provider's OWN controls, never our skin).
+    // Gate the WebView mount on a cached script. Warm cache — the common case, and
+    // every Watch Party mount (snapshot-gated, so seconds later) — is ready immediately.
+    const [scriptReady, setScriptReady] = useState(() => getCachedScript(providerId) != null);
     // The "still syncing" banner appears at the 30s bind timeout. Some providers
     // (e.g. videasy on iOS) autoplay in a frame our bridge can't reach — the video
     // is PLAYING even though we never bound — so the banner is misleading and must
@@ -503,6 +510,26 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       return () => clearTimeout(t);
     }, [bound, slow, bannerRetired]);
 
+    // Poll the MMKV script cache until this provider's OTA bridge lands (syncScripts
+    // emits no signal to subscribe to), then let the WebView mount. After a grace
+    // window we mount anyway, so an unreachable /scripts still degrades to the
+    // provider's own page instead of hanging on the loader forever.
+    useEffect(() => {
+      if (getCachedScript(providerId) != null) {
+        setScriptReady(true);
+        return;
+      }
+      setScriptReady(false);
+      let tries = 0;
+      const iv = setInterval(() => {
+        if (getCachedScript(providerId) != null || ++tries >= 25) {
+          setScriptReady(true);
+          clearInterval(iv);
+        }
+      }, 400); // ~10s grace before degrading to a scriptless load
+      return () => clearInterval(iv);
+    }, [providerId]);
+
     // Bind detection + "still syncing" banner. Re-armed on media change AND every
     // remount (a retry bumps remountNonce), so a remounted WebView that loads but
     // never binds a <video> still surfaces the banner + fires onBindFailed.
@@ -520,7 +547,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       }, BIND_TIMEOUT_MS);
       return () => clearTimeout(t);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [providerId, tmdbId, type, season, episode, remountNonce]);
+    }, [providerId, tmdbId, type, season, episode, remountNonce, scriptReady]);
 
     // Recovery-state reset — ONLY on a real media/provider/episode change, NOT on a
     // retry remount (which must PRESERVE the auto-retry budget so the load→crash
@@ -601,6 +628,11 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
 
     return (
       <View style={styles.web}>
+        {/* Gate the WebView until this provider's OTA bridge is cached — a scriptless
+            load never binds (the video plays under the provider's OWN controls). Warm
+            cache / every Watch Party mount renders immediately; the branded cover
+            below fills the wait. */}
+        {scriptReady && (
         <WebView
           key={`${providerId}:${uri}:${remountNonce}`}
           ref={webRef}
@@ -652,6 +684,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           onRenderProcessGone={() => raiseFatal({ kind: "render_crash" })}
           onContentProcessDidTerminate={() => raiseFatal({ kind: "render_crash" })}
         />
+        )}
         {/* Branded cover — opaque over the WebView from mount until the video paints
             its first frame, so the provider's own poster/splash never shows behind
             our controls on a slow start. Sits below the banner + error overlay.
