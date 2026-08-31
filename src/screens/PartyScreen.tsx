@@ -38,7 +38,7 @@ import {
   type PartySessionRequest,
 } from "@/services/party/PartySession";
 import type { ChatMessage, FloatingReaction } from "@/services/party/usePartyChat";
-import { colors, chat, font, glow, ms, radius } from "@/theme/bearoom";
+import { colors, chat, font, ms, radius } from "@/theme/bearoom";
 import ReanimatedAnimated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from "react-native-reanimated";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Ionicons } from "@expo/vector-icons";
@@ -755,12 +755,18 @@ export default function Party() {
             </View>
           ) : isHost ? (
             <View style={styles.waiting}>
-              <Ionicons name="add-circle-outline" size={30} color={colors.honey} />
+              {/* Same empty state as the tray's queue pane, deliberately: the room
+                  and the tray are two views of one thing and shouldn't word or
+                  draw it differently. */}
+              <View style={styles.emptyGlyph}>
+                <Ionicons name="layers-outline" size={ms(22)} color={colors.honey} />
+              </View>
+              <Text style={styles.waitingTitle}>Nothing queued yet</Text>
               <Text style={styles.waitingText}>
-                Nothing queued yet. Browse and add something — the room stays live while
-                you look.
+                Anything you add lands here for everyone in the room.
               </Text>
               <Pressable style={styles.retryBtn} onPress={openSearchTab}>
+                <Ionicons name="search" size={ms(14)} color={colors.onHoney} />
                 <Text style={styles.retryText}>Find something to watch</Text>
               </Pressable>
             </View>
@@ -1413,7 +1419,25 @@ const styles = StyleSheet.create({
     elevation: 50,
   },
   waiting: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 24 },
-  waitingText: { color: colors.textDim, fontFamily: font.body, fontSize: ms(14), textAlign: "center" },
+  emptyGlyph: {
+    width: ms(52),
+    height: ms(52),
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+    marginBottom: ms(2),
+  },
+  waitingTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
+  waitingText: {
+    color: colors.textFaint,
+    fontFamily: font.body,
+    fontSize: ms(12.5),
+    textAlign: "center",
+    lineHeight: ms(18),
+  },
 
   floatBtn: {
     position: "absolute",
@@ -1566,16 +1590,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.honey,
     alignItems: "center",
     justifyContent: "center",
-    ...glow.honey,
+    // No glow: glow.honey carries elevation 8, and elevation over the WebView
+    // re-captures every frame (the documented playback-stutter cause).
   },
 
   retryBtn: {
-    marginTop: ms(4),
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    marginTop: ms(6),
     backgroundColor: colors.honey,
-    paddingHorizontal: ms(18),
-    paddingVertical: ms(9),
+    paddingHorizontal: ms(16),
+    height: ms(38),
     borderRadius: radius.pill,
-    ...glow.honey,
   },
   retryText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
   grabBtn: { bottom: ms(68) },
@@ -1660,7 +1687,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.honey,
     alignItems: "center",
     justifyContent: "center",
-    ...glow.honey,
   },
   pwGoText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(16) },
 });
