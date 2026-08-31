@@ -163,6 +163,10 @@ export function PartyTray() {
         visible={open}
         transparent
         animationType="slide"
+        // edge-to-edge is on (app.json), so without these the modal's content box
+        // stops above the Android navigation bar and the page leaks underneath.
+        statusBarTranslucent
+        navigationBarTranslucent
         onRequestClose={() => setOpen(false)}
       >
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
@@ -173,6 +177,7 @@ export function PartyTray() {
           winH={winH}
           bottomInset={Math.max(insets.bottom, ms(12))}
           memberIds={memberIds}
+          queueLen={queueLen}
           onClose={() => setOpen(false)}
         />
       </Modal>
@@ -362,6 +367,7 @@ function TraySheet({
   winH,
   bottomInset,
   memberIds,
+  queueLen,
   onClose,
 }: {
   code: string;
@@ -370,10 +376,13 @@ function TraySheet({
   winH: number;
   bottomInset: number;
   memberIds: string;
+  queueLen: number;
   onClose: () => void;
 }) {
+  // Open when there is something to look at, collapsed when there isn't.
+  const [queueOpen, setQueueOpen] = useState(queueLen > 0);
   const halfH = Math.round(winH * 0.46);
-  const fullH = Math.round(winH * 0.9);
+  const fullH = Math.round(winH * 0.78);
   const height = useSharedValue(detent === "full" ? fullH : halfH);
 
   useEffect(() => {
@@ -454,16 +463,37 @@ function TraySheet({
         </Pressable>
       </View>
 
-      {/* full = queue standing where the video sits on PartyScreen, chat beneath */}
+      {/* The queue is a COLLAPSIBLE, height-capped section rather than half the
+          sheet: a 50/50 split spent most of the screen on two empty states, and
+          chat is what you actually keep open while browsing. */}
       {detent === "full" ? (
-        <View style={styles.queuePane}>
-          <Text style={styles.overline}>UP NEXT</Text>
-          <PartyQueueList />
+        <View style={[styles.queuePane, queueOpen && styles.queuePaneOpen]}>
+          <Pressable
+            style={styles.sectionHead}
+            onPress={() => setQueueOpen((v) => !v)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={queueOpen ? "Collapse the queue" : "Expand the queue"}
+          >
+            <Text style={styles.overline}>UP NEXT</Text>
+            {queueLen > 0 ? (
+              <View style={styles.countPill}>
+                <Text style={styles.countText}>{queueLen}</Text>
+              </View>
+            ) : null}
+            <View style={{ flex: 1 }} />
+            <Ionicons
+              name={queueOpen ? "chevron-up" : "chevron-down"}
+              size={ms(15)}
+              color={colors.textDim}
+            />
+          </Pressable>
+          {queueOpen ? <PartyQueueList /> : null}
         </View>
       ) : null}
 
       <View style={styles.chatPane}>
-        <Text style={styles.overline}>CHAT</Text>
+        <Text style={[styles.overline, styles.chatOverline]}>CHAT</Text>
         <PartyChatThread compact />
       </View>
     </Animated.View>
@@ -582,13 +612,31 @@ const styles = StyleSheet.create({
   },
   openRoomText: { fontFamily: font.label, fontSize: ms(11.5), color: colors.onHoney },
 
-  overline: { ...type.overline, paddingHorizontal: ms(16), paddingBottom: ms(6) },
+  overline: { ...type.overline },
+  chatOverline: { paddingHorizontal: ms(16), paddingBottom: ms(6) },
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(8),
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(9),
+  },
+  countPill: {
+    minWidth: ms(18),
+    height: ms(18),
+    paddingHorizontal: ms(5),
+    borderRadius: ms(9),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.honeySoft,
+  },
+  countText: { fontFamily: font.label, fontSize: ms(10), color: colors.honey },
+  /* Capped, not flex: the queue peeks, chat keeps the room. */
   queuePane: {
-    flex: 1,
-    paddingTop: ms(4),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
+  queuePaneOpen: { maxHeight: "42%" },
   chatPane: { flex: 1, paddingTop: ms(10) },
 });
 

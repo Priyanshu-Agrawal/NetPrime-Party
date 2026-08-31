@@ -131,11 +131,11 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   list: { paddingHorizontal: ms(12), paddingBottom: ms(8), gap: ms(2) },
-  empty: { alignItems: "center", justifyContent: "center", paddingVertical: ms(26), gap: ms(8) },
+  empty: { alignItems: "center", justifyContent: "center", paddingVertical: ms(18), gap: ms(7) },
   emptyIcon: {
-    width: ms(40),
-    height: ms(40),
-    borderRadius: ms(20),
+    width: ms(34),
+    height: ms(34),
+    borderRadius: ms(17),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honeySoft,

@@ -47,12 +47,12 @@ export function PartyQueueList() {
     return (
       <View style={styles.empty}>
         <View style={styles.emptyIcon}>
-          <Ionicons name="layers-outline" size={ms(20)} color={colors.honey} />
+          <Ionicons name="layers-outline" size={ms(15)} color={colors.honey} />
         </View>
-        <Text style={styles.emptyText}>Nothing queued yet</Text>
-        <Text style={styles.emptyHint}>
-          Browse and add something — it lands here for everyone.
-        </Text>
+        <View style={styles.emptyCopy}>
+          <Text style={styles.emptyText}>Nothing queued yet</Text>
+          <Text style={styles.emptyHint}>Add something — it lands here for everyone.</Text>
+        </View>
       </View>
     );
   }
@@ -164,26 +164,27 @@ function QueueRow({
 
 const styles = StyleSheet.create({
   list: { paddingHorizontal: ms(14), paddingBottom: ms(10), gap: ms(6) },
+  /* Inline, not a centred hero: this sits inside a capped accordion. */
   empty: {
-    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: ms(7),
-    paddingHorizontal: ms(32),
+    gap: ms(11),
+    paddingHorizontal: ms(16),
+    paddingBottom: ms(14),
   },
+  emptyCopy: { flex: 1, gap: ms(2) },
   emptyIcon: {
-    width: ms(44),
-    height: ms(44),
-    borderRadius: ms(22),
+    width: ms(32),
+    height: ms(32),
+    borderRadius: ms(16),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.honeyGlow,
-    marginBottom: ms(2),
   },
-  emptyText: { ...type.h3, fontSize: ms(14) },
-  emptyHint: { ...type.caption, fontSize: ms(11.5), textAlign: "center", color: colors.textFaint },
+  emptyText: { ...type.label, fontSize: ms(12.5) },
+  emptyHint: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
 
   row: {
     flexDirection: "row",
