@@ -288,6 +288,10 @@ function PartySessionInner({
 
   useEffect(() => {
     if (!client || !engine) return;
+    if (__DEV__) {
+      console.log("[party] session EFFECT RUN — new client for", request?.code);
+      (globalThis as any).__PARTY__ = { client, engine, request };
+    }
     let cancelled = false;
     setError(null);
     setKicked(false);
@@ -319,10 +323,12 @@ function PartySessionInner({
         if (!cancelled) setError(msg);
       });
     return () => {
+      if (__DEV__) console.log("[party] session EFFECT CLEANUP — destroying client");
       cancelled = true;
       unsub();
       void client.destroy();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, engine]);
 
   const chatRaw = usePartyChat({

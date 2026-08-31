@@ -458,8 +458,16 @@ export class PartyClient {
   private reconcileRole(): void {
     if (this.destroyed) return;
     if (this.isHost && !this.leaseTimer) {
+      if (__DEV__) console.log("[party] lease loop START", this.code);
       this.leaseTimer = setInterval(() => this.renewLeaseIfDue(), LEASE_RENEW_INTERVAL_MS);
     } else if (!this.isHost && this.leaseTimer) {
+      if (__DEV__)
+        console.log(
+          "[party] lease loop STOP",
+          this.code,
+          "hostId=", this.snap?.lease.hostId,
+          "me=", this.userId,
+        );
       clearInterval(this.leaseTimer);
       this.leaseTimer = null;
     }
@@ -497,8 +505,9 @@ export class PartyClient {
         this.lastSnapAt = Date.now();
         this.broadcast(this.snap, true); // heartbeat-lite: no queue
       }
-    } catch {
+    } catch (e) {
       // We're no longer host (taken over). Role reconciles on the next snapshot.
+      if (__DEV__) console.log("[party] renewLease FAILED", String((e as Error)?.message ?? e));
     } finally {
       this.leaseRenewInFlight = false;
     }
