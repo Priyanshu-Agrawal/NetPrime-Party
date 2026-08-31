@@ -598,6 +598,9 @@ export default function Party() {
           {/* Left / theater column */}
           <View style={[isWide && styles.desktopLeftCol, isLandscapeMobile && styles.landscapeMobilePlayerCol]}>
             {/* Player */}
+            {/* With nothing playing there is no video to reserve room for, so the
+                16:9 black box just pushes an empty chat down the screen and leaves
+                a void. Collapse to content height and let chat take the space. */}
             <View
               style={
                 fullscreen
@@ -606,7 +609,9 @@ export default function Party() {
                   ? styles.desktopPlayer
                   : isLandscapeMobile
                   ? styles.landscapeMobilePlayer
-                  : styles.player
+                  : hasMedia
+                  ? styles.player
+                  : styles.playerCompact
               }
             >
           {party.error && /password/i.test(party.error) ? (
@@ -1408,6 +1413,8 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(12) },
 
   player: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black, overflow: "hidden" },
+  /* No media: content height on the app background, not a black 16:9 slab. */
+  playerCompact: { width: "100%", paddingVertical: ms(22), overflow: "hidden" },
   playerFs: {
     position: "absolute",
     top: 0,
@@ -1418,7 +1425,15 @@ const styles = StyleSheet.create({
     zIndex: 50,
     elevation: 50,
   },
-  waiting: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 24 },
+  waiting: {
+    // grows inside the 16:9 box (error/waiting states) and hugs content in the
+    // compact box, because flexGrow with no flexBasis does both.
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: ms(9),
+    paddingHorizontal: ms(28),
+  },
   emptyGlyph: {
     width: ms(52),
     height: ms(52),
