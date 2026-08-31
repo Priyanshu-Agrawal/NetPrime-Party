@@ -95,6 +95,9 @@ export interface PartySessionValue extends PartyActions {
   detached: boolean;
   kicked: boolean;
   error: string | null;
+  /** Is the browsing tray expanded? Owned here so the tab bar can raise it. */
+  trayOpen: boolean;
+  setTrayOpen: (v: boolean) => void;
   open: (req: PartySessionRequest) => void;
   /** Re-attempt with a password (or just force a fresh client). */
   retry: (password?: string) => void;
@@ -121,6 +124,8 @@ const IDLE: PartySessionValue = {
   detached: false,
   kicked: false,
   error: null,
+  trayOpen: false,
+  setTrayOpen: () => {},
   open: () => {},
   retry: () => {},
   leave: () => {},
@@ -253,6 +258,7 @@ function PartySessionInner({
   const [error, setError] = useState<string | null>(null);
   // Only used to re-publish the context once userId lands (it arrives async in start()).
   const [userId, setUserId] = useState("");
+  const [trayOpen, setTrayOpen] = useState(false);
 
   // Media is fixed for the room's life; keeping it OUT of the deps below is
   // deliberate — a new object identity each render would otherwise rebuild the
@@ -342,7 +348,7 @@ function PartySessionInner({
   );
 
   const value = useMemo<PartySessionValue>(() => {
-    if (!client || !engine) return { ...IDLE, playerRef, open, retry, leave };
+    if (!client || !engine) return { ...IDLE, playerRef, open, retry, leave, trayOpen, setTrayOpen };
     return {
       request,
       client,
@@ -352,6 +358,8 @@ function PartySessionInner({
       detached,
       kicked,
       error,
+      trayOpen,
+      setTrayOpen,
       open,
       retry,
       leave,
@@ -385,7 +393,7 @@ function PartySessionInner({
       queueAdvance: (from, reason) => client.queueAdvance(from, reason),
       queueClear: (scope) => client.queueClear(scope),
     };
-  }, [client, engine, request, userId, connectedCount, detached, kicked, error, open, retry, leave]);
+  }, [client, engine, request, userId, connectedCount, detached, kicked, error, trayOpen, open, retry, leave]);
 
   return (
     <ClientCtx.Provider value={client}>

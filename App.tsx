@@ -6,6 +6,7 @@ import { ConnectivityBanner } from "@/src/ui/ConnectivityBanner";
 import { MovieContextProvider } from "@/contexts/movieContext";
 import RootNavigator from "@/src/navigation/RootNavigator";
 import { PartySessionProvider } from "@/services/party/PartySession";
+import { PartyTray } from "@/components/party/PartyTray";
 import { linking } from "@/src/navigation/linking";
 import { navigationRef } from "@/src/navigation/navigationRef";
 import { colors } from "@/theme/bearoom";
@@ -126,6 +127,9 @@ export default function App() {
                     that actually read a party context — not the whole app. */}
                 <PartySessionProvider>
                   <RootNavigator />
+                  {/* The live room, carried across every browsing screen. Sits
+                      above the tab bar, hides itself on Party/Player. */}
+                  <PartyTray />
                   {/* App-global offline strip — rendered after RootNavigator so
                       it paints above every screen (insets from SafeAreaProvider). */}
                   <ConnectivityBanner />

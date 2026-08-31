@@ -7,6 +7,7 @@
  * blur was frame-eating; the blur alone is the intended look.
  */
 import { openJoinParty } from "@/src/navigation/actions";
+import { usePartySession, usePartySnapshot } from "@/services/party/PartySession";
 import GlassCard from "@/components/ui/GlassCard";
 import { colors, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,6 +30,9 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { request, setTrayOpen } = usePartySession();
+  const code = usePartySnapshot((s) => s?.code ?? null);
+  const live = !!request && !!code;
 
   const goTab = (routeName: string, key: string, focused: boolean) => {
     void Haptics.selectionAsync();
@@ -69,16 +73,25 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           ))}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Watch party"
+            accessibilityLabel={live ? "Open the watch-party tray" : "Watch party"}
             onPress={() => {
               void Haptics.selectionAsync();
-              openJoinParty();
+              // In a room already → raise the tray so you can chat/queue without
+              // losing your place. Otherwise → the host/join screen.
+              if (live) setTrayOpen(true);
+              else openJoinParty();
             }}
             style={styles.tab}
           >
             <View style={styles.iconWrap}>
-              <Ionicons name="people" size={ms(22)} color={colors.textDim} />
-              <View style={styles.partyDot} />
+              <Ionicons
+                name="people"
+                size={ms(22)}
+                color={live ? colors.honey : colors.textDim}
+              />
+              {/* Lit ONLY while a room is live. It used to be hardcoded on, which
+                  made it decoration that looked like a status light. */}
+              {live ? <View style={styles.partyDot} /> : null}
             </View>
           </Pressable>
           {tail.map((t) => (

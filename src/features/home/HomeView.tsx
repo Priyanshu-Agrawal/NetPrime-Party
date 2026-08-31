@@ -3,6 +3,7 @@ import AppHeader from "@/components/ui/AppHeader";
 import { useFadeInStyle } from "@/components/ui/useCollapsingHeader";
 import { FeedSection } from "@/src/features/home/FeedSection";
 import { openJoinParty } from "@/src/navigation/actions";
+import { usePartySession } from "@/services/party/PartySession";
 import { useGetConfigQuery } from "@/src/store/services/workerApi";
 import { Appear, GlassCard, Text } from "@/src/ui";
 import { OfflineState } from "@/src/ui/OfflineState";
@@ -22,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default React.memo(function HomePage() {
   const insets = useSafeAreaInsets();
+  const inSession = !!usePartySession().request;
   const scrollY = useSharedValue(0);
 
   const onScroll = useAnimatedScrollHandler((e) => {
@@ -79,6 +81,10 @@ export default React.memo(function HomePage() {
       >
         <HeroCarousel />
 
+        {/* Inviting someone already in a room to "start a watch party" is the same
+            mistake the header pill used to make — it would mint a second room and
+            orphan the first. In session, the tray IS the party. */}
+        {inSession ? null : (
         <Appear variant="rise" style={styles.ctaWrap}>
           <GlassCard
             blur={false}
@@ -110,6 +116,7 @@ export default React.memo(function HomePage() {
             </View>
           </GlassCard>
         </Appear>
+        )}
 
         {feed.sections.map((s, i) => (
           <Appear key={s.id} index={i + 1}>
