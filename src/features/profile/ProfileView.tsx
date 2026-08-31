@@ -19,7 +19,8 @@ import {
   openAppSettings,
   requestNotificationPermission,
 } from "@/services/permissions/notifications";
-import { openLibrary, openHomePrefs } from "@/src/navigation/actions";
+import { openJoinParty, openLibrary, openHomePrefs, openPartyHost } from "@/src/navigation/actions";
+import { genRoomCode } from "@/utils/roomCode";
 import { Appear, Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -217,8 +218,21 @@ export default function MoreScreen() {
           </View>
         </Appear>
 
-        {/* Library */}
+        {/* Watch party — a room no longer needs a title to exist: host an empty
+            one, then browse and queue things up while everyone waits inside. */}
         <Appear index={3}>
+          <Card>
+            <Row
+              icon="videocam-outline"
+              label="Host a watch party"
+              onPress={() => openPartyHost({ role: "host", room: genRoomCode() })}
+            />
+            <Row icon="enter-outline" label="Join with a code" onPress={openJoinParty} last />
+          </Card>
+        </Appear>
+
+        {/* Library */}
+        <Appear index={4}>
           <Card>
             <Row icon="time-outline" label="Watch history" onPress={() => openLibrary("WatchHistory")} />
             <Row icon="bookmark-outline" label="My list" onPress={() => openLibrary("MyList")} />
@@ -227,7 +241,7 @@ export default function MoreScreen() {
         </Appear>
 
         {/* Preferences */}
-        <Appear index={4}>
+        <Appear index={5}>
           <Card>
             <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
             <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
@@ -236,14 +250,14 @@ export default function MoreScreen() {
           </Card>
         </Appear>
 
-        <Appear index={5}>
+        <Appear index={6}>
           <Card>
             <Row icon="chatbubble-ellipses-outline" label="Chat & reactions" onPress={() => comingSoon("Chat & reactions")} last />
           </Card>
         </Appear>
 
         {/* Maintenance / about */}
-        <Appear index={6}>
+        <Appear index={7}>
           <Card>
             <Row icon="color-palette-outline" label="Appearance" onPress={() => comingSoon("Appearance")} />
             <Row icon="trash-outline" label="Clear watch history" onPress={confirmClearHistory} />
@@ -252,7 +266,7 @@ export default function MoreScreen() {
           </Card>
         </Appear>
 
-        <Appear index={7}>
+        <Appear index={8}>
           <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
             <Text style={styles.signOutText}>Sign out</Text>
           </TouchableOpacity>

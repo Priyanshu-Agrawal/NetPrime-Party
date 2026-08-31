@@ -9,6 +9,9 @@
  *   way out is confirming, so a stray tap never drops the watch session.
  * - Programmatic leaves (kicked, fatal error) do NOT go through here — they call
  *   router.back() directly, which BackHandler doesn't intercept. That's intended.
+ * - `secondary` adds a middle action for screens where leaving the SCREEN and
+ *   ending the SESSION are different things: a watch party now outlives its
+ *   screen, so "Keep browsing" and "Leave room" are two separate outcomes.
  * - iOS swipe-back is not intercepted (Android-first); revisit with `beforeRemove`
  *   when iOS is stood up.
  */
@@ -21,6 +24,8 @@ export function useMediaCloseGuard(opts: {
   message: string;
   confirmLabel: string;
   onConfirm: () => void;
+  /** Optional middle action — leave the screen WITHOUT the destructive outcome. */
+  secondary?: { label: string; onPress: () => void };
   /** Guard only while true (e.g. media actually loaded). Defaults to true. */
   enabled?: boolean;
   /** Contextual back interceptor for the HARDWARE back only. Return true if the
@@ -28,22 +33,29 @@ export function useMediaCloseGuard(opts: {
    *  skipped. Read live on each press; keep it cheap and side-effect-light. */
   beforeClose?: () => boolean;
 }): { requestClose: () => void } {
-  const { title, message, confirmLabel, onConfirm, enabled = true, beforeClose } = opts;
+  const { title, message, confirmLabel, onConfirm, secondary, enabled = true, beforeClose } = opts;
   const onConfirmRef = useRef(onConfirm);
   onConfirmRef.current = onConfirm;
+  const secondaryRef = useRef(secondary);
+  secondaryRef.current = secondary;
   const beforeCloseRef = useRef(beforeClose);
   beforeCloseRef.current = beforeClose;
   const lastShownRef = useRef(0);
 
+  // Only the LABEL needs to invalidate the callback; the handler is read via ref.
+  const secondaryLabel = secondary?.label;
   const requestClose = useCallback(() => {
     const now = Date.now();
     if (now - lastShownRef.current < 1200) return; // don't stack on rapid back
     lastShownRef.current = now;
+    const sec = secondaryRef.current;
     bearAlert(title, message, [
       { text: "Stay", style: "cancel" },
+      ...(sec ? [{ text: sec.label, onPress: () => secondaryRef.current?.onPress() }] : []),
       { text: confirmLabel, style: "destructive", onPress: () => onConfirmRef.current() },
     ]);
-  }, [title, message, confirmLabel]);
+    // BearAlert stacks at >2 buttons, so the three-way reads as a list, not a row.
+  }, [title, message, confirmLabel, secondaryLabel]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -46,7 +46,7 @@ import { Image } from "expo-image";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { img } from "@/utils/tmdbDetails";
-import { exitMedia, exitMediaBack } from "@/src/navigation/actions";
+import { exitMedia, exitMediaBack, openSearchTab } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
 import type { RouteProp } from "@react-navigation/native";
 import type { RootStackParamList } from "@/src/navigation/types";
@@ -291,16 +291,22 @@ export default function Party() {
   sessionTitleRef.current = media?.title || params.title || "Bearoom party";
 
   // Resist accidental exit: hardware back + the top-bar chevron confirm first.
+  // Now three-way, because the session outlives this screen: browsing away keeps
+  // the room alive (that's how you add to the queue), leaving ends it.
   const { requestClose } = useMediaCloseGuard({
     title: "Leave the party?",
-    message: "You'll leave this watch room and stop syncing with everyone.",
-    confirmLabel: "Leave",
+    message:
+      "Keep browsing to add something to the queue — the room stays live. Leaving ends it for you.",
+    secondary: { label: "Keep browsing", onPress: exitMediaBack },
+    confirmLabel: "Leave room",
     // Pop back to where the party was launched from (the title's details) instead
     // of resetting to Home — same real-back fix as the solo player. Falls back to
     // the reset only when there's no history (e.g. a deep-linked join). Kicked-out
     // (below) stays a hard reset — that's a forced, terminal exit.
     onConfirm: leaveAndExit(exitMediaBack),
-    enabled: hasMedia,
+    // Armed whenever we're in a room, media or not — a medialess room is a real
+    // room now, and backing out of it must not silently strand the session.
+    enabled: !!party.request,
   });
 
   // Removed by the host → bounce out with a note.
@@ -740,12 +746,28 @@ export default function Party() {
                 />
               ) : null}
             </>
-          ) : (
+          ) : !snap ? (
             <View style={styles.waiting}>
               <Ionicons name="hourglass-outline" size={30} color={colors.textFaint} />
               <Text style={styles.waitingText}>
-                {isHostParam ? "Starting party…" : "Waiting for the host to start…"}
+                {isHostParam ? "Starting party…" : "Joining…"}
               </Text>
+            </View>
+          ) : isHost ? (
+            <View style={styles.waiting}>
+              <Ionicons name="add-circle-outline" size={30} color={colors.honey} />
+              <Text style={styles.waitingText}>
+                Nothing queued yet. Browse and add something — the room stays live while
+                you look.
+              </Text>
+              <Pressable style={styles.retryBtn} onPress={openSearchTab}>
+                <Text style={styles.retryText}>Find something to watch</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.waiting}>
+              <Ionicons name="hourglass-outline" size={30} color={colors.textFaint} />
+              <Text style={styles.waitingText}>Waiting for the host to pick something…</Text>
             </View>
           )}
 
