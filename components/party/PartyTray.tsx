@@ -63,9 +63,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /** Routes that already ARE the party, or that play video. */
 const HIDE_ON = new Set(["Party", "Player"]);
-const PEEK_H = ms(68);
+const PEEK_H = ms(62);
 /** Pre-computed: ms() is not a worklet, so it can't be called inside useAnimatedStyle. */
-const PEEK_HIDE_Y = ms(68) + ms(16);
+const PEEK_HIDE_Y = ms(62) + ms(16);
 /** Clearance for the floating tab bar so peek rides above it, never over it. */
 const TAB_BAR_H = ms(64);
 
@@ -230,8 +230,9 @@ function PeekBar({
       {/* Same frosted surface as FloatingTabBar, so the bar and the tab bar it
           rides on read as one navigation object rather than a card floating over
           the content. Quiet controls, rich content. */}
-      <Frost intensity={40} style={StyleSheet.absoluteFill} />
+      <Frost intensity={70} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.peekTint]} />
+      <View style={[StyleSheet.absoluteFill, styles.peekLift]} />
 
       <Pressable
         style={styles.peekBody}
@@ -242,7 +243,9 @@ function PeekBar({
         {poster ? (
           <Image source={{ uri: poster }} style={styles.peekPoster} contentFit="cover" />
         ) : (
-          <View style={[styles.peekPoster, styles.peekPosterEmpty]}>
+          /* Square, not poster-shaped: there is no artwork to stand in for, so a
+             2:3 slot just reads as a missing image. A square tile reads as a glyph. */
+          <View style={styles.peekGlyph}>
             <Ionicons name="film-outline" size={ms(18)} color={colors.textDim} />
           </View>
         )}
@@ -546,10 +549,12 @@ function NowPlayingCard({
 }
 
 const styles = StyleSheet.create({
-  peekWrap: { position: "absolute", left: ms(12), right: ms(12) },
+  /* Pulled in toward the tab bar's footprint so the two stack as one column. Not
+     matched exactly: FloatingTabBar is content-width (four icons), and squeezing a
+     film title into that would strangle it. Slightly wider than the nav pill is
+     the right hierarchy — content bar over nav bar. */
+  peekWrap: { position: "absolute", left: ms(40), right: ms(40) },
 
-  /* Mini-player surface. NO blur, NO elevation (see the header note) — the
-     "live" read comes from a honey hairline + the progress rule, not a shadow. */
   /* Quiet, not loud: a hairline like every other surface, NOT a honey outline.
      The accent is reserved for the progress rule and the live dot. */
   peek: {
@@ -561,17 +566,25 @@ const styles = StyleSheet.create({
   },
   /* Warm tint over the blur — enough body that title/meta stay legible on top of
      a bright poster grid, still transparent enough to read as glass. */
-  peekTint: { backgroundColor: "rgba(22,18,13,0.62)" },
+  /* Two layers over the blur: a lighter charcoal scrim than before (0.62 -> 0.38)
+     so the artwork behind stays legible as texture, plus a warm-white lift that
+     keeps title contrast up. Stronger blur does the rest of the legibility work. */
+  peekTint: { backgroundColor: "rgba(22,18,13,0.38)" },
+  peekLift: { backgroundColor: "rgba(246,239,227,0.07)" },
   peekBody: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(10),
-    paddingHorizontal: ms(10),
+    gap: ms(9),
+    paddingLeft: ms(8),
+    paddingRight: ms(6),
   },
   peekArt: { borderRadius: radius.sm, overflow: "hidden" },
-  peekPoster: { width: ms(38), height: ms(50), borderRadius: radius.sm },
-  peekPosterEmpty: {
+  peekPoster: { width: ms(34), height: ms(46), borderRadius: radius.sm },
+  peekGlyph: {
+    width: ms(38),
+    height: ms(38),
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceStrong,
@@ -587,8 +600,8 @@ const styles = StyleSheet.create({
     color: colors.textDim,
   },
   peekTransport: {
-    width: ms(34),
-    height: ms(34),
+    width: ms(30),
+    height: ms(30),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -618,9 +631,9 @@ const styles = StyleSheet.create({
   },
   avatarOverlap: { marginLeft: -ms(9) },
   chevBtn: {
-    width: ms(30),
-    height: ms(30),
-    borderRadius: ms(15),
+    width: ms(28),
+    height: ms(28),
+    borderRadius: ms(14),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceStrong,
