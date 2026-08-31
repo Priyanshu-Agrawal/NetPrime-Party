@@ -20,6 +20,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { img } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
+import { openSearchTab } from "@/src/navigation/actions";
 import React, { useCallback } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -38,21 +39,36 @@ export function PartyQueueList() {
   );
   const currentId = usePartySnapshot((s) => s?.currentItemId ?? null);
   const isHost = useIsPartyHost();
-  const { queueSetCurrent, queueRemove, userId } = usePartySession();
+  const { queueSetCurrent, queueRemove, userId, setTrayOpen } = usePartySession();
+  const onBrowse = useCallback(() => {
+    setTrayOpen(false);
+    openSearchTab();
+  }, [setTrayOpen]);
 
   const play = useCallback((id: string) => void queueSetCurrent(id).catch(() => {}), [queueSetCurrent]);
   const drop = useCallback((id: string) => void queueRemove([id]).catch(() => {}), [queueRemove]);
 
   if (!queue.length) {
+    // The queue now owns a whole pane rather than a collapsed strip, so the empty
+    // state centres and offers the action instead of sitting in the top corner.
     return (
       <View style={styles.empty}>
         <View style={styles.emptyIcon}>
-          <Ionicons name="layers-outline" size={ms(15)} color={colors.honey} />
+          <Ionicons name="layers-outline" size={ms(22)} color={colors.honey} />
         </View>
-        <View style={styles.emptyCopy}>
-          <Text style={styles.emptyText}>Nothing queued yet</Text>
-          <Text style={styles.emptyHint}>Add something — it lands here for everyone.</Text>
-        </View>
+        <Text style={styles.emptyText}>Nothing queued yet</Text>
+        <Text style={styles.emptyHint}>
+          Anything you add lands here for everyone in the room.
+        </Text>
+        <Pressable
+          style={styles.emptyCta}
+          onPress={onBrowse}
+          accessibilityRole="button"
+          accessibilityLabel="Find something to watch"
+        >
+          <Ionicons name="search" size={ms(14)} color={colors.onHoney} />
+          <Text style={styles.emptyCtaText}>Find something to watch</Text>
+        </Pressable>
       </View>
     );
   }
@@ -166,25 +182,42 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: ms(14), paddingBottom: ms(10), gap: ms(6) },
   /* Inline, not a centred hero: this sits inside a capped accordion. */
   empty: {
-    flexDirection: "row",
+    flex: 1,
     alignItems: "center",
-    gap: ms(11),
-    paddingHorizontal: ms(16),
-    paddingBottom: ms(14),
+    justifyContent: "center",
+    gap: ms(8),
+    paddingHorizontal: ms(34),
   },
-  emptyCopy: { flex: 1, gap: ms(2) },
   emptyIcon: {
-    width: ms(32),
-    height: ms(32),
-    borderRadius: ms(16),
+    width: ms(52),
+    height: ms(52),
+    borderRadius: ms(26),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honeySoft,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.honeyGlow,
+    marginBottom: ms(2),
   },
-  emptyText: { ...type.label, fontSize: ms(12.5) },
-  emptyHint: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
+  emptyText: { ...type.h3, fontSize: ms(15) },
+  emptyHint: {
+    ...type.caption,
+    fontSize: ms(12),
+    color: colors.textFaint,
+    textAlign: "center",
+    lineHeight: ms(17),
+  },
+  emptyCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    marginTop: ms(8),
+    paddingHorizontal: ms(16),
+    height: ms(38),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+  },
+  emptyCtaText: { fontFamily: font.label, fontSize: ms(12.5), color: colors.onHoney },
 
   row: {
     flexDirection: "row",

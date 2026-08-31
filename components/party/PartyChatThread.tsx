@@ -12,6 +12,7 @@
  * while I look for something to queue".
  */
 import BearAvatar from "@/components/avatar/BearAvatar";
+import { GifPicker } from "@/components/party/GifPicker";
 import { bubbleCorners, fmtClock, groupFlags, senderColor } from "@/components/party/chatFormat";
 import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { usePartyChatSession, usePartySession } from "@/services/party/PartySession";
@@ -19,6 +20,7 @@ import { colors, font, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image } from "expo-image";
 import type { ChatMessage } from "@/services/party/usePartyChat";
 
 const bearCache = new Map<string, ReturnType<typeof generateRandomBearConfig>>();
@@ -35,6 +37,7 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
   const chat = usePartyChatSession();
   const { userId } = usePartySession();
   const [draft, setDraft] = useState("");
+  const [showGif, setShowGif] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -91,8 +94,12 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
                     bubbleCorners(mine, firstOfGroup, lastOfGroup),
                   ]}
                 >
-                  {item.kind === "gif" ? (
-                    <Text style={styles.bubbleText}>[GIF]</Text>
+                  {item.kind === "gif" && item.gifUrl ? (
+                    <Image
+                      source={{ uri: item.gifUrl }}
+                      style={[styles.gif, item.sticker && styles.sticker]}
+                      contentFit="contain"
+                    />
                   ) : (
                     <Text style={styles.bubbleText}>{item.text}</Text>
                   )}
@@ -104,7 +111,31 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
         }}
       />
 
+      <View style={styles.quickRow}>
+        {QUICK_REACTIONS.map((e) => (
+          <Pressable
+            key={e}
+            onPress={() => chat.sendReaction(e)}
+            hitSlop={6}
+            style={styles.quickChip}
+            accessibilityRole="button"
+            accessibilityLabel={`React ${e}`}
+          >
+            <Text style={styles.quickEmoji}>{e}</Text>
+          </Pressable>
+        ))}
+      </View>
+
       <View style={[styles.composer, compact && styles.composerCompact]}>
+        <Pressable
+          onPress={() => setShowGif(true)}
+          hitSlop={6}
+          style={styles.gifBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Send a GIF or sticker"
+        >
+          <Text style={styles.gifText}>GIF</Text>
+        </Pressable>
         <TextInput
           style={styles.input}
           placeholder="Say something to the pack…"
@@ -124,9 +155,19 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
           <Ionicons name="arrow-up" size={ms(17)} color={colors.onHoney} />
         </Pressable>
       </View>
+
+      <GifPicker
+        visible={showGif}
+        onClose={() => setShowGif(false)}
+        customerId={userId}
+        onPick={(g, k) => chat.sendGif(g, k === "stickers")}
+      />
     </View>
   );
 }
+
+/** Same set the room uses, so a reaction sent from the tray reads identically. */
+const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
@@ -149,7 +190,7 @@ const styles = StyleSheet.create({
   avatarCol: { width: ms(22) },
   bubbleCol: { maxWidth: "78%" },
   sender: { fontFamily: font.label, fontSize: ms(10.5), marginBottom: ms(2) },
-  bubble: { paddingHorizontal: ms(11), paddingVertical: ms(7) },
+  bubble: { paddingHorizontal: ms(11), paddingVertical: ms(7), overflow: "hidden" },
   bubbleMine: { backgroundColor: colors.honeySoft, alignSelf: "flex-end" },
   bubbleTheirs: { backgroundColor: colors.surfaceStrong, alignSelf: "flex-start" },
   bubbleText: { color: colors.text, fontFamily: font.body, fontSize: ms(13), lineHeight: ms(18) },
@@ -164,6 +205,32 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   composerCompact: { paddingBottom: ms(4) },
+  quickRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(10),
+    paddingHorizontal: ms(14),
+    paddingBottom: ms(8),
+  },
+  quickChip: {
+    width: ms(30),
+    height: ms(30),
+    borderRadius: ms(15),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  quickEmoji: { fontSize: ms(15) },
+  gifBtn: {
+    paddingHorizontal: ms(9),
+    height: ms(40),
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+  },
+  gifText: { fontFamily: font.label, fontSize: ms(11), color: colors.honey, letterSpacing: 0.5 },
+  gif: { width: ms(150), height: ms(150), borderRadius: radius.sm },
+  sticker: { width: ms(110), height: ms(110) },
   input: {
     flex: 1,
     height: ms(40),

@@ -43,7 +43,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { img } from "@/utils/tmdbDetails";
 import { navigationRef } from "@/src/navigation/navigationRef";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -69,7 +69,14 @@ const PEEK_HIDE_Y = ms(58) + ms(16);
 /** Clearance for the floating tab bar so peek rides above it, never over it. */
 const TAB_BAR_H = ms(64);
 
-type Detent = "half" | "full";
+/** The room's current media, as both the peek bar and the sheet need it. */
+export type TrayMedia = {
+  tmdbId: string;
+  type: "movie" | "tv";
+  title?: string;
+  season?: number;
+  episode?: number;
+} | null;
 
 const bearCache = new Map<string, ReturnType<typeof generateRandomBearConfig>>();
 function bearFor(userId: string) {
@@ -118,7 +125,6 @@ export function PartyTray() {
   // Open/close lives on the session so the tab bar's party button can raise the
   // tray from outside this component.
   const { trayOpen: open, setTrayOpen: setOpen } = session;
-  const [detent, setDetent] = useState<Detent>("half");
 
   // slide the peek bar in/out
   const shown = useSharedValue(0);
@@ -172,8 +178,7 @@ export function PartyTray() {
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
         <TraySheet
           code={code!}
-          detent={detent}
-          setDetent={setDetent}
+          media={media}
           winH={winH}
           bottomInset={Math.max(insets.bottom, ms(12))}
           memberIds={memberIds}
@@ -195,7 +200,7 @@ function PeekBar({
   onOpen,
 }: {
   code: string;
-  media: { tmdbId: string; type: "movie" | "tv"; title?: string; season?: number; episode?: number } | null;
+  media: TrayMedia;
   queueLen: number;
   memberIds: string;
   onOpen: () => void;
@@ -206,17 +211,28 @@ function PeekBar({
   const poster = img(details?.poster_path, "w154") ?? undefined;
   const playing = !!media;
   const title = media?.title || details?.title || details?.name || "Nothing playing";
-  const meta =
-    media?.type === "tv" && media.season != null
-      ? `S${media.season} · E${media.episode ?? 1}`
-      : queueLen > 0
-      ? `${queueLen} queued`
-      : "Add something to watch";
 
   const pos = useLivePosition();
   const runtimeSec = useRuntimeSeconds(details);
   const pct = runtimeSec > 0 ? Math.min(1, pos / runtimeSec) : 0;
   const ids = useMemo(() => memberIds.split(",").filter(Boolean), [memberIds]);
+
+  // Two lines, and the second one has to EARN its place. While something is
+  // playing that means the episode + elapsed time; only an idle room gets a
+  // call to action. The room code lives in the header chip — repeating it here
+  // was noise on the line that should be telling you where you are in the film.
+  const sub = playing
+    ? [
+        media?.type === "tv" && media.season != null
+          ? `S${media.season} · E${media.episode ?? 1}`
+          : null,
+        runtimeSec > 0 ? `${fmt(pos)} / ${fmt(runtimeSec)}` : pos > 0 ? fmt(pos) : null,
+      ]
+        .filter(Boolean)
+        .join("  ·  ")
+    : queueLen > 0
+    ? `${queueLen} queued · tap to open`
+    : "Tap to add something to watch";
 
   return (
     <View style={styles.peek}>
@@ -251,16 +267,11 @@ function PeekBar({
           accessibilityRole="button"
           accessibilityLabel="Open the party tray"
         >
-          <View style={styles.livePill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveCode}>{code}</Text>
-          </View>
           <Text numberOfLines={1} style={styles.peekTitle}>
             {title}
           </Text>
           <Text numberOfLines={1} style={styles.peekMeta}>
-            {meta}
-            {playing && pos > 0 ? `  ·  ${fmt(pos)}` : ""}
+            {sub}
           </Text>
         </Pressable>
 
@@ -362,141 +373,174 @@ function useLivePosition(): number {
 
 function TraySheet({
   code,
-  detent,
-  setDetent,
-  winH,
+  media,
   bottomInset,
+  winH,
   memberIds,
   queueLen,
   onClose,
 }: {
   code: string;
-  detent: Detent;
-  setDetent: (d: Detent) => void;
-  winH: number;
+  media: TrayMedia;
   bottomInset: number;
+  winH: number;
   memberIds: string;
   queueLen: number;
   onClose: () => void;
 }) {
-  // Open when there is something to look at, collapsed when there isn't.
-  const [queueOpen, setQueueOpen] = useState(queueLen > 0);
-  const halfH = Math.round(winH * 0.46);
-  const fullH = Math.round(winH * 0.78);
-  const height = useSharedValue(detent === "full" ? fullH : halfH);
+  // ONE height and a switcher, not detents plus a collapsible section. Those
+  // three overlapping ways to resize meant the pane you actually came for got a
+  // sliver of the sheet, and both halves showed empty states at once. A single
+  // tall sheet with two tabs gives whichever pane you picked the whole area.
+  const [tab, setTab] = useState<"chat" | "queue">("chat");
+  const ids = useMemo(() => memberIds.split(",").filter(Boolean), [memberIds]);
 
-  useEffect(() => {
-    height.value = withTiming(detent === "full" ? fullH : halfH, {
-      duration: duration.base,
-      easing: easing.standard,
-    });
-  }, [detent, halfH, fullH, height]);
-
-  const sheetStyle = useAnimatedStyle(() => ({ height: height.value }));
-
-  const toggle = useCallback(
-    () => setDetent(detent === "full" ? "half" : "full"),
-    [detent, setDetent],
-  );
-
-  // Drag the grabber: up past a threshold → full, down → half, further → close.
+  // The grabber now does one thing: dismiss. No detent to guess at.
   const pan = useMemo(
     () =>
       Gesture.Pan()
         .onEnd((e) => {
           "worklet";
-          if (e.translationY < -40) runOnJS(setDetent)("full");
-          else if (e.translationY > 90) runOnJS(onClose)();
-          else if (e.translationY > 40) runOnJS(setDetent)("half");
+          if (e.translationY > 60) runOnJS(onClose)();
         })
         .runOnJS(false),
-    [setDetent, onClose],
+    [onClose],
   );
 
-  const ids = useMemo(() => memberIds.split(",").filter(Boolean), [memberIds]);
-
   return (
-    <Animated.View style={[styles.sheet, { paddingBottom: bottomInset }, sheetStyle]}>
+    <View style={[styles.sheet, { height: Math.round(winH * 0.8), paddingBottom: bottomInset }]}>
       <Frost intensity={50} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.sheetTint]} />
+
       <GestureDetector gesture={pan}>
         <Pressable
-          onPress={toggle}
+          onPress={onClose}
           style={styles.grabberHit}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={detent === "full" ? "Collapse the tray" : "Expand the tray to show the queue"}
+          accessibilityLabel="Close the party tray"
         >
           <View style={styles.grabber} />
         </Pressable>
       </GestureDetector>
 
-      <View style={styles.sheetHead}>
-        <View style={styles.sheetHeadLeft}>
-          <View style={styles.livePill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveCode}>{code}</Text>
-          </View>
-          <View style={styles.avatars}>
-            {ids.slice(0, 4).map((id, i) => (
-              <View key={id} style={[styles.avatarSlot, i > 0 && styles.avatarOverlap]}>
-                <BearAvatar config={bearFor(id)} size={ms(22)} />
-              </View>
-            ))}
-          </View>
-          <Text style={styles.watching}>
-            {ids.length} watching
-          </Text>
+      {/* Expanding used to DROP the artwork the peek bar had, so you lost your
+          bearings on the way in. It now carries over and grows. */}
+      <NowPlayingCard media={media} code={code} onOpenRoom={() => { onClose(); enterParty({ room: code, role: "guest" }); }} />
+
+      <View style={styles.whoRow}>
+        <View style={styles.avatars}>
+          {ids.slice(0, 5).map((id, i) => (
+            <View key={id} style={[styles.avatarSlot, i > 0 && styles.avatarOverlap]}>
+              <BearAvatar config={bearFor(id)} size={ms(24)} />
+            </View>
+          ))}
         </View>
-        <Pressable
-          style={styles.openRoomBtn}
-          onPress={() => {
-            onClose();
-            enterParty({ room: code, role: "guest" });
-          }}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="Open the room"
-        >
-          <Ionicons name="tv-outline" size={ms(14)} color={colors.onHoney} />
-          <Text style={styles.openRoomText}>Open room</Text>
-        </Pressable>
+        <Text style={styles.watching}>
+          {ids.length} {ids.length === 1 ? "person" : "people"} in the room
+        </Text>
       </View>
 
-      {/* The queue is a COLLAPSIBLE, height-capped section rather than half the
-          sheet: a 50/50 split spent most of the screen on two empty states, and
-          chat is what you actually keep open while browsing. */}
-      {detent === "full" ? (
-        <View style={[styles.queuePane, queueOpen && styles.queuePaneOpen]}>
-          <Pressable
-            style={styles.sectionHead}
-            onPress={() => setQueueOpen((v) => !v)}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={queueOpen ? "Collapse the queue" : "Expand the queue"}
-          >
-            <Text style={styles.overline}>UP NEXT</Text>
-            {queueLen > 0 ? (
-              <View style={styles.countPill}>
-                <Text style={styles.countText}>{queueLen}</Text>
-              </View>
-            ) : null}
-            <View style={{ flex: 1 }} />
-            <Ionicons
-              name={queueOpen ? "chevron-up" : "chevron-down"}
-              size={ms(15)}
-              color={colors.textDim}
-            />
-          </Pressable>
-          {queueOpen ? <PartyQueueList /> : null}
-        </View>
-      ) : null}
-
-      <View style={styles.chatPane}>
-        <Text style={[styles.overline, styles.chatOverline]}>CHAT</Text>
-        <PartyChatThread compact />
+      <View style={styles.segment}>
+        {(["chat", "queue"] as const).map((t) => {
+          const active = tab === t;
+          return (
+            <Pressable
+              key={t}
+              onPress={() => setTab(t)}
+              style={[styles.segItem, active && styles.segItemActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t === "chat" ? "Chat" : "Queue"}
+            >
+              <Text style={[styles.segText, active && styles.segTextActive]}>
+                {t === "chat" ? "Chat" : "Up next"}
+              </Text>
+              {t === "queue" && queueLen > 0 ? (
+                <View style={[styles.countPill, active && styles.countPillActive]}>
+                  <Text style={[styles.countText, active && styles.countTextActive]}>{queueLen}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        })}
       </View>
-    </Animated.View>
+
+      <View style={styles.pane}>
+        {tab === "chat" ? <PartyChatThread compact /> : <PartyQueueList />}
+      </View>
+    </View>
+  );
+}
+
+/** The sheet's anchor: what the room is on, and the way back into it. */
+function NowPlayingCard({
+  media,
+  code,
+  onOpenRoom,
+}: {
+  media: TrayMedia;
+  code: string;
+  onOpenRoom: () => void;
+}) {
+  const { data: details } = useDetailsQuery(
+    media ? { type: media.type, id: media.tmdbId } : skipToken,
+  );
+  const poster = img(details?.poster_path, "w154") ?? undefined;
+  const pos = useLivePosition();
+  const runtimeSec = useRuntimeSeconds(details);
+  const pct = runtimeSec > 0 ? Math.min(1, pos / runtimeSec) : 0;
+  const title = media?.title || details?.title || details?.name || "Nothing playing";
+  const line =
+    media
+      ? [
+          media.type === "tv" && media.season != null
+            ? `S${media.season} · E${media.episode ?? 1}`
+            : null,
+          runtimeSec > 0 ? `${fmt(pos)} / ${fmt(runtimeSec)}` : pos > 0 ? fmt(pos) : null,
+        ]
+          .filter(Boolean)
+          .join("  ·  ")
+      : "Pick something and it plays for everyone";
+
+  return (
+    <View style={styles.npCard}>
+      {poster ? (
+        <Image source={{ uri: poster }} style={styles.npPoster} contentFit="cover" />
+      ) : (
+        <View style={[styles.npPoster, styles.npPosterEmpty]}>
+          <Ionicons name="film-outline" size={ms(20)} color={colors.honey} />
+        </View>
+      )}
+      <View style={styles.npMid}>
+        {/* The code sits here, small and quiet — it is reference information, not
+            a headline, and it was shouting at the top of the sheet before. */}
+        <View style={styles.livePill}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveCode}>{code}</Text>
+        </View>
+        <Text numberOfLines={1} style={styles.npTitle}>
+          {title}
+        </Text>
+        <Text numberOfLines={1} style={styles.npLine}>
+          {line}
+        </Text>
+        {media ? (
+          <View style={styles.npTrack}>
+            <View style={[styles.npFill, { width: `${Math.round(pct * 100)}%` }]} />
+          </View>
+        ) : null}
+      </View>
+      <Pressable
+        style={styles.npOpen}
+        onPress={onOpenRoom}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Open the room"
+      >
+        <Ionicons name="tv-outline" size={ms(17)} color={colors.onHoney} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -591,36 +635,79 @@ const styles = StyleSheet.create({
     borderRadius: ms(2),
     backgroundColor: colors.borderStrong,
   },
-  sheetHead: {
+
+  /* ---- expanded sheet ------------------------------------------------- */
+  whoRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: ms(10),
+    gap: ms(9),
     paddingHorizontal: ms(16),
-    paddingBottom: ms(12),
+    paddingTop: ms(12),
   },
-  sheetHeadLeft: { flexDirection: "row", alignItems: "center", gap: ms(9), flexShrink: 1 },
-  watching: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
-  openRoomBtn: {
+  watching: { ...type.caption, fontSize: ms(11.5), color: colors.textDim },
+
+  /* Now-playing card — the sheet's anchor. */
+  npCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(5),
-    paddingHorizontal: ms(12),
-    height: ms(32),
-    borderRadius: radius.pill,
+    gap: ms(12),
+    marginHorizontal: ms(14),
+    padding: ms(10),
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  npPoster: { width: ms(44), height: ms(62), borderRadius: radius.sm },
+  npPosterEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+  },
+  npMid: { flex: 1, gap: ms(3) },
+  npTitle: { ...type.h3, fontSize: ms(15) },
+  npLine: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
+  npTrack: {
+    height: ms(3),
+    borderRadius: ms(2),
+    backgroundColor: colors.surfaceStrong,
+    marginTop: ms(4),
+    overflow: "hidden",
+  },
+  npFill: { height: ms(3), borderRadius: ms(2), backgroundColor: colors.honey },
+  npOpen: {
+    width: ms(38),
+    height: ms(38),
+    borderRadius: ms(19),
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.honey,
   },
-  openRoomText: { fontFamily: font.label, fontSize: ms(11.5), color: colors.onHoney },
 
-  overline: { ...type.overline },
-  chatOverline: { paddingHorizontal: ms(16), paddingBottom: ms(6) },
-  sectionHead: {
+  /* Segmented switcher — one pane at full height beats two half-empty ones. */
+  segment: {
+    flexDirection: "row",
+    gap: ms(4),
+    margin: ms(14),
+    marginBottom: ms(6),
+    padding: ms(4),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+  },
+  segItem: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(8),
-    paddingHorizontal: ms(16),
-    paddingVertical: ms(9),
+    justifyContent: "center",
+    gap: ms(6),
+    height: ms(34),
+    borderRadius: radius.pill,
   },
+  segItemActive: { backgroundColor: colors.honey },
+  segText: { fontFamily: font.label, fontSize: ms(12.5), color: colors.textDim },
+  segTextActive: { color: colors.onHoney },
   countPill: {
     minWidth: ms(18),
     height: ms(18),
@@ -630,14 +717,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.honeySoft,
   },
+  countPillActive: { backgroundColor: "rgba(26,18,6,0.22)" },
   countText: { fontFamily: font.label, fontSize: ms(10), color: colors.honey },
-  /* Capped, not flex: the queue peeks, chat keeps the room. */
-  queuePane: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  queuePaneOpen: { maxHeight: "42%" },
-  chatPane: { flex: 1, paddingTop: ms(10) },
+  countTextActive: { color: colors.onHoney },
+
+  pane: { flex: 1 },
 });
 
 export default PartyTray;
