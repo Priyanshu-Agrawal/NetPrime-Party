@@ -709,11 +709,13 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  /* Real glass now: the blur carries it (intensity 90) under a light scrim rather
-     than a near-opaque slab at 0.86, so the screen behind stays present as
-     texture. The warm lift keeps text contrast where the backdrop goes bright. */
-  sheetTint: { backgroundColor: "rgba(16,13,10,0.52)" },
-  sheetLift: { backgroundColor: "rgba(246,239,227,0.05)" },
+  /* The SHEET stays dark and near-opaque — it is a panel you read against, and a
+     busy poster grid showing through a full-height surface is noise, not depth.
+     The glass here is the heavy blur plus the warm lift at the edges, not
+     transparency. (The mini-player is the opposite case: it is a thin strip, so
+     it stays light and lets the artwork through.) */
+  sheetTint: { backgroundColor: "rgba(16,13,10,0.84)" },
+  sheetLift: { backgroundColor: "rgba(246,239,227,0.03)" },
   grabberHit: { alignItems: "center", paddingTop: ms(9), paddingBottom: ms(7) },
   grabber: {
     width: ms(42),
