@@ -34,9 +34,10 @@ import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { usePartySession, usePartySnapshot } from "@/services/party/PartySession";
 import { effectivePositionMs } from "@/services/party/protocol";
 import { enterParty } from "@/src/navigation/actions";
-import { colors, font, ms, radius } from "@/theme/bearoom";
+import { colors, font, ms, radius, type } from "@/theme/bearoom";
 import { duration, easing } from "@/theme/motion";
 import { Ionicons } from "@expo/vector-icons";
+import { Frost } from "@/src/ui/Frost";
 import { Image } from "expo-image";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
@@ -198,73 +199,106 @@ function PeekBar({
     media ? { type: media.type, id: media.tmdbId } : skipToken,
   );
   const poster = img(details?.poster_path, "w154") ?? undefined;
-  const title = media?.title || details?.title || details?.name || "Nothing queued yet";
-  const sub =
+  const playing = !!media;
+  const title = media?.title || details?.title || details?.name || "Nothing playing";
+  const meta =
     media?.type === "tv" && media.season != null
       ? `S${media.season} · E${media.episode ?? 1}`
       : queueLen > 0
-      ? `${queueLen} in queue`
-      : "Tap to add something";
+      ? `${queueLen} queued`
+      : "Add something to watch";
 
   const pos = useLivePosition();
+  const runtimeSec = useRuntimeSeconds(details);
+  const pct = runtimeSec > 0 ? Math.min(1, pos / runtimeSec) : 0;
   const ids = useMemo(() => memberIds.split(",").filter(Boolean), [memberIds]);
 
   return (
     <View style={styles.peek}>
-      {/* artwork is the shortcut straight back into the room */}
-      <Pressable
-        onPress={() => enterParty({ room: code, role: "guest" })}
-        hitSlop={4}
-        style={styles.peekArt}
-        accessibilityRole="button"
-        accessibilityLabel="Back to the party"
-      >
-        {poster ? (
-          <Image source={{ uri: poster }} style={styles.peekPoster} contentFit="cover" />
-        ) : (
-          <View style={[styles.peekPoster, styles.peekPosterEmpty]}>
-            <Ionicons name="add" size={ms(16)} color={colors.honey} />
-          </View>
-        )}
-      </Pressable>
-
-      <Pressable
-        style={styles.peekMid}
-        onPress={onOpen}
-        hitSlop={4}
-        accessibilityRole="button"
-        accessibilityLabel="Open the party tray"
-      >
-        <Text numberOfLines={1} style={styles.peekTitle}>
-          {title}
-        </Text>
-        <View style={styles.peekSubRow}>
-          <View style={styles.liveDot} />
-          <Text numberOfLines={1} style={styles.peekSub}>
-            {code} · {sub}
-            {pos > 0 ? ` · ${fmt(pos)}` : ""}
-          </Text>
-        </View>
-      </Pressable>
-
-      <Pressable
-        style={styles.peekRight}
-        onPress={onOpen}
-        hitSlop={4}
-        accessibilityRole="button"
-        accessibilityLabel="Expand the party tray"
-      >
-        <View style={styles.avatars}>
-          {ids.slice(0, 3).map((id, i) => (
-            <View key={id} style={[styles.avatarSlot, i > 0 && { marginLeft: -ms(9) }]}>
-              <BearAvatar config={bearFor(id)} size={ms(20)} />
+      {/* Same frosted surface as FloatingTabBar (GlassCard @ intensity 40), so the
+          tray and the bar it rides on read as one object rather than two. Frost is
+          safe here: the tray hides itself on Party/Player, and the "never over live
+          video" rule is about the video surface, not browse screens. */}
+      <Frost intensity={40} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, styles.peekTint]} />
+      <View style={styles.peekBody}>
+        {/* Artwork is the shortcut straight back into the room. */}
+        <Pressable
+          onPress={() => enterParty({ room: code, role: "guest" })}
+          hitSlop={4}
+          style={styles.peekArt}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the party"
+        >
+          {poster ? (
+            <Image source={{ uri: poster }} style={styles.peekPoster} contentFit="cover" />
+          ) : (
+            <View style={[styles.peekPoster, styles.peekPosterEmpty]}>
+              <Ionicons name="film-outline" size={ms(17)} color={colors.honey} />
             </View>
-          ))}
-        </View>
-        <Ionicons name="chevron-up" size={ms(16)} color={colors.textDim} />
-      </Pressable>
+          )}
+        </Pressable>
+
+        <Pressable
+          style={styles.peekMid}
+          onPress={onOpen}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel="Open the party tray"
+        >
+          <View style={styles.livePill}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveCode}>{code}</Text>
+          </View>
+          <Text numberOfLines={1} style={styles.peekTitle}>
+            {title}
+          </Text>
+          <Text numberOfLines={1} style={styles.peekMeta}>
+            {meta}
+            {playing && pos > 0 ? `  ·  ${fmt(pos)}` : ""}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.peekRight}
+          onPress={onOpen}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel="Expand the party tray"
+        >
+          <View style={styles.avatars}>
+            {ids.slice(0, 3).map((id, i) => (
+              <View key={id} style={[styles.avatarSlot, i > 0 && styles.avatarOverlap]}>
+                <BearAvatar config={bearFor(id)} size={ms(21)} />
+              </View>
+            ))}
+          </View>
+          <View style={styles.chevBtn}>
+            <Ionicons name="chevron-up" size={ms(15)} color={colors.honey} />
+          </View>
+        </Pressable>
+      </View>
+
+      {/* A hairline honey rule along the bottom edge is the whole "something is
+          playing" signal — no numbers to read, and it costs one View. */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%` }]} />
+      </View>
     </View>
   );
+}
+
+/** Total runtime in seconds from a TMDB details payload (movie or episode). */
+function useRuntimeSeconds(details: any): number {
+  return useMemo(() => {
+    const mins =
+      typeof details?.runtime === "number"
+        ? details.runtime
+        : Array.isArray(details?.episode_run_time)
+        ? details.episode_run_time[0]
+        : 0;
+    return (mins ?? 0) * 60;
+  }, [details]);
 }
 
 /**
@@ -374,6 +408,8 @@ function TraySheet({
 
   return (
     <Animated.View style={[styles.sheet, { paddingBottom: bottomInset }, sheetStyle]}>
+      <Frost intensity={50} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, styles.sheetTint]} />
       <GestureDetector gesture={pan}>
         <Pressable
           onPress={toggle}
@@ -387,16 +423,22 @@ function TraySheet({
       </GestureDetector>
 
       <View style={styles.sheetHead}>
-        <View style={styles.liveDot} />
-        <Text style={styles.sheetCode}>{code}</Text>
-        <View style={styles.avatars}>
-          {ids.slice(0, 4).map((id, i) => (
-            <View key={id} style={[styles.avatarSlot, i > 0 && { marginLeft: -ms(9) }]}>
-              <BearAvatar config={bearFor(id)} size={ms(20)} />
-            </View>
-          ))}
+        <View style={styles.sheetHeadLeft}>
+          <View style={styles.livePill}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveCode}>{code}</Text>
+          </View>
+          <View style={styles.avatars}>
+            {ids.slice(0, 4).map((id, i) => (
+              <View key={id} style={[styles.avatarSlot, i > 0 && styles.avatarOverlap]}>
+                <BearAvatar config={bearFor(id)} size={ms(22)} />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.watching}>
+            {ids.length} watching
+          </Text>
         </View>
-        <View style={{ flex: 1 }} />
         <Pressable
           style={styles.openRoomBtn}
           onPress={() => {
@@ -404,8 +446,10 @@ function TraySheet({
             enterParty({ room: code, role: "guest" });
           }}
           hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Open the room"
         >
-          <Ionicons name="expand-outline" size={ms(13)} color={colors.honey} />
+          <Ionicons name="tv-outline" size={ms(14)} color={colors.onHoney} />
           <Text style={styles.openRoomText}>Open room</Text>
         </Pressable>
       </View>
@@ -413,11 +457,13 @@ function TraySheet({
       {/* full = queue standing where the video sits on PartyScreen, chat beneath */}
       {detent === "full" ? (
         <View style={styles.queuePane}>
+          <Text style={styles.overline}>UP NEXT</Text>
           <PartyQueueList />
         </View>
       ) : null}
 
       <View style={styles.chatPane}>
+        <Text style={styles.overline}>CHAT</Text>
         <PartyChatThread compact />
       </View>
     </Animated.View>
@@ -426,54 +472,91 @@ function TraySheet({
 
 const styles = StyleSheet.create({
   peekWrap: { position: "absolute", left: ms(12), right: ms(12) },
+
+  /* Mini-player surface. NO blur, NO elevation (see the header note) — the
+     "live" read comes from a honey hairline + the progress rule, not a shadow. */
   peek: {
     height: PEEK_H,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+  },
+  /* Warm tint over the blur — enough body that title/meta stay legible on top of
+     a bright poster grid, still transparent enough to read as glass. */
+  peekTint: { backgroundColor: "rgba(22,18,13,0.62)" },
+  peekBody: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(10),
+    gap: ms(11),
     paddingHorizontal: ms(10),
-    borderRadius: radius.lg,
-    // NO blur, NO elevation — see the header note.
-    backgroundColor: colors.bgElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
   },
-  peekArt: { borderRadius: ms(6), overflow: "hidden" },
-  peekPoster: { width: ms(30), height: ms(42), borderRadius: ms(6) },
+  peekArt: { borderRadius: radius.sm, overflow: "hidden" },
+  peekPoster: { width: ms(34), height: ms(46), borderRadius: radius.sm },
   peekPosterEmpty: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
   },
-  peekMid: { flex: 1, gap: ms(3) },
-  peekTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(13) },
-  peekSubRow: { flexDirection: "row", alignItems: "center", gap: ms(5) },
-  peekSub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(11), flexShrink: 1 },
-  liveDot: { width: ms(6), height: ms(6), borderRadius: ms(3), backgroundColor: colors.honey },
-  peekRight: { flexDirection: "row", alignItems: "center", gap: ms(6) },
-  avatars: { flexDirection: "row", alignItems: "center" },
-  avatarSlot: {
-    borderRadius: ms(12),
-    borderWidth: ms(1.5),
-    borderColor: colors.bgElevated,
-    overflow: "hidden",
+  peekMid: { flex: 1, gap: ms(2) },
+  peekTitle: { ...type.label, fontFamily: font.headlineSemi, fontSize: ms(13.5) },
+  peekMeta: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
+
+  /* The room's identity: a honey capsule you can find at a glance. */
+  livePill: { flexDirection: "row", alignItems: "center", gap: ms(5) },
+  liveDot: {
+    width: ms(6),
+    height: ms(6),
+    borderRadius: ms(3),
+    backgroundColor: colors.honey,
+  },
+  liveCode: {
+    fontFamily: font.label,
+    fontSize: ms(10),
+    letterSpacing: 1.4,
+    color: colors.honey,
   },
 
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)" },
+  peekRight: { flexDirection: "row", alignItems: "center", gap: ms(8) },
+  avatars: { flexDirection: "row", alignItems: "center" },
+  avatarSlot: {
+    borderRadius: radius.pill,
+    borderWidth: ms(1.5),
+    borderColor: "rgba(22,18,13,0.9)",
+    overflow: "hidden",
+  },
+  avatarOverlap: { marginLeft: -ms(9) },
+  chevBtn: {
+    width: ms(28),
+    height: ms(28),
+    borderRadius: ms(14),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.honeySoft,
+  },
+
+  progressTrack: { height: ms(2), backgroundColor: colors.surface },
+  progressFill: { height: ms(2), backgroundColor: colors.honey },
+
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
   sheet: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.bgElevated,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    overflow: "hidden",
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  grabberHit: { alignItems: "center", paddingVertical: ms(10) },
+  sheetTint: { backgroundColor: "rgba(16,13,10,0.86)" },
+  grabberHit: { alignItems: "center", paddingTop: ms(9), paddingBottom: ms(7) },
   grabber: {
-    width: ms(38),
+    width: ms(42),
     height: ms(4),
     borderRadius: ms(2),
     backgroundColor: colors.borderStrong,
@@ -481,32 +564,32 @@ const styles = StyleSheet.create({
   sheetHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(8),
-    paddingHorizontal: ms(14),
-    paddingBottom: ms(10),
+    justifyContent: "space-between",
+    gap: ms(10),
+    paddingHorizontal: ms(16),
+    paddingBottom: ms(12),
   },
-  sheetCode: {
-    color: colors.text,
-    fontFamily: font.headlineSemi,
-    fontSize: ms(13),
-    letterSpacing: 1,
-  },
+  sheetHeadLeft: { flexDirection: "row", alignItems: "center", gap: ms(9), flexShrink: 1 },
+  watching: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
   openRoomBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(4),
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(6),
+    gap: ms(5),
+    paddingHorizontal: ms(12),
+    height: ms(32),
     borderRadius: radius.pill,
-    backgroundColor: colors.honeySoft,
+    backgroundColor: colors.honey,
   },
-  openRoomText: { color: colors.honey, fontFamily: font.label, fontSize: ms(11) },
+  openRoomText: { fontFamily: font.label, fontSize: ms(11.5), color: colors.onHoney },
+
+  overline: { ...type.overline, paddingHorizontal: ms(16), paddingBottom: ms(6) },
   queuePane: {
     flex: 1,
+    paddingTop: ms(4),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  chatPane: { flex: 1 },
+  chatPane: { flex: 1, paddingTop: ms(10) },
 });
 
 export default PartyTray;

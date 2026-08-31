@@ -60,7 +60,9 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons name="chatbubble-outline" size={ms(20)} color={colors.textFaint} />
+            <View style={styles.emptyIcon}>
+              <Ionicons name="chatbubbles-outline" size={ms(18)} color={colors.honey} />
+            </View>
             <Text style={styles.emptyText}>Say something to the pack</Text>
           </View>
         }
@@ -119,7 +121,7 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
           onPress={send}
           hitSlop={6}
         >
-          <Ionicons name="send" size={ms(15)} color={colors.onHoney} />
+          <Ionicons name="arrow-up" size={ms(17)} color={colors.onHoney} />
         </Pressable>
       </View>
     </View>
@@ -129,8 +131,18 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   list: { paddingHorizontal: ms(12), paddingBottom: ms(8), gap: ms(2) },
-  empty: { alignItems: "center", justifyContent: "center", paddingVertical: ms(28), gap: ms(6) },
-  emptyText: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(12) },
+  empty: { alignItems: "center", justifyContent: "center", paddingVertical: ms(26), gap: ms(8) },
+  emptyIcon: {
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(20),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honeyGlow,
+  },
+  emptyText: { color: colors.textDim, fontFamily: font.bodyMed, fontSize: ms(12.5) },
   row: { flexDirection: "row", alignItems: "flex-end", gap: ms(6) },
   rowMine: { justifyContent: "flex-end" },
   rowTheirs: { justifyContent: "flex-start" },
@@ -154,7 +166,9 @@ const styles = StyleSheet.create({
   composerCompact: { paddingBottom: ms(4) },
   input: {
     flex: 1,
-    height: ms(38),
+    height: ms(40),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     paddingHorizontal: ms(14),
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
@@ -163,9 +177,9 @@ const styles = StyleSheet.create({
     fontSize: ms(13),
   },
   send: {
-    width: ms(38),
-    height: ms(38),
-    borderRadius: ms(19),
+    width: ms(40),
+    height: ms(40),
+    borderRadius: ms(20),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honey,
