@@ -218,6 +218,31 @@ For a pasted link that is **neither** YouTube **nor** a direct media URL:
   either keep the host as the origin (not room-syncable) or fail with a clear message. This is the same wall
   that killed the server-side scraper; we surface it honestly rather than pretend.
 
+  > **⚠ AMENDED 2026-08-31 — this premise did not reproduce and must be re-measured, not assumed.**
+  > The on-device plugin research ([../research/nuvio-plugin-architecture.md](../research/nuvio-plugin-architecture.md))
+  > tested exactly this and found **no IP-lock**: 2 MB of media was served **HTTP 206 to a foreign Tor exit
+  > IP, with no headers at all**, from a URL resolved ~20 minutes earlier on a different continent. Resolved
+  > URLs also re-resolved **deterministically** (identical bytes under a rotated seed), so a guest can derive
+  > the same URL locally instead of being handed the host's.
+  >
+  > The post-mortem's IP-lock finding was real but was measured against **server-side** resolution, where the
+  > CDN token is minted for the *resolver's* IP and the phone is a different IP. Sniffing happens on the
+  > viewer's own device, so that mismatch does not arise by construction.
+  >
+  > **Keep this graceful-degradation design as the fallback** — some CDNs certainly do bind tokens, and
+  > `syncable: false` remains the right escape hatch. But **measure per-provider before labelling anything
+  > host-only**, and prefer "guests re-resolve locally" over "host streams to guests" wherever the source
+  > allows it.
+
+  > **Prior art exists — do not start from scratch.** `components/player/SnifferWebView.old.tsx` (153 lines)
+  > already implements the offscreen-WebView `fetch`/`XHR` hook and posts back the first `.m3u8`/`.mp4` with
+  > synthesized headers. Its documented blocker — *"injected JS runs in the top frame only… if a provider
+  > fetches its stream from inside a CROSS-ORIGIN iframe, that request is invisible here"* — **has since been
+  > solved elsewhere in this repo**: `HijackPlayer.tsx:663` sets
+  > `injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}` (all-frames injection, with a nonce-gated
+  > frame relay). Porting that one prop is most of the gap. Phase 4 is therefore **cheaper than its "hardest,
+  > most fragile" label** suggests.
+
 ---
 
 ## 7. Party UX rebuild (the "existing UX improvements" you want first)
@@ -300,10 +325,30 @@ Each phase is independently shippable and testable end-to-end.
 ## 12. Data model & schema changes
 
 - **QueueItem:** `{ id, type (§2), ref, title, poster?, addedBy (userId), addedAt, status: queued|playing|done|failed, syncable: bool }`.
+  > **Refined 2026-08-31 for implementation.** `type` becomes a **discriminator on `ref` itself**
+  > (`QueueRef = { source: "tmdb" | "direct" | "plugin" | "youtube", … }`) so the item and its reference
+  > cannot disagree. Field names settled as `posterPath` (a TMDB *path*, never a full URL),
+  > `addedByUserId`, `runtimeMs`, `subtitle`. `status` drops `playing` — the current item is identified by
+  > the room's `queue_current_id`, so a per-item `playing` flag would be a second source of truth.
+  > **`id` is exactly `mediaKey()`** from `utils/failureMemory.ts:31-35` (`movie:<id>` / `tv:<id>:<s>:<e>`) —
+  > keep the two formulas in lockstep so failure memory and queue identity agree.
+  >
+  > Critically, **no ref carries a resolved URL except `direct`**. `plugin` carries the identifier tuple
+  > (`tmdbId + pluginId + streamId? + language?`) because plugin resolution is deterministic, so each guest
+  > resolves locally rather than being handed the host's URL. That is what keeps plugin items syncable.
 - **Party state:** replace single `media` with `{ queue: QueueItem[], currentIndex, playback }`. New/changed
   Supabase: a `party_queue` representation (table or snapshot field) + RPCs for add/remove/reorder/advance,
   RLS-gated to room members (mirrors the chat/party RLS from C1). **Migration:** existing single-media rooms map
   to a 1-item queue.
+  > **Settled 2026-08-31:** a **`queue jsonb` column on `party_rooms`**, not a `party_queue` table — every
+  > queue RPC already has to `SELECT … FOR UPDATE` the room row to bump `seq` and re-anchor, so the room lock
+  > already serialises queue mutations; `party_snapshot()` stays a single-table `language sql` function; and
+  > it needs **zero new RLS policy** (inherits `party_rooms_select`). Identity is `queue_current_id`, **not**
+  > `currentIndex` — an index breaks under reorder.
+  >
+  > **`party_rooms.media` is NOT removed.** It stays as a derived mirror of the current item, so an
+  > already-installed v1 client in the same room keeps playing correctly. That removes the flag day and makes
+  > the risky migration provable by running the *current unmodified build* against the migrated database.
 - **`curated_collection`** (Phase 5): `{ id, title, description, cover, author?, role?, article? (far-future),
   items: HeterogeneousRef[], visibility: editorial|personal|shared }`.
 - **Per-domain browser allow/block** (Phase 4): local persisted list.
@@ -322,11 +367,19 @@ Each phase is independently shippable and testable end-to-end.
 - **`ended` signal reliability** — auto-next depends on every player emitting a clean `ended`.
 
 **Open decisions (confirm before the relevant phase):**
-1. **YouTube:** extractor (native, fragile, ToS) vs IFrame (branded, stable). *Leaning extractor* (off-store).
-2. **Queue authority:** host-authoritative (recommended) vs shared/collaborative editing.
-3. **Curated-collection storage:** Supabase editorial + personal, or local-first personal to start.
+1. **YouTube:** extractor (native, fragile, ToS) vs IFrame (branded, stable). *Leaning extractor* (off-store). — **still open**
+2. ~~**Queue authority:** host-authoritative vs shared/collaborative editing.~~
+   **RESOLVED 2026-08-31 → host-authoritative.** Ordering and current-item are host-only (same lease
+   predicate as `party_set_media`); *adds* are gated by the already-provisioned per-member `canQueue`
+   permission (`0001_party_core.sql:143,167`) and the room-level `queueEnabled` flag (`:37`). Rationale:
+   choosing what plays *is* playback control, and the existing sync model is already host-authoritative,
+   so a collaborative current-item would need a second authority model for no user-visible gain.
+3. **Curated-collection storage:** Supabase editorial + personal, or local-first personal to start. — **still open**
 4. **Web-sniffed non-syncable items:** "host-only in-room" playback vs reject-with-message.
-5. **Phase-1 start:** queue-first (your stated order) vs a direct-link thin slice first to prove the player.
+   — **still open, but its premise changed** — see the amendment in §6.4; re-measure before deciding.
+5. ~~**Phase-1 start:** queue-first vs a direct-link thin slice first.~~
+   **RESOLVED 2026-08-31 → queue-first.** The queue is the socket every later source plugs into; doing the
+   direct-link slice first would mean building the player interface *and* reworking party sync twice.
 
 ---
 

@@ -67,8 +67,8 @@ Implemented a perfectly silent, zero-UI preference memory system.
 
 ---
 
-## `[/]` Phase 6: Cloudflare-Served Injection Scripts (The Bridge)
-**Status:** **ACTIVE** — cutover code complete + typecheck clean; PENDING device QA.
+## `[x]` Phase 6: Cloudflare-Served Injection Scripts (The Bridge)
+**Status:** **CLOSED 2026-08-31** — cutover shipped and live; the last open item (broad device QA) is **superseded by Phase 11**, see below.
 **Objective:** Decouple DOM-hijack logic from the app binary for instant cat-and-mouse updates.
 
 **Strategy pivot — Option 1 (serve the PROVEN bridge verbatim).** A red-team of the
@@ -95,13 +95,26 @@ moves), and keep the clean core+delta as a **later, incremental refactor**.
   as the clean-refactor target. The deferred **event-rename** (`timeupdate`/`state`) and
   **echo-suppression into `np.cmd`** belong to THAT refactor — not needed for Option 1
   (the legacy bridge already has them).
-* `[ ]` **Device QA:** re-upload the legacy bridge first, then verify none of the 8
-  subsystems regressed. See `docs/qa/phase6-cutover-qa.md`.
+* `[x]` **Device QA (videasy):** done — the bridge binds 3/3 on a clean runtime; the
+  intermittent no-bind was root-caused to a keepAlive race and fixed (`ad06d7d`, bridge
+  `videasy@b4f4919a`). See `docs/qa/phase6-cutover-qa.md` and the bind-verification note.
+* `[~]` **Device QA (the other 8 hijackable providers): SUPERSEDED by Phase 11.**
+  *Closed deliberately, not forgotten.* Only `videasy` has ever had a `script_version`
+  (verified against the live worker `/config`: 14 providers, exactly one with a script),
+  so "QA the other 8" really means "author 8 more bespoke bridges and maintain them" —
+  a treadmill only the operator can run, since uploading a bridge needs the operator
+  secret. Phase 11 (on-device plugin resolution) reaches the same providers through a
+  community-maintained plugin ecosystem instead. Revisit only if Phase 11 is abandoned.
 
 ---
 
-## `[/]` Phase 7: Telemetry & Failure Memory (The Smart Net)
-**Status:** **ACTIVE**
+## `[x]` Phase 7: Telemetry & Failure Memory (The Smart Net)
+**Status:** **CLOSED 2026-08-31** — all four items shipped and live. Kept open historically
+only because provider-health demotion had never actually fired (no provider was failing
+enough); that is a *quiet success*, not an incomplete task. `utils/failureMemory.ts`
+(MMKV, 4h TTL, `mediaKey()` → providerId) is in use by `PlayerScreen.pickInitialProvider`,
+`triggerFallback` and `onFatalError`. **Phase 11 will reuse `mediaKey()` verbatim as the
+queue item id** — keep the two formulas in lockstep.
 **Objective:** Prevent endless fallback loops and power the cat-and-mouse update cycle.
 **Details:**
 * `[x]` Implement a tiny `POST /report` (provider, tmdbId, outcome) to Supabase.
@@ -218,3 +231,58 @@ Follow-up to the iOS-bind fix. Three parts (diagnosis: [docs/investigations/vide
 **Details:**
 * **Review Mode:** Wire the Supabase `enabledProviders: []` state to show a fully benign "Listing Only" UI.
 * **Web Parity:** Acknowledge cross-origin iframe limits. Provide a simplified Web-only fallback story.
+
+---
+
+## `[/]` Phase 11: On-Device Plugin Resolution (Program 1 · P3)
+**Status:** **RESEARCH COMPLETE + VERIFIED — build not started. Gated behind Program 1 · P1.**
+**Objective:** Replace the per-provider OTA-bridge treadmill with a community-maintained plugin
+ecosystem that resolves `tmdbId → stream URL + headers + audio-track id` **on the device**, and play
+the result in a native player instead of under the provider's own web chrome.
+
+Full study, with every number reproducible: [`docs/research/nuvio-plugin-architecture.md`](research/nuvio-plugin-architecture.md).
+Provider shortlist: [`docs/providers/plugin-provider-shortlist.md`](providers/plugin-provider-shortlist.md).
+
+**Why this exists.** Phase 6 shipped one bridge, for one provider, updatable only by the operator.
+The live worker serves **14 providers with exactly one `script_version`**. Every source that breaks is
+an operator evening. This phase moves that maintenance to an ecosystem that already maintains it.
+
+**What the research settled (all measured on real hardware, not argued):**
+* `[x]` **The three walls from `scraper-poc-postmortem.md` are server-side walls.** No IP-lock (2 MB of
+  media served HTTP 206 to a foreign Tor exit, no headers); no Cloudflare/JA3 block from Node **or** RN
+  fetch; resolved URLs are stable and deterministically re-resolvable — only the 30s seed rotates.
+* `[x]` **Plugins already run in our Hermes.** `eval`/`new Function` both work; the obfuscated 23 KB
+  videasy plugin loaded in-app and returned the *same* URLs as the Node harness.
+* `[x]` **The real wall is codecs.** The premium Hindi tier is MKV + HEVC + E-AC3: only **43 %** of
+  streams and **12 %** of Hindi streams are AVPlayer-compatible, and the A063 test device has **no
+  AC3/E-AC3 decoder at all** (`/vendor/etc/media_codecs*.xml`). iOS has the *decoders* but cannot
+  demux MKV — a stream-copy remux to fMP4 plays and seeks on AVFoundation (1.5 s CPU per 120 s of 4K).
+* `[x]` **`expo-libvlc-player@3.4.25` solves both platforms** — its devDeps pin `expo ~53.0.27` +
+  `react-native 0.79.6`, our exact stack. Runtime-verified on the physical Android device *and* the iOS
+  sim with audio-track enumeration + switching. Cost: **35 MB**, LGPL-2.1. Deferred to *Optional*.
+* `[x]` **Sandbox chosen by benchmark, not preference.** Hidden WebView beats QuickJS-as-asm.js by
+  **300–1600×** (plugin parse 11 ms vs 3 518 ms; 2 M-iteration loop 17 ms vs 26 974 ms). QuickJS has a
+  working `setInterruptHandler` and perfect ES coverage but is disqualified on throughput.
+* `[x]` **Provider audit:** 19 repos → 227 unique scrapers → 152 declaring hi/en → **111 returned
+  nothing**. Lock-in set = `evyrith` + `playimdb` + `vidrock` (9/9 titles). Hindi dubs confirmed by
+  `ffprobe` as real audio (`aac,2,hin`) and are **HLS/AAC**, so they play on plain `expo-video`.
+
+**Build items (none started):**
+* `[ ]` Hidden-WebView sandbox + native fetch proxy. **Hardening is not optional:** capture and
+  `delete window.ReactNativeWebView` after installing the shim, add CSP `default-src 'none'`, add a
+  host-side per-plugin timeout (plugins carry none — one hung a `Promise.all` indefinitely), and
+  reload-on-hang since there is no CPU interrupt.
+* `[ ]` Provider layer: **pin to commit SHAs, never `refs/heads/main`**; allowlist the measured set;
+  blacklist `anikototv` + `animekai` (both return confidently *wrong* content — `anikototv` served a
+  13-minute clip for all 5 titles tested).
+* `[ ]` `cheerio/slim` (the default entry pulls `node:stream`/`undici`) + `crypto-js` (UMD verified
+  working in-app). Per-plugin failure guards — `castle` throws in Hermes but works in Node.
+* `[ ]` Language selection UX. **Two measured caveats:** manifest language tags are inconsistent
+  (present on Endgame, absent on Jawan/Oppenheimer — trust the provider *label*, treat tags as a bonus),
+  and Hindi is per-title, not guaranteed (Oppenheimer had Bengali/Tamil/Telugu but no Hindi).
+
+**Standing risks:** obfuscated third-party JS with unrestricted network access, auto-refreshed on a
+timer — a genuine supply-chain exposure, which is why pinning is mandatory. Legal/ToS posture is
+unchanged by any of this. And provider liveness is volatile: `videasy`'s upstream went fully dark for
+~30 minutes mid-research (DNS+TCP fine, no HTTP in 20 s) and recovered — a live demonstration of why
+one provider is not an architecture.

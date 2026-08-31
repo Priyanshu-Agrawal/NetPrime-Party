@@ -1,7 +1,15 @@
 # ADR — Cooren as a stream backend for Bearoom (validation spike)
 
 **Date:** 2026-08-25 · **Status:** ⛔ **NO-GO — dropped.** Too unstable to pursue for Bearoom even in a dev environment (owner decision, 2026-08-25). Keep the WebView hijack.
-**Related:** `docs/research/scraper-poc-postmortem.md` (native-resolver rejection), HANDBOOK §3.4
+**Related:** `docs/research/scraper-poc-postmortem.md` (native-resolver rejection), HANDBOOK §3.4,
+[`nuvio-plugin-architecture.md`](./nuvio-plugin-architecture.md) (the successor study)
+
+> **2026-08-31 — still NO-GO, but now for a narrower reason.** This ADR rejects Cooren because its
+> proxy model puts every viewer's bytes through our egress, which is the ~$500/mo cost the project exists to
+> avoid. That reasoning stands. What changed is the *alternative*: on-device resolution reaches the same
+> outcome with **no server and no bandwidth bill at all**, and the IP-lock problem this ADR treats as the
+> justification for a proxy **was not reproduced** (media served HTTP 206 to a foreign IP, no headers). So
+> Cooren is not merely unfavourable — it solves a problem we no longer have.
 **Spike target:** does a self-hosted Cooren (`/Users/essence/ReactNative/CoorenLabs`) resolve real
 streams that play end-to-end on a device *on a different IP than the resolver*, and at what cost?
 

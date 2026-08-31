@@ -10,7 +10,37 @@ You're picking up **Bearoom / NetPrime** — a server-driven movie & synced-watc
 ## The one-paragraph mental model
 Tier 1 is a **Cloudflare Worker (Hono + Zod) + Supabase Postgres** serving `/config` (the dynamic provider registry — **no baked-in fallback**, a store-review killswitch), `/scripts` (OTA DOM-hijack bridges), `/report` (telemetry), `/scrape`. Tier 2 is a **`react-native-webview`** mounted on the provider's own embed page, into which the app injects a JS **bridge** (`src/scripts/legacy-videasy.ts`, served OTA, cached in MMKV) that finds and drives the provider's `<video>` — this is what powers solo playback AND synced watch-party. State is **Redux Toolkit + RTK Query**. Only the `videasy` provider (branded **"NetPrime"** in-app) ships a working bridge today.
 
-## Where things stand (2026-08-22)
+## 🧭 Current direction (2026-08-31) — read this before planning anything
+The line above ("only `videasy` ships a working bridge") **is the problem the project is now solving.** The
+live worker serves 14 providers with exactly **one** `script_version`, and only the operator can deploy a new
+bridge, so every source that rots is an operator evening.
+
+Three days of measurement ([docs/research/nuvio-plugin-architecture.md](research/nuvio-plugin-architecture.md))
+established a second, **additive** lane: **on-device plugin resolution** — a sandboxed third-party scraper
+turns a `tmdbId` into a raw stream URL + headers + audio-track id, played in a **native** player with our own
+controls. The WebView hijack is **not** being removed; it stays as the fallback.
+
+**Build order is decided** (see [ROADMAP](ROADMAP.md) → Program 1):
+**P1 queue spine → P2 native player lane → P3 plugin source → P4 in-app browser/sniffer**, with a libVLC
+upgrade held as *Optional*. **P1 is next** — it needs nothing from the research and is the socket every later
+source plugs into.
+
+⚠️ **Two archived documents will actively mislead you if read cold.**
+[`scraper-poc-postmortem.md`](research/scraper-poc-postmortem.md) says native playback is impossible and
+[`cooren-fit-adr.md`](research/cooren-fit-adr.md) says the same about proxying — **both measured *server-side*
+resolution**, where the CDN token is minted for the resolver's IP and the phone is a different IP. On-device
+that mismatch cannot arise, and it was not reproduced (2 MB served HTTP 206 to a foreign Tor exit, no
+headers). Both docs now carry an amendment banner. Cite them for *why server-side was rejected*, never for
+"native is impossible."
+
+The genuinely hard problem turned out to be **codecs, not scraping**: iOS cannot demux MKV (it *can* decode
+HEVC/AC-3/E-AC3 inside MP4/HLS), and the Android test device has no AC3/E-AC3 decoder at all. This does not
+block P2/P3 — the measured Hindi dubs are HLS/AAC and play on plain `expo-video`.
+
+## Where things stand (last refreshed 2026-08-31)
+> ⚠️ The bullets in this section are a **2026-08-22 snapshot** and have drifted. For current status read the
+> **tail of [project-board.md](project-board.md)** (now through `Phase 11`) and [ROADMAP.md](ROADMAP.md).
+> Since that snapshot: Discovery D1–D4 shipped, and the plugin research above landed.
 - Branch **`feat/improvements`**, HEAD ≈ **`ce06e5f`**, `tsc` clean. Worker live at `netprime-worker.spiderfan-no1.workers.dev`. (The branch moves fast across concurrent sessions — trust `git log`, not this hash.)
 - **Search rework (`8add469`, `ce06e5f`):** `SearchView` migrated to **FlashList** with an extracted `useSearchData` hook (debounced, race-safe, ref-based pagination, dedup, short-list auto-load) and **catalog filters** (All/Movies/TV/People type chips + provider chips via TMDB `discover`). New files under `src/features/search/` (`useSearchData.ts`, `BrowseHeader.tsx`, `GridItem.tsx`, `SearchInput.tsx`) + new `tmdbApi` endpoints. **See the board's "Search rework" entry for six open review follow-ups** (notably `watch_region=US` vs the India-first audience, and swallowed TMDB error messages).
 - **Brand refresh (`7932d54`):** the logo is now a **bear + film-strip + play** mark (not the old paw) — honey on flat charcoal, no glow. Every app-icon/splash asset was regenerated from it (source + native), and `assets/images/brandmark.png` (transparent) is wired into the header/onboarding via `src/ui/BrandWordmark.tsx`. See the "Brand identity" board entry for the reusable SVG→headless-Chromium asset pipeline. The board's 3D mascot bear is NOT generated (needs an image model).
@@ -32,7 +62,9 @@ On iOS videasy renders its `<video>` in a **cross-origin sub-frame** the main-fr
 - **Metro:** `npx expo start` (Android device: `adb reverse tcp:8081 tcp:8081` + the `bearoom://` deep link; a second app on the machine may hold 8081 → use `--port 8082`). iOS: `npx expo run:ios`.
 - **Two-debugger model:** RN layer via **execbro** MCP (`scan_metro`, `get_logs`, `inspect_component`, `redux_get_state`, `execute_in_app`, screenshots/tap) — works on both the iOS sim and Android device. WebView layer via **Chrome DevTools / Safari Web Inspector (CDP)** — the only truthful view of the injected bridge (`console.log` inside the WebView is swallowed under Bridgeless). Public provider DOM via **Playwright** (desktop, cheap selector-rot check). Recipe in [HANDBOOK §"Device debug recipe"](HANDBOOK.md).
 - **Env:** `EXPO_PUBLIC_WORKER_URL` (root `.env.local`, symlinked into `worker/.dev.vars`). `SUPABASE_SERVICE_ROLE_KEY` + `KLIPY` key are the **operator's secrets** — never commit them; the operator runs `wrangler secret put` / the upload CLI.
-- **Commit discipline:** commit **only when explicitly asked**; branch first if on `master`. End commit messages with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- **Commit discipline:** commit **only when explicitly asked**; branch first if on `master`. End commit messages with a `Co-Authored-By:` trailer naming **the model actually doing the work**
+  (history contains `Claude Opus 4.8` for older commits and `Claude Opus 5` from 2026-08-31 onward — attribute
+  honestly rather than matching the previous line).
 
 ## Product guardrails (from the operator)
 Values hard technical pushback over agreement — flag runtime regressions `tsc` can't catch. Scarred by lost work → persist deferred ideas durably (that's what the project-board + HANDBOOK §19 are for). Never demote/pollute production data affecting real users. No baked-in provider fallback (the killswitch).

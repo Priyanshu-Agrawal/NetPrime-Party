@@ -12,6 +12,39 @@
 > [../providers/videasy.md](../providers/videasy.md). Status: **designed +
 > feasibility-proven, not yet built.**
 
+> ## 📌 2026-08-31 — status update after the plugin research
+> This document is **still the design of record for the native lane**, now scheduled as **Program 1 · P2**
+> (board `Phase 11` covers the plugin *source* that feeds it). Three things it says have been re-measured —
+> see [`../research/nuvio-plugin-architecture.md`](../research/nuvio-plugin-architecture.md).
+>
+> **1. The "Re-Sniff Loop" premise is weaker than assumed — likely unnecessary for the plugin lane.**
+> It exists because CDN tokens were believed to expire mid-playback and force a 403 re-sniff. Measured
+> against the same provider: re-resolving 4 minutes later, **under a rotated seed, returned byte-identical
+> URLs**, and a URL resolved ~20 min earlier still served media. Only the 30 s *seed* rotates, not the
+> stream. Keep the loop as defensive error handling, but do not architect around it — and **re-resolve
+> deterministically** (same `tmdbId + provider + language` → same URL) rather than re-sniffing, which also
+> lets a party guest derive the URL locally instead of receiving the host's.
+>
+> **2. `NativePlayer` as a drop-in `forwardRef<PlayerHandle>` is confirmed correct, and cheaper than it
+> looks.** `PlayerHandle` (`components/player/HijackPlayer.tsx:92-111`) is already lane-agnostic — proven by
+> `HijackPlayer.web.tsx` implementing the identical contract independently — and `PlayerControls.tsx` is
+> already decoupled (state pushed in imperatively via `setPlayback()`, every action a plain callback). The
+> only WebView-shaped leaks to fix: `QualityLevel` is exported *from* `HijackPlayer` rather than a neutral
+> module; `readQuality()`/`readAudio()` must currently be staggered 750 ms purely for videasy's single
+> settings tab; and `onBound` must be synthesised, since the two screens use `playerBound` as the
+> "mount our controls" gate.
+>
+> **3. Codec reality, measured on real hardware.** `expo-video`/AVPlayer **cannot open MKV at all** on iOS
+> (`canPlayType('video/x-matroska') === ""`; a real file fails with `MediaError code 4`) — though iOS *does*
+> decode HEVC, AC-3 and E-AC3 inside MP4/HLS, so the gap is the **demuxer, not the decoders**. On Android
+> the inverse: ExoPlayer demuxes MKV fine, but the A063 test device declares **no AC3/E-AC3/DTS decoder**,
+> so that tier plays silent. Neither blocks P2: the plugin shortlist's Hindi dubs are **HLS/AAC**, which
+> `expo-video` handles natively. The MKV tier needs `expo-libvlc-player` (runtime-verified, 35 MB,
+> LGPL-2.1) and is deferred to roadmap *Optional*.
+>
+> Unchanged and still true: the **no `seeked` event** limitation below, the echo-suppression rule, and the
+> seconds-vs-milliseconds boundary.
+
 ## Why
 Native playback unlocks what a WebView can't: **PiP, background/lock-screen audio,
 AirPlay/Chromecast, native scrubber/quality/speed**, and a first-class **dub picker

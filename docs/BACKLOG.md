@@ -163,9 +163,19 @@ pipeline).
 - **Security plan CLOSED:** C1 · H1/M1/M7 · H2/H3 all shipped + live (was `docs/plans/backend-hardening.md`).
 - **Phase 10 (App/Play review)** — **N/A / MOOT** given the off-store decision; retained only as the clean-build
   concept above.
-- **Native stream player REJECTED** — WebView stays primary (deterministic WAF tokens killed native sniffing);
-  native features added *around* the WebView. Memory: `native-player-rejected`.
-- **Cooren as a stream backend — NO-GO** (`docs/research/cooren-fit-adr.md`).
+- **~~Native stream player REJECTED~~ → AMENDED 2026-08-31: WebView stays primary, native lane is
+  *additive*.** The rejection rested on **server-side** resolution (deterministic WAF tokens, IP-locked CDNs).
+  Re-measured on-device, none of those walls held — see
+  [`docs/research/nuvio-plugin-architecture.md`](research/nuvio-plugin-architecture.md). The hijack is **not**
+  being removed; a native player + plugin source are added beside it as Program 1 · P2/P3. The real
+  constraint turned out to be **codecs** (iOS cannot demux MKV; many Android devices lack an AC3/E-AC3
+  decoder), which is why the libVLC upgrade is scoped as *Optional*, not required.
+- **Cooren as a stream backend — NO-GO** (`docs/research/cooren-fit-adr.md`). *Still no-go; on-device
+  resolution reaches the same outcome with no server, so the bandwidth trade-off is moot rather than merely
+  unfavourable.*
+- **Plugin supply chain (if Program 1 · P3 is built):** pin providers to **commit SHAs, never
+  `refs/heads/main`**, and allowlist only the measured shortlist — 111 of 152 audited scrapers returned
+  nothing and two return confidently *wrong* content.
 - **No blur / no elevation on any video screen** (proven stutter rule).
 - **No baked-in provider fallback** — the empty-`/config` killswitch is deliberate (store-review posture, now
   also the off-store "listing-only" mode).

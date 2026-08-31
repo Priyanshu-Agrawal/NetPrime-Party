@@ -55,6 +55,22 @@ the injection doc) and, on-device:
 ## Open items        — unknowns, risks
 ```
 
+## A second, non-embed model is coming (Program 1 · P3)
+Everything above describes the **embed + hijack** model: load someone's player page and inject a bridge.
+A second lane is designed and verified but not built — **on-device plugin resolution**, where a sandboxed
+third-party scraper turns a `tmdbId` into a raw stream URL + headers + audio-track id, played in a native
+player with our own controls. It is *additive*: the embed lane stays as the fallback.
+
+- Measured provider shortlist (what actually works, and what lies): [plugin-provider-shortlist.md](./plugin-provider-shortlist.md)
+- Full study: [../research/nuvio-plugin-architecture.md](../research/nuvio-plugin-architecture.md)
+- Board entry: `Phase 11` in [../project-board.md](../project-board.md)
+
+Note the two models answer different questions. Hijack asks *"can the bridge reach this page's `<video>`?"*
+(hence `videoLocation`); plugins ask *"does this scraper return a playable URL for this tmdbId?"* — a
+provider can be useless to one and fine for the other. `videasy` is hijackable **and** has a plugin;
+`vidsrcTo` is neither.
+
 ## Status
 - **videasy** ("NetPrime") — fully documented: [videasy.md](./videasy.md).
 - Others (vidfast/vixsrc/vidlink/vidcore/…) — not yet reverse-engineered; add docs as you touch them.
+- **Plugin-lane providers** are measured rather than reverse-engineered — see the shortlist above.

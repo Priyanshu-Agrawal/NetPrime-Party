@@ -87,10 +87,25 @@ Worker surface (all under `netprime-worker.spiderfan-no1.workers.dev`): `GET /co
 
 ### 3.4 Alternatives considered & rejected
 
-- **Native `expo-video` fed by a sniffed stream** — rejected: the provider serves HLS behind a **deterministic, ephemeral, WAF-gated token** (two fresh headless sessions resolve the *identical* token; a URL dead in hours), so a native player cannot self-heal on token expiry. See [native-player-rejected.md](docs/architecture/native-player.md).
+- **Native `expo-video` fed by a sniffed stream** — ~~rejected~~ **AMENDED 2026-08-31 → adopted as an
+  *additive* lane (Program 1 · P2/P3); the WebView hijack stays primary and is not removed.** The original
+  rejection reasoned from a *server-side* resolver, where the CDN token is minted for the resolver's IP and
+  the phone is a different IP. Re-measured with resolution **on the device**, none of it held: no IP-lock
+  (2 MB served **HTTP 206 to a foreign Tor exit, no headers**), no WAF/JA3 block from Node *or* RN fetch,
+  and the "can't self-heal" model was simply wrong — only the 30 s *seed* rotates, and re-resolving under a
+  **different** seed returns **byte-identical URLs**, so the lane is deterministically self-healing by
+  construction. What *is* real is a **codec** wall (iOS cannot demux MKV; many Android devices ship no
+  AC3/E-AC3 decoder) — which is why the libVLC upgrade is scoped *Optional* rather than required. Study:
+  [nuvio-plugin-architecture.md](research/nuvio-plugin-architecture.md); design:
+  [native-player.md](architecture/native-player.md).
 - **On-device open-source extraction (`@movie-web/providers` / `p-stream`)** — rejected/removed: the package is abandoned (all sources return null); the maintained fork is DMCA-taken-down. Package uninstalled.
+  **Note (2026-08-31):** this rejection was about *those two libraries*, not the idea. The **Nuvio plugin
+  ecosystem** is a different, live implementation of the same concept — 227 scrapers, actively maintained —
+  and is now Program 1 · P3. Curation is the catch: 111 of 152 audited scrapers returned nothing, and two
+  return confidently *wrong* content, so only a measured, SHA-pinned shortlist is usable
+  ([plugin-provider-shortlist.md](providers/plugin-provider-shortlist.md)).
 - **Pure server scraper (CinePro-style)** — rejected: fast but brittle, breaks on every AES key update.
-- **Reverse-proxy hub (iMayhem-style)** — rejected: proxying video segments incurs massive bandwidth cost (~$500/mo), defeating the $0 goal.
+- **Reverse-proxy hub (iMayhem-style)** — rejected: proxying video segments incurs massive bandwidth cost (~$500/mo), defeating the $0 goal. *(Still rejected — and now moot: on-device resolution reaches the same outcome with no server at all. See [cooren-fit-adr.md](research/cooren-fit-adr.md).)*
 - **Bundled provider list (`providers.json`)** — superseded: kept only as the Supabase seed source, not imported at runtime; a bundled fallback would leak the catalog exactly during store review.
 
 ### 3.5 Key files & entry points

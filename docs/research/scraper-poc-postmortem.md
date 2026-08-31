@@ -4,6 +4,30 @@
 **Status:** **REJECTED / ARCHIVED FOR REFERENCE ONLY**  
 **Decision:** Standardize 100% on the **Injected WebView Hijack Architecture** across Mobile and Web.
 
+> ## ⚠ 2026-08-31 — READ THIS BEFORE CITING THIS DOCUMENT
+> **This post-mortem is not wrong, but its scope is narrower than its title suggests.** Everything below was
+> measured against **server-side resolution** — a resolver running on our infrastructure, handing a URL to a
+> phone on a *different* IP. Every blocker it identifies follows from that split.
+>
+> Re-measured against **on-device** resolution ([`nuvio-plugin-architecture.md`](./nuvio-plugin-architecture.md),
+> 2026-08-29), the three walls do not hold:
+> - **IP-locked CDN tokens** — not reproduced. 2 MB of media served **HTTP 206 to a foreign Tor exit IP with
+>   no headers**, from a URL resolved ~20 min earlier. And when resolver and player are the same device, the
+>   mismatch cannot arise by construction.
+> - **Cloudflare WAF / JA3 fingerprinting** — not hit, from plain Node *or* React Native fetch.
+> - **Deterministic sub-hour tokens that "can't self-heal"** — the model was wrong. Only the 30 s *seed*
+>   rotates; re-resolving under a **different** seed returned **byte-identical URLs**.
+> - **"videasy is `enc=2`, client-decrypted, so no API shortcut"** — defeated. A ~23 KB JS plugin
+>   reimplements the decrypt and runs inside our own Hermes runtime.
+>
+> **What survives:** the WebView hijack remains primary and is *not* being removed; a native lane is
+> **additive** (Program 1 · P2/P3). The genuinely hard problem turned out to be **codecs, not scraping** —
+> see the successor doc.
+>
+> Cite this document for *why server-side resolution was rejected*. Do not cite it for "native playback is
+> impossible."
+
+
 ---
 
 ## 🎯 Executive Summary & Verdict

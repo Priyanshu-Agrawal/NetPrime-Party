@@ -904,3 +904,60 @@ In-app: point the dev client at Metro
 (`xcrun simctl openurl <udid> "bearoom://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8082"`),
 then run the plugin through the debugger with `new Function("module","exports","console","fetch", code)`.
 No app changes required.
+
+---
+
+## 9. Decision record (2026-08-31)
+
+This study was commissioned as "is Nuvio's approach usable for us." It is, with conditions. What follows is
+what was **decided**, so a future reader does not have to re-derive it from the measurements above.
+
+### Adopted
+- **Hybrid, plugin-first, additive.** The WebView hijack **stays** as a fallback lane; the plugin lane is
+  added beside it. Removing the hijack buys nothing and would cost the working party feature.
+- **Plugin lane becomes Program 1 · P3** on the roadmap (board `Phase 11`), *after* P1 (queue spine) and P2
+  (native player lane). P1 first because the plugin lane produces a stream URL and something has to hold it;
+  building P3 first would mean building the player interface and reworking party sync twice.
+- **Sandbox: hidden WebView + native fetch proxy.** Chosen on measurement (§7.1d), not preference — it beats
+  QuickJS-as-asm.js by 300–1600×. Note this WebView renders no video; it executes scraper JS only.
+- **Provider set: `evyrith` + `playimdb` + `vidrock`**, pinned. See
+  [`../providers/plugin-provider-shortlist.md`](../providers/plugin-provider-shortlist.md).
+- **A source discriminator lands in P1's queue schema now** (`tmdb | direct | plugin | youtube`), even though
+  only `tmdb` is implemented, so the wire format never has to change.
+
+### Rejected, and why
+- **QuickJS compiled to asm.js** (`@jitl/quickjs-asmjs-mjs-release-sync`) — perfect ES coverage and a working
+  `setInterruptHandler`, but parsing *one* 23 KB plugin costs 3 518 ms vs 11 ms in a WebView. Ten providers
+  in parallel would block the JS thread for ~35 s. Disqualified on throughput alone.
+- **A native QuickJS module** — the only RN binding is a 3-star, 7-commit module with no memory limit and no
+  interrupt handler. Not a dependency to put under playback.
+- **Hermes `eval` / `new Function` for shipping** — works today (verified), but shares the app's realm,
+  globals and intrinsics. Fine for measurement, never for third-party code.
+- **On-device FFmpeg remux as the primary iOS path** — proven to work and cheap in CPU (§6.5.3d), but it
+  needs a local HTTP server, a progressive-remux pipeline and seek-mapping, on top of an orphaned dependency
+  (`arthenica/ffmpeg-kit` archived 2026-07-02, no canonical RN successor). Kept as a documented fallback.
+
+### Deferred
+- **`expo-libvlc-player@3.4.25`** → roadmap *Optional*. Runtime-verified on both platforms, but the Hindi
+  **dubs** are HLS/AAC and play on plain `expo-video`; libVLC only unlocks the 4K HEVC + E-AC3 MKV tier.
+  Revisit when that tier is shown to matter, and budget **35 MB** plus an LGPL-2.1 review.
+
+### Non-negotiable conditions if P3 is built
+1. **Pin providers to commit SHAs, never `refs/heads/main`.** These are obfuscated third-party scripts that
+   auto-refresh on a timer; an unpinned repo is an unreviewed code push straight into the app.
+2. **Allowlist only the measured set.** 111 of 152 audited scrapers returned nothing, and two
+   (`anikototv`, `animekai`) return confidently *wrong* content — a 13-minute clip for every title, in one
+   case. Curation is the product.
+3. **Harden the sandbox before it executes untrusted code**: capture and `delete window.ReactNativeWebView`
+   after installing the shim; CSP `default-src 'none'`; a host-side per-plugin timeout (plugins carry none);
+   reload-on-hang.
+4. **Resolve → open → read tracks → offer the picker.** Never promise the user a language before the player
+   has reported the real audio tracks; manifest tags are inconsistent and provider labels are free text.
+
+### Explicitly unchanged
+Legal/ToS posture. Nothing here alters it; that is a product decision, not a technical one.
+
+### Known unknowns carried forward
+Long-run provider durability (this is one afternoon of measurement, and `videasy`'s upstream died for
+~30 minutes inside that window); whether the sandbox holds up under 10 concurrent plugins on a low-end
+device; and the real App Store implications of an LGPL native dependency, should P5 ever be taken.
