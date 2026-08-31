@@ -1,13 +1,16 @@
 /**
- * Watch-party wire protocol — the single shared contract between the Room
- * Durable Object (the authority) and the React Native client (a controller /
- * viewer). Both sides import these types; neither invents its own.
+ * Watch-party shared contract — the types both sides agree on. The authority is
+ * Postgres: clients call SECURITY DEFINER RPCs, which validate and return a full
+ * snapshot; that snapshot is fanned out on a single "snap" broadcast. Supabase
+ * Realtime is transport, never authority.
  *
  * Design invariants encoded here (agreed in design review):
- *   1.  One authority per room (the Room DO). Clients send INTENTS; the server
- *       emits authoritative EVENTS. Realtime is transport, never authority.
- *   2.  The SERVER owns the clock. Clients estimate their offset to server time
- *       (Ping/Pong) so the reference clock never moves when the host changes.
+ *   1.  One authority per room (the room row). A client *asks* via RPC; the
+ *       server validates membership / role / lease / epoch / permissions / config
+ *       and only then mutates and re-broadcasts.
+ *   2.  The SERVER owns the clock. Clients estimate their offset to
+ *       `party_server_time` (see PartyClient.pingClock) so the reference clock
+ *       never moves when the host changes.
  *   3.  Playback is a TIMELINE ANCHOR, not a per-second position — see
  *       PlaybackAnchor + effectivePositionMs().
  *   4.  Every authoritative playback mutation carries { epoch, seq }:
@@ -42,15 +45,6 @@ export interface Member {
   approved: boolean;
   /** Whether the member currently has at least one live connection. */
   connected: boolean;
-}
-
-/** One live WebSocket connection (a member may have several across devices). */
-export interface SessionInfo {
-  connectionId: string;
-  userId: string;
-  installationId: string;
-  /** Server-stamped last-seen; drives connection-level liveness for election. */
-  lastSeenAt: number;
 }
 
 // ─────────────────────────────── room config ────────────────────────────────
@@ -133,7 +127,7 @@ export interface HostLease {
   leaseExpiresAt: number | null;
 }
 
-// ─────────────────────────── chat / queue / polls ───────────────────────────
+// ─────────────────────────────────── chat ───────────────────────────────────
 
 export interface ChatMessage {
   id: string;
@@ -146,87 +140,6 @@ export interface ChatMessage {
   /** Server-stamped. */
   at: number;
 }
-
-export interface QueueItem {
-  id: string;
-  media: PartyMedia;
-  addedByUserId: string;
-  at: number;
-}
-
-export interface Poll {
-  id: string;
-  question: string;
-  options: string[];
-  /** optionIdx -> vote count. */
-  tally: number[];
-  /** userId -> optionIdx (server-side truth; sent to clients for their own vote). */
-  open: boolean;
-  createdByUserId: string;
-  at: number;
-}
-
-// ─────────────────────── client → server: INTENTS ───────────────────────────
-// A client *asks*. The server validates (membership, role, lease, epoch,
-// permissions, config) and only then mutates + fans out an authoritative event.
-
-export type ClientIntent =
-  // handshake / liveness
-  | { t: "hello"; installationId: string; userId?: string; displayName: string; token?: string; password?: string }
-  | { t: "bye" }
-  | { t: "ping"; c0: number } // c0 = client time; server replies pong with its time
-  | { t: "renewLease" } // host heartbeat
-  // playback (require canControlPlayback + valid lease/epoch)
-  | { t: "setMedia"; media: PartyMedia }
-  | { t: "play"; positionMs?: number }
-  | { t: "pause"; positionMs?: number }
-  | { t: "seek"; positionMs: number }
-  | { t: "setRate"; rate: number }
-  | { t: "buffering"; buffering: boolean }
-  // host / room administration
-  | { t: "transferHost"; targetUserId: string }
-  | { t: "grabControl" } // guest takes control when the host has opted in
-  | { t: "setConfig"; patch: Partial<RoomConfig> }
-  | { t: "setPermissions"; targetUserId: string; patch: Partial<Permissions> }
-  | { t: "approveMember"; targetUserId: string }
-  | { t: "kick"; targetUserId: string }
-  // chat / gifs
-  | { t: "chat"; kind: "text" | "gif"; body: string; gifUrl?: string }
-  // queue
-  | { t: "queueAdd"; media: PartyMedia }
-  | { t: "queueRemove"; itemId: string }
-  | { t: "queueNext" }
-  // polls
-  | { t: "pollCreate"; question: string; options: string[] }
-  | { t: "pollVote"; pollId: string; optionIdx: number }
-  | { t: "pollClose"; pollId: string };
-
-// ─────────────────────── server → client: EVENTS ────────────────────────────
-// Authoritative. `welcome`/`state` carry full snapshots (also used for late-join
-// catch-up); the rest are deltas. `playback` is the hot path.
-
-export type ServerEvent =
-  | { t: "welcome"; connectionId: string; you: Member; token: string; serverTimeMs: number }
-  | { t: "pong"; c0: number; s: number } // s = server time when it replied
-  // full canonical snapshot (join / re-sync)
-  | {
-      t: "state";
-      playback: PlaybackAnchor;
-      media: PartyMedia | null;
-      lease: HostLease;
-      config: RoomConfig;
-      members: Member[];
-    }
-  // deltas
-  | { t: "playback"; playback: PlaybackAnchor; media?: PartyMedia | null }
-  | { t: "lease"; lease: HostLease }
-  | { t: "config"; config: RoomConfig }
-  | { t: "members"; members: Member[]; sessions?: SessionInfo[] }
-  | { t: "chat"; msg: ChatMessage }
-  | { t: "queue"; items: QueueItem[]; currentItemId?: string }
-  | { t: "poll"; poll: Poll }
-  | { t: "error"; code: string; message: string }
-  | { t: "kicked"; reason?: string };
 
 // ───────────────────────────── tunables (server) ────────────────────────────
 // Lease well under any mobile-network stall; renew at ~1/3 of it.
