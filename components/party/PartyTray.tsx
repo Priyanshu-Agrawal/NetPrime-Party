@@ -43,7 +43,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { img } from "@/utils/tmdbDetails";
 import { navigationRef } from "@/src/navigation/navigationRef";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -55,6 +55,7 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -394,10 +395,36 @@ function TraySheet({
 }) {
   // ONE height and a switcher, not detents plus a collapsible section. Those
   // three overlapping ways to resize meant the pane you actually came for got a
-  // sliver of the sheet, and both halves showed empty states at once. A single
-  // tall sheet with two tabs gives whichever pane you picked the whole area.
-  const [tab, setTab] = useState<"chat" | "queue">("chat");
+  // sliver of the sheet, and both halves showed empty states at once.
+  //
+  // The two panes are a PAGER: swiping between chat and the queue is how a phone
+  // expects to move sideways, and the segment's pill is driven off the same scroll
+  // offset, so the control tracks your finger instead of snapping after the fact.
+  const { width: winW } = useWindowDimensions();
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  const scrollX = useSharedValue(0);
+  const [tab, setTab] = useState(0);
+  const [trackW, setTrackW] = useState(0);
   const ids = useMemo(() => memberIds.split(",").filter(Boolean), [memberIds]);
+
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollX.value = e.contentOffset.x;
+  });
+
+  const segPad = ms(4);
+  const pillW = trackW > 0 ? (trackW - segPad * 2) / 2 : 0;
+  const pillStyle = useAnimatedStyle(() => ({
+    width: pillW,
+    transform: [{ translateX: winW > 0 ? (scrollX.value / winW) * pillW : 0 }],
+  }));
+
+  const goTo = useCallback(
+    (i: number) => {
+      setTab(i);
+      scrollRef.current?.scrollTo({ x: i * winW, animated: true });
+    },
+    [winW],
+  );
 
   // The grabber now does one thing: dismiss. No detent to guess at.
   const pan = useMemo(
@@ -413,8 +440,9 @@ function TraySheet({
 
   return (
     <View style={[styles.sheet, { height: Math.round(winH * 0.8), paddingBottom: bottomInset }]}>
-      <Frost intensity={50} style={StyleSheet.absoluteFill} />
+      <Frost intensity={90} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.sheetTint]} />
+      <View style={[StyleSheet.absoluteFill, styles.sheetLift]} />
 
       <GestureDetector gesture={pan}>
         <Pressable
@@ -430,7 +458,14 @@ function TraySheet({
 
       {/* Expanding used to DROP the artwork the peek bar had, so you lost your
           bearings on the way in. It now carries over and grows. */}
-      <NowPlayingCard media={media} code={code} onOpenRoom={() => { onClose(); enterParty({ room: code, role: "guest" }); }} />
+      <NowPlayingCard
+        media={media}
+        code={code}
+        onOpenRoom={() => {
+          onClose();
+          enterParty({ room: code, role: "guest" });
+        }}
+      />
 
       <View style={styles.whoRow}>
         <View style={styles.avatars}>
@@ -445,24 +480,25 @@ function TraySheet({
         </Text>
       </View>
 
-      <View style={styles.segment}>
-        {(["chat", "queue"] as const).map((t) => {
-          const active = tab === t;
+      <View style={styles.segment} onLayout={(e) => setTrackW(e.nativeEvent.layout.width)}>
+        <Animated.View style={[styles.segPill, pillStyle]} />
+        {["Chat", "Up next"].map((label, i) => {
+          const active = tab === i;
           return (
             <Pressable
-              key={t}
-              onPress={() => setTab(t)}
-              style={[styles.segItem, active && styles.segItemActive]}
+              key={label}
+              onPress={() => goTo(i)}
+              style={styles.segItem}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={t === "chat" ? "Chat" : "Queue"}
+              accessibilityLabel={label}
             >
-              <Text style={[styles.segText, active && styles.segTextActive]}>
-                {t === "chat" ? "Chat" : "Up next"}
-              </Text>
-              {t === "queue" && queueLen > 0 ? (
+              <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
+              {i === 1 && queueLen > 0 ? (
                 <View style={[styles.countPill, active && styles.countPillActive]}>
-                  <Text style={[styles.countText, active && styles.countTextActive]}>{queueLen}</Text>
+                  <Text style={[styles.countText, active && styles.countTextActive]}>
+                    {queueLen}
+                  </Text>
                 </View>
               ) : null}
             </Pressable>
@@ -470,9 +506,28 @@ function TraySheet({
         })}
       </View>
 
-      <View style={styles.pane}>
-        {tab === "chat" ? <PartyChatThread compact /> : <PartyQueueList />}
-      </View>
+      <Animated.ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={(e) =>
+          setTab(Math.round(e.nativeEvent.contentOffset.x / Math.max(1, winW)))
+        }
+        style={styles.pager}
+        // The chat thread and the queue are both vertical lists; without this the
+        // horizontal pager swallows the first few pixels of every vertical drag.
+        directionalLockEnabled
+      >
+        <View style={{ width: winW }}>
+          <PartyChatThread compact />
+        </View>
+        <View style={{ width: winW }}>
+          <PartyQueueList />
+        </View>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -654,7 +709,11 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  sheetTint: { backgroundColor: "rgba(16,13,10,0.86)" },
+  /* Real glass now: the blur carries it (intensity 90) under a light scrim rather
+     than a near-opaque slab at 0.86, so the screen behind stays present as
+     texture. The warm lift keeps text contrast where the backdrop goes bright. */
+  sheetTint: { backgroundColor: "rgba(16,13,10,0.52)" },
+  sheetLift: { backgroundColor: "rgba(246,239,227,0.05)" },
   grabberHit: { alignItems: "center", paddingTop: ms(9), paddingBottom: ms(7) },
   grabber: {
     width: ms(42),
@@ -717,13 +776,25 @@ const styles = StyleSheet.create({
 
   /* Segmented switcher — one pane at full height beats two half-empty ones. */
   segment: {
+    position: "relative",
     flexDirection: "row",
-    gap: ms(4),
     margin: ms(14),
-    marginBottom: ms(6),
+    marginBottom: ms(8),
     padding: ms(4),
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
+  },
+  /* Driven off the pager's scroll offset, so it tracks the swipe rather than
+     snapping once the gesture is already over. */
+  segPill: {
+    position: "absolute",
+    left: ms(4),
+    top: ms(4),
+    bottom: ms(4),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
   },
   segItem: {
     flex: 1,
@@ -736,11 +807,6 @@ const styles = StyleSheet.create({
   },
   /* Selection reads as a raised neutral pill (the platform idiom) instead of a
      honey slab — a filled accent here competed with the content it sits above. */
-  segItemActive: {
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
   segText: { fontFamily: font.label, fontSize: ms(12.5), color: colors.textDim },
   segTextActive: { color: colors.text },
   countPill: {
@@ -756,7 +822,7 @@ const styles = StyleSheet.create({
   countText: { fontFamily: font.label, fontSize: ms(10), color: colors.honey },
   countTextActive: { color: colors.honey },
 
-  pane: { flex: 1 },
+  pager: { flex: 1 },
 });
 
 export default PartyTray;
