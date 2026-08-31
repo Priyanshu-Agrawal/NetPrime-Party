@@ -141,6 +141,142 @@ export interface ChatMessage {
   at: number;
 }
 
+// ─────────────────────────────────── queue ──────────────────────────────────
+// The room plays a QUEUE; `media` is a derived mirror of the current item, kept
+// so v1 clients keep working (see supabase/migrations/0008_party_queue.sql).
+//
+// A `ref` is a discriminated SOURCE DESCRIPTOR, and the discriminator exists from
+// day one because P3/P4 sources are designed, not hypothetical. Note what is NOT
+// in here: no variant except `direct` carries a resolved stream URL. A plugin ref
+// carries the identifier tuple and every client resolves it locally — plugin
+// resolution was measured to be deterministic, so shipping a URL would only add
+// an expiry problem.
+
+export type QueueSourceType = "tmdb" | "direct" | "plugin" | "youtube";
+
+/** A TMDB title played through an embed provider — the lane that exists today. */
+export interface QueueRefTmdb {
+  source: "tmdb";
+  tmdbId: string;
+  type: "movie" | "tv";
+  season?: number;
+  episode?: number;
+  /** Pin the room to one provider; omitted means "whatever the client picks". */
+  providerId?: string;
+}
+
+/** A TMDB title resolved ON-DEVICE by a sandboxed plugin (Program 1 · P3). */
+export interface QueueRefPlugin {
+  source: "plugin";
+  tmdbId: string;
+  type: "movie" | "tv";
+  season?: number;
+  episode?: number;
+  /** Pinned to a commit SHA at the registry level, never a moving branch. */
+  pluginId: string;
+  /** Which of the plugin's returned streams — omitted means "best available". */
+  streamId?: string;
+  /** ISO-639-1 audio preference, e.g. "hi" for a Hindi dub. */
+  language?: string;
+}
+
+/** A raw stream URL — sniffed in-app (P4) or pasted. The only variant with a URL. */
+export interface QueueRefDirect {
+  source: "direct";
+  url: string;
+  headers?: Record<string, string>;
+}
+
+export interface QueueRefYoutube {
+  source: "youtube";
+  videoId: string;
+}
+
+export type QueueRef = QueueRefTmdb | QueueRefPlugin | QueueRefDirect | QueueRefYoutube;
+
+export type QueueItemStatus = "queued" | "done" | "failed";
+
+/** One queue entry. Server-stamped: id, addedByUserId, addedAt, status. */
+export interface QueueItem {
+  id: string;
+  ref: QueueRef;
+  title?: string;
+  subtitle?: string;
+  posterPath?: string;
+  runtimeMs?: number;
+  addedByUserId: string;
+  addedAt: number;
+  status: QueueItemStatus;
+  /**
+   * False for a source only the adder can play (an IP-locked sniffed stream).
+   * The room still advances through it; other members just cannot follow along.
+   */
+  syncable: boolean;
+}
+
+/** What a client sends to party_queue_add — the server stamps everything else. */
+export interface QueueItemInput {
+  ref: QueueRef;
+  title?: string;
+  subtitle?: string;
+  posterPath?: string;
+  runtimeMs?: number;
+  syncable?: boolean;
+}
+
+export const QUEUE_MAX_ITEMS = 100;
+
+/**
+ * Mirrors party_queue_item_id() in 0008, which in turn reuses mediaKey() from
+ * utils/failureMemory.ts — the three must stay in lockstep so queue ids and
+ * failure-memory keys line up.
+ *
+ * Returns null for `direct`, whose id is an md5 of the URL that only the server
+ * computes. That is not a gap: the server dedupes on add, so a client only needs
+ * this for optimistic "is this already queued?" checks, and those only happen on
+ * TMDB-shaped refs (the Add-to-queue affordances on details screens).
+ */
+export function queueItemId(ref: QueueRef): string | null {
+  switch (ref.source) {
+    case "youtube":
+      return `yt:${ref.videoId}`;
+    case "direct":
+      return null;
+    default:
+      return ref.type === "tv"
+        ? `tv:${ref.tmdbId}:${ref.season ?? 1}:${ref.episode ?? 1}`
+        : `movie:${ref.tmdbId}`;
+  }
+}
+
+/**
+ * Mirrors party_media_of_item(). Only TMDB-shaped sources have a PartyMedia;
+ * direct/youtube yield null, which is what a v1 client sees for them.
+ */
+export function partyMediaFromRef(ref: QueueRef, title?: string): PartyMedia | null {
+  if (ref.source !== "tmdb" && ref.source !== "plugin") return null;
+  return {
+    tmdbId: ref.tmdbId,
+    type: ref.type,
+    ...(ref.season != null ? { season: ref.season } : {}),
+    ...(ref.episode != null ? { episode: ref.episode } : {}),
+    ...(title ? { title } : {}),
+    ...(ref.source === "tmdb" && ref.providerId ? { providerId: ref.providerId } : {}),
+  };
+}
+
+/** Mirrors party_ref_of_media() — the inverse, for the legacy set-media path. */
+export function refFromPartyMedia(m: PartyMedia): QueueRefTmdb {
+  return {
+    source: "tmdb",
+    tmdbId: m.tmdbId,
+    type: m.type,
+    ...(m.season != null ? { season: m.season } : {}),
+    ...(m.episode != null ? { episode: m.episode } : {}),
+    ...(m.providerId ? { providerId: m.providerId } : {}),
+  };
+}
+
 // ───────────────────────────── tunables (server) ────────────────────────────
 // Lease well under any mobile-network stall; renew at ~1/3 of it.
 export const LEASE_DURATION_MS = 6000;

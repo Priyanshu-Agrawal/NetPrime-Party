@@ -31,6 +31,8 @@ import type {
   PartyMedia,
   Permissions,
   PlaybackAnchor,
+  QueueItem,
+  QueueItemInput,
   RoomConfig,
 } from "./protocol";
 
@@ -38,11 +40,23 @@ export interface RoomSnapshot {
   code: string;
   lease: HostLease;
   playback: PlaybackAnchor;
+  /** Derived mirror of the current queue item; null for a non-TMDB source. */
   media: PartyMedia | null;
+  queue: QueueItem[];
+  currentItemId: string | null;
+  /** Bumped by every queue mutation. Guards against out-of-order queue state. */
+  queueRev: number;
   config: RoomConfig;
   members: Member[];
   serverTimeMs: number;
 }
+
+/**
+ * A heartbeat broadcast omits the queue (see broadcast()), so the three queue
+ * fields are optional on the wire and reconstructed in applySnapshot().
+ */
+type WireSnapshot = Omit<RoomSnapshot, "queue" | "currentItemId" | "queueRev"> &
+  Partial<Pick<RoomSnapshot, "queue" | "currentItemId" | "queueRev">>;
 
 const HOST_TIMEOUT_MS = 7000; // no host heartbeat this long -> consider host gone
 const CLOCK_PING_BURST = 5; // initial offset-estimation pings
@@ -231,6 +245,49 @@ export class PartyClient {
     await this.rpcSnap("party_grab_control", { p_code: this.code });
   }
 
+  // --- queue ----------------------------------------------------------------
+  // All six go through rpcSnap, so the single "snap" broadcast stays the only
+  // fan-out path. Authorization is the server's: add/remove need canQueue, the
+  // rest are host-only, and a rejected call throws rather than silently no-oping.
+  async queueAdd(items: QueueItemInput[], position: "end" | "next" = "end"): Promise<void> {
+    await this.rpcSnap("party_queue_add", {
+      p_code: this.code,
+      p_items: items,
+      p_position: position,
+    });
+  }
+  async queueRemove(itemIds: string[]): Promise<void> {
+    await this.rpcSnap("party_queue_remove", { p_code: this.code, p_item_ids: itemIds });
+  }
+  async queueMove(itemId: string, toIndex: number): Promise<void> {
+    await this.rpcSnap("party_queue_move", {
+      p_code: this.code,
+      p_item_id: itemId,
+      p_to_index: toIndex,
+    });
+  }
+  async queueSetCurrent(itemId: string): Promise<void> {
+    await this.rpcSnap("party_queue_set_current", { p_code: this.code, p_item_id: itemId });
+  }
+  /**
+   * `fromItemId` is the idempotency key — pass the item you believe is playing.
+   * A call naming a no-longer-current item is a server-side no-op, which is what
+   * absorbs duplicate `ended` events from multiple frames. Pass null to force.
+   */
+  async queueAdvance(
+    fromItemId: string | null,
+    reason: "ended" | "failed" | "skipped" = "ended",
+  ): Promise<void> {
+    await this.rpcSnap("party_queue_advance", {
+      p_code: this.code,
+      p_from_item_id: fromItemId,
+      p_reason: reason,
+    });
+  }
+  async queueClear(scope: "done" | "all" = "done"): Promise<void> {
+    await this.rpcSnap("party_queue_clear", { p_code: this.code, p_scope: scope });
+  }
+
   private async setPlayback(action: string, positionMs: number | null, rate: number | null): Promise<void> {
     await this.rpcSnap("party_set_playback", {
       p_code: this.code,
@@ -244,13 +301,14 @@ export class PartyClient {
   private async rpcSnap(fn: string, args: Record<string, unknown>): Promise<RoomSnapshot | null> {
     const { data, error } = await supabase.rpc(fn, args);
     if (error) throw new Error(`${fn}: ${error.message}`);
-    if (data) this.applySnapshot(data as RoomSnapshot, true);
+    if (data) this.applySnapshot(data as WireSnapshot, true);
     return (data as RoomSnapshot) ?? null;
   }
 
-  private applySnapshot(s: RoomSnapshot, fromSelf = false): void {
-    if (this.destroyed || !s || !s.playback) return;
+  private applySnapshot(wire: WireSnapshot, fromSelf = false): void {
+    if (this.destroyed || !wire || !wire.playback) return;
     const cur = this.snap;
+    const s = this.withQueue(wire, cur);
     if (cur) {
       // Newest-wins by (epoch, seq) — applied to our OWN RPC results too, since
       // concurrent fire-and-forget mutations can resolve out of order and an
@@ -259,6 +317,15 @@ export class PartyClient {
         b = cur.playback;
       const newer = a.epoch > b.epoch || (a.epoch === b.epoch && a.seq >= b.seq);
       if (!newer) return; // stale — drop
+      // A snapshot can be newer by (epoch, seq) and still carry OLDER queue state:
+      // seq is bumped by every mutation, queueRev only by queue ones, so two
+      // concurrent RPCs resolving out of order can pair a fresh seq with a stale
+      // queue. Never let the queue go backwards.
+      if (s.queueRev < cur.queueRev) {
+        s.queue = cur.queue;
+        s.currentItemId = cur.currentItemId;
+        s.queueRev = cur.queueRev;
+      }
     }
     // Kicked: a STRICTLY-NEWER authoritative snapshot no longer lists us (a real
     // kick bumps seq). We must require strictly-newer, not just `>=`: a stale host
@@ -289,8 +356,33 @@ export class PartyClient {
     if (fromSelf) this.broadcast(s);
   }
 
-  private broadcast(s: RoomSnapshot): void {
-    void this.channel?.send({ type: "broadcast", event: "snap", payload: s });
+  /**
+   * `lite` strips the queue. The host re-broadcasts the whole snapshot on every
+   * lease heartbeat (every 2s), and at the 100-item cap that snapshot is ~21 kB —
+   * so a heartbeat would otherwise push ~10 kB/s per client for state that did not
+   * change. A payload with no `queue` key means "queue unchanged"; the receiver
+   * carries its own forward in withQueue().
+   */
+  private broadcast(s: RoomSnapshot, lite = false): void {
+    const payload: WireSnapshot = lite
+      ? { ...s, queue: undefined, currentItemId: undefined, queueRev: undefined }
+      : s;
+    void this.channel?.send({ type: "broadcast", event: "snap", payload });
+  }
+
+  /**
+   * Reconstruct the three queue fields from a wire snapshot. Absent means
+   * "unchanged" (a heartbeat, or a server predating 0008), so we carry the
+   * current values forward — or start empty when we have no snapshot yet.
+   */
+  private withQueue(wire: WireSnapshot, cur: RoomSnapshot | null): RoomSnapshot {
+    if (wire.queue !== undefined) return wire as RoomSnapshot;
+    return {
+      ...wire,
+      queue: cur?.queue ?? [],
+      currentItemId: cur?.currentItemId ?? null,
+      queueRev: cur?.queueRev ?? 0,
+    };
   }
 
   // --- realtime channel (broadcast transport + presence) --------------------
@@ -309,7 +401,7 @@ export class PartyClient {
     // channel + its presence entry on a fast unmount / password-retry rebuild).
     this.channel = channel;
     channel.on("broadcast", { event: "snap" }, ({ payload }) =>
-      this.applySnapshot(payload as RoomSnapshot),
+      this.applySnapshot(payload as WireSnapshot),
     );
     channel.on("presence", { event: "sync" }, () => {
       const state = channel.presenceState();
@@ -387,7 +479,7 @@ export class PartyClient {
           },
         };
         this.lastSnapAt = Date.now();
-        this.broadcast(this.snap);
+        this.broadcast(this.snap, true); // heartbeat-lite: no queue
       }
     } catch {
       // We're no longer host (taken over). Role reconciles on the next snapshot.
