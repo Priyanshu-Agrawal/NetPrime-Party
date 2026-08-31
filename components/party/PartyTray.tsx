@@ -31,7 +31,7 @@ import { PartyChatThread } from "@/components/party/PartyChatThread";
 import { PartyQueueList } from "@/components/party/PartyQueueList";
 import BearAvatar from "@/components/avatar/BearAvatar";
 import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
-import { usePartySession, usePartySnapshot } from "@/services/party/PartySession";
+import { useIsPartyHost, usePartySession, usePartySnapshot } from "@/services/party/PartySession";
 import { effectivePositionMs } from "@/services/party/protocol";
 import { enterParty } from "@/src/navigation/actions";
 import { colors, font, ms, radius, type } from "@/theme/bearoom";
@@ -63,9 +63,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /** Routes that already ARE the party, or that play video. */
 const HIDE_ON = new Set(["Party", "Player"]);
-const PEEK_H = ms(58);
+const PEEK_H = ms(68);
 /** Pre-computed: ms() is not a worklet, so it can't be called inside useAnimatedStyle. */
-const PEEK_HIDE_Y = ms(58) + ms(16);
+const PEEK_HIDE_Y = ms(68) + ms(16);
 /** Clearance for the floating tab bar so peek rides above it, never over it. */
 const TAB_BAR_H = ms(64);
 
@@ -159,7 +159,6 @@ export function PartyTray() {
         <PeekBar
           code={code!}
           media={media}
-          queueLen={queueLen}
           memberIds={memberIds}
           onOpen={() => setOpen(true)}
         />
@@ -195,13 +194,11 @@ export function PartyTray() {
 function PeekBar({
   code,
   media,
-  queueLen,
   memberIds,
   onOpen,
 }: {
   code: string;
   media: TrayMedia;
-  queueLen: number;
   memberIds: string;
   onOpen: () => void;
 }) {
@@ -217,89 +214,93 @@ function PeekBar({
   const pct = runtimeSec > 0 ? Math.min(1, pos / runtimeSec) : 0;
   const ids = useMemo(() => memberIds.split(",").filter(Boolean), [memberIds]);
 
-  // Two lines, and the second one has to EARN its place. While something is
-  // playing that means the episode + elapsed time; only an idle room gets a
-  // call to action. The room code lives in the header chip — repeating it here
-  // was noise on the line that should be telling you where you are in the film.
-  const sub = playing
-    ? [
-        media?.type === "tv" && media.season != null
-          ? `S${media.season} · E${media.episode ?? 1}`
-          : null,
-        runtimeSec > 0 ? `${fmt(pos)} / ${fmt(runtimeSec)}` : pos > 0 ? fmt(pos) : null,
-      ]
-        .filter(Boolean)
-        .join("  ·  ")
-    : queueLen > 0
-    ? `${queueLen} queued · tap to open`
-    : "Tap to add something to watch";
+  // Who may drive playback. UI gating is cosmetic (the server is the chokepoint),
+  // but offering a transport control that silently fails is worse than hiding it.
+  const isHost = useIsPartyHost();
+  const { play, pause, userId } = usePartySession();
+  const canControl = usePartySnapshot(
+    (s) =>
+      !!userId &&
+      !!s?.members?.some((m) => m.userId === userId && m.permissions?.canControlPlayback),
+  );
+  const roomPlaying = usePartySnapshot((s) => s?.playback?.status === "playing");
 
   return (
     <View style={styles.peek}>
-      {/* Same frosted surface as FloatingTabBar (GlassCard @ intensity 40), so the
-          tray and the bar it rides on read as one object rather than two. Frost is
-          safe here: the tray hides itself on Party/Player, and the "never over live
-          video" rule is about the video surface, not browse screens. */}
+      {/* Same frosted surface as FloatingTabBar, so the bar and the tab bar it
+          rides on read as one navigation object rather than a card floating over
+          the content. Quiet controls, rich content. */}
       <Frost intensity={40} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, styles.peekTint]} />
-      <View style={styles.peekBody}>
-        {/* Artwork is the shortcut straight back into the room. */}
-        <Pressable
-          onPress={() => enterParty({ room: code, role: "guest" })}
-          hitSlop={4}
-          style={styles.peekArt}
-          accessibilityRole="button"
-          accessibilityLabel="Back to the party"
-        >
-          {poster ? (
-            <Image source={{ uri: poster }} style={styles.peekPoster} contentFit="cover" />
-          ) : (
-            <View style={[styles.peekPoster, styles.peekPosterEmpty]}>
-              <Ionicons name="film-outline" size={ms(17)} color={colors.honey} />
-            </View>
-          )}
-        </Pressable>
 
-        <Pressable
-          style={styles.peekMid}
-          onPress={onOpen}
-          hitSlop={4}
-          accessibilityRole="button"
-          accessibilityLabel="Open the party tray"
-        >
+      <Pressable
+        style={styles.peekBody}
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel="Open the party tray"
+      >
+        {poster ? (
+          <Image source={{ uri: poster }} style={styles.peekPoster} contentFit="cover" />
+        ) : (
+          <View style={[styles.peekPoster, styles.peekPosterEmpty]}>
+            <Ionicons name="film-outline" size={ms(18)} color={colors.textDim} />
+          </View>
+        )}
+
+        <View style={styles.peekMid}>
           <Text numberOfLines={1} style={styles.peekTitle}>
             {title}
           </Text>
-          <Text numberOfLines={1} style={styles.peekMeta}>
-            {sub}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.peekRight}
-          onPress={onOpen}
-          hitSlop={4}
-          accessibilityRole="button"
-          accessibilityLabel="Expand the party tray"
-        >
-          <View style={styles.avatars}>
-            {ids.slice(0, 3).map((id, i) => (
-              <View key={id} style={[styles.avatarSlot, i > 0 && styles.avatarOverlap]}>
-                <BearAvatar config={bearFor(id)} size={ms(21)} />
-              </View>
-            ))}
+          {/* One metadata line that answers WHAT and WHERE at once, so the room
+              isn't a second floating widget competing for the same attention. */}
+          <View style={styles.peekMetaRow}>
+            {playing ? (
+              <Text numberOfLines={1} style={styles.peekMeta}>
+                {runtimeSec > 0 ? `${fmt(pos)} / ${fmt(runtimeSec)}` : fmt(pos)}
+                {media?.type === "tv" && media.season != null
+                  ? `  ·  S${media.season} E${media.episode ?? 1}`
+                  : ""}
+                {"  ·  "}
+              </Text>
+            ) : (
+              <Text numberOfLines={1} style={styles.peekMeta}>
+                Add something to watch{"  ·  "}
+              </Text>
+            )}
+            {ids[0] ? <BearAvatar config={bearFor(ids[0])} size={ms(13)} /> : null}
+            <Text numberOfLines={1} style={styles.peekCode}>
+              {code}
+            </Text>
           </View>
-          <View style={styles.chevBtn}>
-            <Ionicons name="chevron-up" size={ms(15)} color={colors.honey} />
-          </View>
-        </Pressable>
-      </View>
+        </View>
 
-      {/* A hairline honey rule along the bottom edge is the whole "something is
-          playing" signal — no numbers to read, and it costs one View. */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%` }]} />
-      </View>
+        {playing && (isHost || canControl) ? (
+          <Pressable
+            onPress={() => (roomPlaying ? pause() : play())}
+            hitSlop={10}
+            style={styles.peekTransport}
+            accessibilityRole="button"
+            accessibilityLabel={roomPlaying ? "Pause for everyone" : "Play for everyone"}
+          >
+            <Ionicons
+              name={roomPlaying ? "pause" : "play"}
+              size={ms(19)}
+              color={colors.text}
+            />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.chevBtn}>
+          <Ionicons name="chevron-up" size={ms(15)} color={colors.text} />
+        </View>
+      </Pressable>
+
+      {/* A 2dp rule welded to the bottom edge — progress without a widget. */}
+      {playing ? (
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%` }]} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -549,12 +550,14 @@ const styles = StyleSheet.create({
 
   /* Mini-player surface. NO blur, NO elevation (see the header note) — the
      "live" read comes from a honey hairline + the progress rule, not a shadow. */
+  /* Quiet, not loud: a hairline like every other surface, NOT a honey outline.
+     The accent is reserved for the progress rule and the live dot. */
   peek: {
     height: PEEK_H,
     borderRadius: radius.lg,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honeyGlow,
+    borderColor: colors.border,
   },
   /* Warm tint over the blur — enough body that title/meta stay legible on top of
      a bright poster grid, still transparent enough to read as glass. */
@@ -563,21 +566,32 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(11),
+    gap: ms(10),
     paddingHorizontal: ms(10),
   },
   peekArt: { borderRadius: radius.sm, overflow: "hidden" },
-  peekPoster: { width: ms(34), height: ms(46), borderRadius: radius.sm },
+  peekPoster: { width: ms(38), height: ms(50), borderRadius: radius.sm },
   peekPosterEmpty: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.honeySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honeyGlow,
+    backgroundColor: colors.surfaceStrong,
   },
-  peekMid: { flex: 1, gap: ms(2) },
-  peekTitle: { ...type.label, fontFamily: font.headlineSemi, fontSize: ms(13.5) },
-  peekMeta: { ...type.caption, fontSize: ms(11), color: colors.textFaint },
+  peekMid: { flex: 1, gap: ms(3) },
+  peekTitle: { ...type.label, fontFamily: font.headlineSemi, fontSize: ms(14) },
+  peekMetaRow: { flexDirection: "row", alignItems: "center", gap: ms(4) },
+  peekMeta: { ...type.caption, fontSize: ms(11), color: colors.textDim, flexShrink: 1 },
+  peekCode: {
+    fontFamily: font.label,
+    fontSize: ms(10.5),
+    letterSpacing: 0.8,
+    color: colors.textDim,
+  },
+  peekTransport: {
+    width: ms(34),
+    height: ms(34),
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   /* The room's identity: a honey capsule you can find at a glance. */
   livePill: { flexDirection: "row", alignItems: "center", gap: ms(5) },
@@ -604,15 +618,15 @@ const styles = StyleSheet.create({
   },
   avatarOverlap: { marginLeft: -ms(9) },
   chevBtn: {
-    width: ms(28),
-    height: ms(28),
-    borderRadius: ms(14),
+    width: ms(30),
+    height: ms(30),
+    borderRadius: ms(15),
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.honeySoft,
+    backgroundColor: colors.surfaceStrong,
   },
 
-  progressTrack: { height: ms(2), backgroundColor: colors.surface },
+  progressTrack: { height: ms(2), backgroundColor: colors.surfaceStrong },
   progressFill: { height: ms(2), backgroundColor: colors.honey },
 
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },

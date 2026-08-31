@@ -12,8 +12,10 @@ import { colors, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { Ionicons } from "@expo/vector-icons";
-import { enterParty, openJoinParty, openSearchTab } from "@/src/navigation/actions";
+import { openJoinParty, openSearchTab } from "@/src/navigation/actions";
 import { usePartySession, usePartySnapshot } from "@/services/party/PartySession";
+import BearAvatar from "@/components/avatar/BearAvatar";
+import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import React from "react";
 import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import { BrandWordmark } from "./BrandWordmark";
@@ -26,10 +28,20 @@ interface Props {
   style?: ViewStyle;
 }
 
+const bearCache = new Map<string, ReturnType<typeof generateRandomBearConfig>>();
+function bearFor(userId: string) {
+  let c = bearCache.get(userId);
+  if (!c) {
+    c = generateRandomBearConfig("neutral", userId);
+    bearCache.set(userId, c);
+  }
+  return c;
+}
+
 export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
-  const inSession = !!usePartySession().request;
+  const { request, userId, setTrayOpen } = usePartySession();
   const code = usePartySnapshot((s) => s?.code ?? null);
-  const live = inSession && !!code;
+  const live = !!request && !!code;
   return (
     <View style={[styles.bar, style]}>
       <View style={styles.brandRow}>
@@ -42,17 +54,22 @@ export function AppHeader({ showSearch = true, onSearchPress, style }: Props) {
           </IconButton>
         ) : null}
         {live ? (
+          /* Room presence, not a status readout. Lead with WHO (the bear), the
+             code second, and on the app's normal elevated surface — the honey
+             outline made it read as a debug badge. Tapping raises the tray, so
+             you stay where you are instead of being thrown into the room. */
           <Pressable
             style={({ pressed }) => [styles.roomChip, pressed && pressedStyle]}
-            onPress={() => enterParty({ room: code!, role: "guest" })}
+            onPress={() => setTrayOpen(true)}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel={`Back to room ${code}`}
+            accessibilityLabel={`Watch party ${code}`}
           >
-            <View style={styles.liveDot} />
+            {userId ? <BearAvatar config={bearFor(userId)} size={ms(24)} /> : null}
             <Text variant="label" style={styles.roomChipText}>
               {code}
             </Text>
+            <Ionicons name="chevron-down" size={ms(13)} color={colors.textDim} />
           </Pressable>
         ) : (
           <Pressable
@@ -99,16 +116,16 @@ const styles = StyleSheet.create({
   roomChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: ms(6),
-    paddingHorizontal: spacing.md,
+    gap: ms(7),
+    paddingLeft: ms(5),
+    paddingRight: ms(10),
     height: layout.headerControl,
     borderRadius: radius.pill,
-    backgroundColor: colors.honeySoft,
+    backgroundColor: colors.bgElevated,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honey,
+    borderColor: colors.border,
   },
-  roomChipText: { color: colors.honey, fontSize: ms(12), letterSpacing: 1 },
-  liveDot: { width: ms(6), height: ms(6), borderRadius: ms(3), backgroundColor: colors.honey },
+  roomChipText: { color: colors.text, fontSize: ms(12), letterSpacing: 0.8 },
 });
 
 export default AppHeader;
