@@ -88,7 +88,10 @@ export class PartyClient {
   private lastLeaseRenewAt = 0;
   private leaseRenewInFlight = false;
 
-  private snapCb: ((s: RoomSnapshot) => void) | null = null;
+  // A Set, not a single callback: the snapshot is read through
+  // useSyncExternalStore by every component that selects from it, so there are
+  // many concurrent subscribers with independent lifetimes.
+  private snapCbs = new Set<(s: RoomSnapshot) => void>();
   private connCb: ((n: number) => void) | null = null;
   private kickedCb: (() => void) | null = null;
 
@@ -107,9 +110,22 @@ export class PartyClient {
   }
 
   // --- public accessors -----------------------------------------------------
-  onSnapshot(cb: (s: RoomSnapshot) => void): void {
-    this.snapCb = cb;
-    if (this.snap) cb(this.snap);
+  /**
+   * Subscribe to snapshots. Returns an unsubscribe, and the signature is
+   * deliberately `() => void` so it drops straight into useSyncExternalStore
+   * alongside the `snapshot` getter below — which is already a valid
+   * getSnapshot, since applySnapshot() replaces `this.snap` wholesale and the
+   * reference is therefore stable between broadcasts.
+   *
+   * Does NOT replay the current snapshot to the new subscriber: useSyncExternalStore
+   * reads it via getSnapshot on mount, and an eager call here would be a render-phase
+   * setState for the older useEffect-based callers.
+   */
+  onSnapshot(cb: (s: RoomSnapshot) => void): () => void {
+    this.snapCbs.add(cb);
+    return () => {
+      this.snapCbs.delete(cb);
+    };
   }
   onConnectedCount(cb: (n: number) => void): void {
     this.connCb = cb;
@@ -351,7 +367,7 @@ export class PartyClient {
     }
     this.snap = s;
     this.lastSnapAt = Date.now();
-    this.snapCb?.(s);
+    for (const cb of this.snapCbs) cb(s);
     this.reconcileRole();
     if (fromSelf) this.broadcast(s);
   }

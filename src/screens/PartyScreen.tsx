@@ -20,7 +20,6 @@ import {
 import {
   HijackPlayer,
   type PlayerEvent,
-  type PlayerHandle,
   type QualityLevel,
 } from "@/components/player/HijackPlayer";
 import { PlayerControls, type PlayerControlsHandle } from "@/components/player/PlayerControls";
@@ -31,8 +30,14 @@ import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
 import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { getDisplayName } from "@/services/party/identity";
 import type { Member, PartyMedia } from "@/services/party/protocol";
-import { useParty } from "@/services/party/useParty";
-import { usePartyChat, type ChatMessage, type FloatingReaction } from "@/services/party/usePartyChat";
+import {
+  useIsPartyHost,
+  usePartyChatSession,
+  usePartySession,
+  usePartySnapshot,
+  type PartySessionRequest,
+} from "@/services/party/PartySession";
+import type { ChatMessage, FloatingReaction } from "@/services/party/usePartyChat";
 import { colors, chat, font, glow, ms, radius } from "@/theme/bearoom";
 import ReanimatedAnimated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from "react-native-reanimated";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -193,13 +198,10 @@ export default function Party() {
     [isHostParam],
   );
 
-  const playerRef = useRef<PlayerHandle>(null);
   const controlsRef = useRef<PlayerControlsHandle>(null);
   // Our native overlay mounts only once the bridge binds a <video> (i.e. past
   // videasy's pre-play "tap to start" gate). Reset if the media/provider changes.
   const [playerBound, setPlayerBound] = useState(false);
-  const [password, setPassword] = useState<string | undefined>(undefined);
-  const [pwAttempt, setPwAttempt] = useState(0);
   const [pwPrompt, setPwPrompt] = useState(false);
   const [pwInput, setPwInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -216,17 +218,44 @@ export default function Party() {
   const [livePos, setLivePos] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
 
-  const party = useParty({
-    code: room,
-    role: isHostParam ? "host" : "guest",
-    displayName,
-    media: hostMedia,
-    password,
-    retryNonce: pwAttempt,
-    playerRef,
-  });
+  // The session lives above the navigator (services/party/PartySession.tsx), so
+  // this screen no longer OWNS the room — it asks for one and then renders it.
+  // Re-entering the same room (deep link, or coming back from the tray) must NOT
+  // rebuild the client, which is why open() is gated on the code actually changing.
+  const party = usePartySession();
+  const playerRef = party.playerRef;
+  const liveCode = party.request?.code;
+  // Guard against re-opening a room the user just left: leave() clears the
+  // session while this screen is still mounted, which would otherwise look
+  // identical to "arrived at a room we aren't in yet" and immediately rejoin.
+  const openedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!room || liveCode === room || openedRef.current === room) return;
+    openedRef.current = room;
+    const req: PartySessionRequest = {
+      code: room,
+      role: isHostParam ? "host" : "guest",
+      displayName,
+      media: hostMedia,
+    };
+    party.open(req);
+  }, [room, liveCode, isHostParam, displayName, hostMedia, party]);
 
-  const snap = party.snapshot;
+  // Leaving is now explicit: the session outlives this screen, so unmounting no
+  // longer ends the room. Every terminal exit must say so.
+  const leaveAndExit = useCallback(
+    (exit: () => void) => () => {
+      openedRef.current = null;
+      party.leave();
+      exit();
+    },
+    [party],
+  );
+
+  // Full snapshot: this screen renders essentially all of it, so a selector would
+  // buy nothing. Narrow selectors are for the app-wide surfaces (tray, queue chips).
+  const snap = usePartySnapshot((s) => s);
+  const isHost = useIsPartyHost();
   const media = snap?.media;
   const config = snap?.config;
   const providerId = media?.providerId;
@@ -248,13 +277,13 @@ export default function Party() {
   const selfMember = members.find((m) => m.userId === party.userId);
   const selfApproved = selfMember?.approved !== false;
   const reactionsOn = config?.gifsEnabled !== false;
-  const canParticipate = party.isHost || selfApproved; // approved (or host) → not in the waiting room
+  const canParticipate = isHost || selfApproved; // approved (or host) → not in the waiting room
   const canSendChat =
-    party.isHost ||
+    isHost ||
     (selfApproved && config?.chatEnabled !== false && selfMember?.permissions?.canChat !== false);
-  const canGrabControl = !party.isHost && selfApproved && !!config?.guestControlDefault;
+  const canGrabControl = !isHost && selfApproved && !!config?.guestControlDefault;
   // Only those who can drive playback get a tappable "jump to this moment" chip.
-  const canSeek = party.isHost || selfMember?.permissions?.canControlPlayback === true;
+  const canSeek = isHost || selfMember?.permissions?.canControlPlayback === true;
   const hasMedia = !!(providerId && media);
   const pendingCount = guests.filter((g) => g.approved === false).length;
   const sessionStarted = useRef(false);
@@ -270,7 +299,7 @@ export default function Party() {
     // of resetting to Home — same real-back fix as the solo player. Falls back to
     // the reset only when there's no history (e.g. a deep-linked join). Kicked-out
     // (below) stays a hard reset — that's a forced, terminal exit.
-    onConfirm: exitMediaBack,
+    onConfirm: leaveAndExit(exitMediaBack),
     enabled: hasMedia,
   });
 
@@ -278,9 +307,9 @@ export default function Party() {
   useEffect(() => {
     if (!party.kicked) return;
     bearAlert("Removed", "The host removed you from this room.", [
-      { text: "OK", onPress: exitMedia },
+      { text: "OK", onPress: leaveAndExit(exitMedia) },
     ]);
-  }, [party.kicked]);
+  }, [party.kicked, leaveAndExit]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
@@ -365,8 +394,7 @@ export default function Party() {
   const submitPassword = () => {
     const p = pwInput.trim();
     if (!p) return;
-    setPassword(p);
-    setPwAttempt((n) => n + 1); // force a client rebuild + retry even if pw unchanged
+    party.retry(p); // rebuilds the client even if the password is unchanged
     setPwPrompt(false);
     setPwInput("");
   };
@@ -380,7 +408,7 @@ export default function Party() {
     });
   };
 
-  const chat = usePartyChat({ code: roomCode, userId: party.userId, name: displayName });
+  const chat = usePartyChatSession();
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -458,7 +486,7 @@ export default function Party() {
       if (canSeek) party.seekTo(sec);
       else playerRef.current?.seek(sec);
     },
-    [canSeek, party],
+    [canSeek, party, playerRef],
   );
 
   const share = () => {
@@ -727,7 +755,7 @@ export default function Party() {
               actionable "Tap to sync". */}
 
           {/* no host → take over */}
-          {!party.isHost && !hostPresent && !!snap ? (
+          {!isHost && !hostPresent && !!snap ? (
             <Pressable style={[styles.floatBtn, styles.takeoverBtn]} onPress={party.claimHost}>
               <Ionicons name="megaphone" size={16} color={colors.text} />
               <Text style={[styles.floatText, { color: colors.text }]}>Take over as host</Text>
@@ -752,7 +780,7 @@ export default function Party() {
         </View>
 
           {/* Host status bar (portrait / tablet only). */}
-          {party.isHost && !isLandscapeMobile ? (
+          {isHost && !isLandscapeMobile ? (
           <View style={styles.hostBar}>
             <View style={styles.hostHintRow}>
               <Ionicons name="ellipse" size={8} color={colors.honey} />
@@ -930,7 +958,7 @@ export default function Party() {
       ) : null}
 
       {/* Host: room administration sheet */}
-      {party.isHost && config ? (
+      {isHost && config ? (
         <RoomSettingsSheet
           visible={showSettings}
           onClose={() => setShowSettings(false)}

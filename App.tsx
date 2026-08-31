@@ -5,6 +5,7 @@ import { AlertHost } from "@/components/ui/BearAlert";
 import { ConnectivityBanner } from "@/src/ui/ConnectivityBanner";
 import { MovieContextProvider } from "@/contexts/movieContext";
 import RootNavigator from "@/src/navigation/RootNavigator";
+import { PartySessionProvider } from "@/services/party/PartySession";
 import { linking } from "@/src/navigation/linking";
 import { navigationRef } from "@/src/navigation/navigationRef";
 import { colors } from "@/theme/bearoom";
@@ -119,10 +120,16 @@ export default function App() {
                   style={colorScheme === "light" ? "dark" : "light"}
                   translucent
                 />
-                <RootNavigator />
-                {/* App-global offline strip — rendered after RootNavigator so
-                    it paints above every screen (insets from SafeAreaProvider). */}
-                <ConnectivityBanner />
+                {/* The watch-party session lives ABOVE the navigator so leaving
+                    PartyScreen no longer destroys the room. `children` is a stable
+                    element, so session state changes re-render only the components
+                    that actually read a party context — not the whole app. */}
+                <PartySessionProvider>
+                  <RootNavigator />
+                  {/* App-global offline strip — rendered after RootNavigator so
+                      it paints above every screen (insets from SafeAreaProvider). */}
+                  <ConnectivityBanner />
+                </PartySessionProvider>
               </NavigationContainer>
               <AlertHost />
             </MovieContextProvider>
