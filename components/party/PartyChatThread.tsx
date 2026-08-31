@@ -151,8 +151,14 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
           style={[styles.send, !draft.trim() && styles.sendOff]}
           onPress={send}
           hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Send"
         >
-          <Ionicons name="arrow-up" size={ms(17)} color={colors.onHoney} />
+          <Ionicons
+            name="arrow-up"
+            size={ms(17)}
+            color={draft.trim() ? colors.onHoney : colors.textDim}
+          />
         </Pressable>
       </View>
 
@@ -191,8 +197,11 @@ const styles = StyleSheet.create({
   bubbleCol: { maxWidth: "78%" },
   sender: { fontFamily: font.label, fontSize: ms(10.5), marginBottom: ms(2) },
   bubble: { paddingHorizontal: ms(11), paddingVertical: ms(7), overflow: "hidden" },
-  bubbleMine: { backgroundColor: colors.honeySoft, alignSelf: "flex-end" },
-  bubbleTheirs: { backgroundColor: colors.surfaceStrong, alignSelf: "flex-start" },
+  /* Mine vs theirs is carried by lightness plus a whisper of warmth. A honey-
+     tinted block for every message you sent turned the thread into a wall of
+     accent and pulled focus off whatever you were browsing. */
+  bubbleMine: { backgroundColor: "rgba(240,169,60,0.09)", alignSelf: "flex-end" },
+  bubbleTheirs: { backgroundColor: colors.surface, alignSelf: "flex-start" },
   bubbleText: { color: colors.text, fontFamily: font.body, fontSize: ms(13), lineHeight: ms(18) },
   time: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(9.5), marginTop: ms(2) },
   composer: {
@@ -251,7 +260,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.honey,
   },
-  sendOff: { opacity: 0.45 },
+  /* At rest the composer shouldn't glow — the button takes the accent only once
+     there is something to send. */
+  sendOff: { backgroundColor: colors.surfaceStrong },
 });
 
 export default PartyChatThread;

@@ -512,8 +512,8 @@ function NowPlayingCard({
       {poster ? (
         <Image source={{ uri: poster }} style={styles.npPoster} contentFit="cover" />
       ) : (
-        <View style={[styles.npPoster, styles.npPosterEmpty]}>
-          <Ionicons name="film-outline" size={ms(20)} color={colors.honey} />
+        <View style={styles.npGlyph}>
+          <Ionicons name="film-outline" size={ms(20)} color={colors.textDim} />
         </View>
       )}
       <View style={styles.npMid}>
@@ -542,7 +542,7 @@ function NowPlayingCard({
         accessibilityRole="button"
         accessibilityLabel="Open the room"
       >
-        <Ionicons name="tv-outline" size={ms(17)} color={colors.onHoney} />
+        <Ionicons name="tv-outline" size={ms(17)} color={colors.honey} />
       </Pressable>
     </View>
   );
@@ -686,12 +686,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   npPoster: { width: ms(44), height: ms(62), borderRadius: radius.sm },
-  npPosterEmpty: {
+  npGlyph: {
+    width: ms(48),
+    height: ms(48),
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.honeySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honeyGlow,
+    backgroundColor: colors.surfaceStrong,
   },
   npMid: { flex: 1, gap: ms(3) },
   npTitle: { ...type.h3, fontSize: ms(15) },
@@ -704,13 +705,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   npFill: { height: ms(3), borderRadius: ms(2), backgroundColor: colors.honey },
+  /* Quiet: this is a way OUT of the sheet, not the thing you came to do. */
   npOpen: {
     width: ms(38),
     height: ms(38),
     borderRadius: ms(19),
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.honey,
+    backgroundColor: colors.surfaceStrong,
   },
 
   /* Segmented switcher — one pane at full height beats two half-empty ones. */
@@ -732,9 +734,15 @@ const styles = StyleSheet.create({
     height: ms(34),
     borderRadius: radius.pill,
   },
-  segItemActive: { backgroundColor: colors.honey },
+  /* Selection reads as a raised neutral pill (the platform idiom) instead of a
+     honey slab — a filled accent here competed with the content it sits above. */
+  segItemActive: {
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+  },
   segText: { fontFamily: font.label, fontSize: ms(12.5), color: colors.textDim },
-  segTextActive: { color: colors.onHoney },
+  segTextActive: { color: colors.text },
   countPill: {
     minWidth: ms(18),
     height: ms(18),
@@ -744,9 +752,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.honeySoft,
   },
-  countPillActive: { backgroundColor: "rgba(26,18,6,0.22)" },
+  countPillActive: { backgroundColor: colors.honeySoft },
   countText: { fontFamily: font.label, fontSize: ms(10), color: colors.honey },
-  countTextActive: { color: colors.onHoney },
+  countTextActive: { color: colors.honey },
 
   pane: { flex: 1 },
 });
