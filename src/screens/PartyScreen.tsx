@@ -766,20 +766,30 @@ export default function Party() {
             </View>
           ) : isHost ? (
             <View style={styles.waiting}>
-              {/* Same empty state as the tray's queue pane, deliberately: the room
-                  and the tray are two views of one thing and shouldn't word or
-                  draw it differently. */}
-              <View style={styles.emptyGlyph}>
-                <Ionicons name="layers-outline" size={ms(22)} color={colors.honey} />
+              {/* A waiting room's real content is the CHAT — that's what you do
+                  until someone picks. So "nothing queued" is a compact prompt on
+                  one row, not a hero block; a big glyph, a headline, a full-width
+                  sentence and a wide CTA stacked up pushed chat into a void. */}
+              <View style={styles.idleRow}>
+                <View style={styles.idleGlyph}>
+                  <Ionicons name="layers-outline" size={ms(17)} color={colors.honey} />
+                </View>
+                {/* One line. The strip directly below already says "you're hosting,
+                    your playback syncs to everyone", so a second explanatory line
+                    here only had room to truncate. */}
+                <Text numberOfLines={1} style={styles.idleTitle}>
+                  Nothing queued yet
+                </Text>
+                <Pressable
+                  style={styles.idleCta}
+                  onPress={openSearchTab}
+                  accessibilityRole="button"
+                  accessibilityLabel="Find something to watch"
+                >
+                  <Ionicons name="search" size={ms(13)} color={colors.onHoney} />
+                  <Text style={styles.idleCtaText}>Browse</Text>
+                </Pressable>
               </View>
-              <Text style={styles.waitingTitle}>Nothing queued yet</Text>
-              <Text style={styles.waitingText}>
-                Anything you add lands here for everyone in the room.
-              </Text>
-              <Pressable style={styles.retryBtn} onPress={openSearchTab}>
-                <Ionicons name="search" size={ms(14)} color={colors.onHoney} />
-                <Text style={styles.retryText}>Find something to watch</Text>
-              </Pressable>
             </View>
           ) : (
             <View style={styles.waiting}>
@@ -1422,7 +1432,7 @@ const styles = StyleSheet.create({
 
   player: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black, overflow: "hidden" },
   /* No media: content height on the app background, not a black 16:9 slab. */
-  playerCompact: { width: "100%", paddingVertical: ms(22), overflow: "hidden" },
+  playerCompact: { width: "100%", paddingHorizontal: ms(12), paddingTop: ms(10), overflow: "hidden" },
   /* Connecting: own the whole screen so there is one thing to look at. */
   playerFill: { width: "100%", flex: 1, overflow: "hidden" },
   playerFs: {
@@ -1444,17 +1454,35 @@ const styles = StyleSheet.create({
     gap: ms(9),
     paddingHorizontal: ms(28),
   },
-  emptyGlyph: {
-    width: ms(52),
-    height: ms(52),
+  idleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(11),
+    padding: ms(10),
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  idleGlyph: {
+    width: ms(34),
+    height: ms(34),
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.honeySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honeyGlow,
-    marginBottom: ms(2),
   },
+  idleTitle: { flex: 1, color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(13.5) },
+  idleCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(5),
+    paddingHorizontal: ms(12),
+    height: ms(32),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+  },
+  idleCtaText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(12) },
   waitingTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
   waitingText: {
     color: colors.textFaint,
