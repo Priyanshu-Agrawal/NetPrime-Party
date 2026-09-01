@@ -291,6 +291,11 @@ export default function Party() {
   // Only those who can drive playback get a tappable "jump to this moment" chip.
   const canSeek = isHost || selfMember?.permissions?.canControlPlayback === true;
   const hasMedia = !!(providerId && media);
+  // The queue can hold items this build cannot play (a plugin source — P3 is not
+  // built). Those mirror to a PartyMedia with no providerId, so hasMedia is false
+  // while the queue is NOT empty. Keying the empty state on media alone made the
+  // room claim "nothing queued" with items sitting in it.
+  const queueLen = snap?.queue?.length ?? 0;
   // The player block only earns space when it has something to show. An idle room
   // rendered a prompt bar here and then left ~60% of the screen empty below it;
   // the empty state now lives IN that space instead (see ListEmptyComponent).
@@ -951,17 +956,23 @@ export default function Party() {
             <View style={styles.chatEmpty}>
               <View style={styles.chatEmptyGlyph}>
                 <Ionicons
-                  name={hasMedia ? "chatbubbles-outline" : "layers-outline"}
+                  name={hasMedia ? "chatbubbles-outline" : queueLen > 0 ? "play-skip-forward-outline" : "layers-outline"}
                   size={ms(22)}
                   color={colors.honey}
                 />
               </View>
               <Text style={styles.chatEmptyTitle}>
-                {hasMedia ? "Say something to the pack" : "Nothing queued yet"}
+                {hasMedia
+                  ? "Say something to the pack"
+                  : queueLen > 0
+                  ? "Nothing playing right now"
+                  : "Nothing queued yet"}
               </Text>
               <Text style={styles.chatEmptyText}>
                 {hasMedia
                   ? "Reactions and messages show up here."
+                  : queueLen > 0
+                  ? `${queueLen} in the queue — this build can't play the current one.`
                   : "Pick something to watch, then invite the pack."}
               </Text>
               {!hasMedia ? (
