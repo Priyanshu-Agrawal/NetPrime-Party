@@ -58,6 +58,8 @@ export interface PartySessionRequest {
 
 export interface PartyActions {
   onPlayerEvent: (e: PlayerEvent) => void;
+  /** Host: change WHAT the room plays (also used to switch provider on failure). */
+  setMedia: (m: PartyMedia) => Promise<void>;
   play: () => void;
   pause: () => void;
   seekBy: (deltaSec: number) => void;
@@ -130,6 +132,7 @@ const IDLE: PartySessionValue = {
   retry: () => {},
   leave: () => {},
   onPlayerEvent: () => {},
+  setMedia: NOOP_ASYNC,
   play: () => {},
   pause: () => {},
   seekBy: () => {},
@@ -367,6 +370,7 @@ function PartySessionInner({
         engine.onPlayerEvent(e);
         if (e.event === "tick") client.renewLeaseIfDue();
       },
+      setMedia: (m) => client.setMedia(m),
       play: () => void client.play(),
       pause: () => void client.pause(),
       seekBy: (deltaSec) => {

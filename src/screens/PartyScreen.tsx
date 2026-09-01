@@ -27,6 +27,8 @@ import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import { bearAlert } from "@/components/ui/BearAlert";
 import GlassButton from "@/components/ui/GlassButton";
 import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
+import { getActiveProviders, isPartyCapable } from "@/components/player/providerRegistry";
+import { mediaKey, recordProviderFailure } from "@/utils/failureMemory";
 import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { getDisplayName } from "@/services/party/identity";
 import type { Member, PartyMedia } from "@/services/party/protocol";
@@ -504,6 +506,24 @@ export default function Party() {
     [canSeek, party, playerRef],
   );
 
+  // A dead source in a party had NO recovery: PlayerScreen wires onSwitchSource,
+  // PartyScreen never did, so the error overlay offered only "Retry" against a
+  // provider that had already failed. Switching is a HOST action — it changes the
+  // room's media for everyone — so it re-sets media with the next party-capable
+  // provider and records the failure so the picker biases away from it next time.
+  const switchSource = useCallback(() => {
+    if (!isHost || !media || !providerId) return;
+    recordProviderFailure(mediaKey(media), providerId);
+    const next = getActiveProviders().find(
+      (p) => isPartyCapable(p) && p.id !== providerId,
+    );
+    if (!next) {
+      bearAlert("No other source", "There's no other source that can host a party.");
+      return;
+    }
+    runAdmin("Couldn't switch source", party.setMedia({ ...media, providerId: next.id }));
+  }, [isHost, media, providerId, party]);
+
   const share = () => {
     void Share.share({
       message:
@@ -653,6 +673,7 @@ export default function Party() {
                 posterUrl={posterUrl}
                 onPlayerEvent={onEvent}
                 onBound={() => setPlayerBound(true)}
+                onSwitchSource={isHost ? switchSource : undefined}
                 nativeControls={playerBound}
               />
               {/* Mount our overlay ONLY after the <video> binds. videasy gates

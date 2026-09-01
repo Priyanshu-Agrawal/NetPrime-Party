@@ -882,7 +882,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     backgroundColor: colors.playerBg,
   },
-  errorTitle: { color: colors.white, fontSize: 16, fontWeight: "700", textAlign: "center" },
+  errorTitle: { color: colors.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
   errorSub: { color: colors.textDim, fontSize: 13, textAlign: "center", lineHeight: 18 },
   errorBtns: { flexDirection: "row", gap: 10, marginTop: 10 },
   errorPrimary: {
