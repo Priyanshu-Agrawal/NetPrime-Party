@@ -107,11 +107,16 @@ export function PartyTray() {
   const code = usePartySnapshot((s) => s?.code ?? null);
   const media = usePartySnapshot(
     (s) => s?.media ?? null,
+    // Compare every field the tray actually renders. The identity fields alone
+    // meant a title (or provider) correction for the SAME tmdbId never reached
+    // the UI — caught by renaming a queued title and watching the card ignore it.
     (a, b) =>
       a?.tmdbId === b?.tmdbId &&
       a?.type === b?.type &&
       a?.season === b?.season &&
-      a?.episode === b?.episode,
+      a?.episode === b?.episode &&
+      a?.title === b?.title &&
+      a?.providerId === b?.providerId,
   );
   const queueLen = usePartySnapshot((s) => s?.queue?.length ?? 0);
   const memberIds = usePartySnapshot(
