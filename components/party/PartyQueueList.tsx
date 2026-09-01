@@ -125,28 +125,20 @@ function QueueRow({
 
   return (
     <View style={[styles.row, current && styles.rowCurrent]}>
-      <View style={styles.thumbWrap}>
-        {poster ? (
-          <Image source={{ uri: poster }} style={styles.thumb} contentFit="cover" />
-        ) : (
-          <View style={[styles.thumb, styles.thumbEmpty]}>
-            <Ionicons
-              name={r.source === "youtube" ? "logo-youtube" : "link-outline"}
-              size={ms(13)}
-              color={colors.textDim}
-            />
-          </View>
-        )}
-        {current ? (
-          <View style={styles.nowBadge}>
-            <Ionicons name="play" size={ms(9)} color={colors.onHoney} />
-          </View>
-        ) : (
-          <View style={styles.idxBadge}>
-            <Text style={styles.idxText}>{index + 1}</Text>
-          </View>
-        )}
-      </View>
+      {/* No index badge over the artwork: the ORDER is the number, and the badge
+          both clipped the poster and started counting at 2 once the current item
+          stopped showing one. */}
+      {poster ? (
+        <Image source={{ uri: poster }} style={styles.thumb} contentFit="cover" />
+      ) : (
+        <View style={[styles.thumb, styles.thumbEmpty]}>
+          <Ionicons
+            name={r.source === "youtube" ? "logo-youtube" : "link-outline"}
+            size={ms(15)}
+            color={colors.textDim}
+          />
+        </View>
+      )}
 
       <View style={styles.mid}>
         <Text
@@ -156,22 +148,38 @@ function QueueRow({
           {item.title ?? details?.title ?? details?.name ?? item.id}
         </Text>
         <View style={styles.metaRow}>
-          <Text numberOfLines={1} style={styles.sub}>
-            {subtitleOf(item)}
-          </Text>
-          {failed ? <Text style={styles.failTag}>couldn&apos;t play</Text> : null}
-          {done ? <Text style={styles.doneTag}>watched</Text> : null}
+          {current ? (
+            <>
+              <View style={styles.nowDot} />
+              <Text style={styles.nowText}>Now playing</Text>
+            </>
+          ) : (
+            <Text numberOfLines={1} style={styles.sub}>
+              {subtitleOf(item)}
+            </Text>
+          )}
+          {/* Status is a chip, not more words on the metadata line — "Movie watched"
+              read as one broken phrase. */}
+          {failed ? (
+            <View style={[styles.tag, styles.tagFail]}>
+              <Text style={styles.tagFailText}>Couldn&apos;t play</Text>
+            </View>
+          ) : done ? (
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>Watched</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
       {isHost && !current ? (
-        <Pressable onPress={() => onPlay(item.id)} hitSlop={6} style={styles.act}>
-          <Ionicons name="play-circle" size={ms(22)} color={colors.honey} />
+        <Pressable onPress={() => onPlay(item.id)} hitSlop={8} style={styles.act}>
+          <Ionicons name="play" size={ms(16)} color={colors.honey} />
         </Pressable>
       ) : null}
       {canDrop && !current ? (
-        <Pressable onPress={() => onDrop(item.id)} hitSlop={6} style={styles.act}>
-          <Ionicons name="remove-circle-outline" size={ms(19)} color={colors.textFaint} />
+        <Pressable onPress={() => onDrop(item.id)} hitSlop={8} style={styles.act}>
+          <Ionicons name="close" size={ms(16)} color={colors.textFaint} />
         </Pressable>
       ) : null}
     </View>
@@ -232,50 +240,32 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.honeyGlow,
   },
-  thumbWrap: { width: ms(34), height: ms(46) },
-  thumb: { width: ms(34), height: ms(46), borderRadius: radius.sm },
+  thumb: { width: ms(38), height: ms(52), borderRadius: radius.sm },
   thumbEmpty: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceStrong,
   },
   /* The index/now badge sits ON the artwork so the row stays two columns wide. */
-  idxBadge: {
-    position: "absolute",
-    left: -ms(4),
-    top: -ms(4),
-    minWidth: ms(16),
-    height: ms(16),
-    paddingHorizontal: ms(3),
-    borderRadius: ms(8),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.bgElevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  idxText: { fontFamily: font.label, fontSize: ms(9), color: colors.textDim },
-  nowBadge: {
-    position: "absolute",
-    left: -ms(4),
-    top: -ms(4),
-    width: ms(16),
-    height: ms(16),
-    borderRadius: ms(8),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.honey,
-  },
 
   mid: { flex: 1, gap: ms(3) },
   title: { ...type.body, fontSize: ms(13), fontFamily: font.bodyMed },
   titleCurrent: { color: colors.honeyBright },
   titleMuted: { color: colors.textDim },
   metaRow: { flexDirection: "row", alignItems: "center", gap: ms(6) },
+  nowDot: { width: ms(5), height: ms(5), borderRadius: ms(3), backgroundColor: colors.honey },
+  nowText: { fontFamily: font.label, fontSize: ms(10.5), color: colors.honey },
+  tag: {
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(2),
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceStrong,
+  },
+  tagText: { fontFamily: font.label, fontSize: ms(9.5), color: colors.textDim },
+  tagFail: { backgroundColor: "rgba(229,89,89,0.14)" },
+  tagFailText: { fontFamily: font.label, fontSize: ms(9.5), color: colors.danger },
   sub: { ...type.caption, fontSize: ms(10.5), color: colors.textFaint },
-  failTag: { ...type.caption, fontSize: ms(10), color: colors.danger },
-  doneTag: { ...type.caption, fontSize: ms(10), color: colors.textFaint },
-  act: { padding: ms(3) },
+  act: { width: ms(30), height: ms(30), alignItems: "center", justifyContent: "center" },
 });
 
 export default PartyQueueList;
