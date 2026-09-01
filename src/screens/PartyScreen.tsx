@@ -255,6 +255,10 @@ export default function Party() {
   // Full snapshot: this screen renders essentially all of it, so a selector would
   // buy nothing. Narrow selectors are for the app-wide surfaces (tray, queue chips).
   const snap = usePartySnapshot((s) => s);
+  // No snapshot yet = we are not in a room. There is nothing to chat in and
+  // nothing to queue, so the screen should be ONE centred state rather than a
+  // stub at the top plus an empty chat below it.
+  const connecting = !snap && !party.error;
   const isHost = useIsPartyHost();
   const media = snap?.media;
   const config = snap?.config;
@@ -611,6 +615,8 @@ export default function Party() {
                   ? styles.landscapeMobilePlayer
                   : hasMedia
                   ? styles.player
+                  : connecting
+                  ? styles.playerFill
                   : styles.playerCompact
               }
             >
@@ -839,8 +845,10 @@ export default function Party() {
           ) : null}
           </View>
           {/* Right / chat column — a slide-in drawer in landscape (a SOLID panel, not
-              blurred: a blur on the video screen re-captures the video every frame). */}
-          {!isLandscapeMobile || landscapeChatOpen ? (
+              blurred: a blur on the video screen re-captures the video every frame).
+              Hidden while connecting: an empty thread under a spinner is a second
+              void, and you can't talk to a room you haven't joined. */}
+          {!connecting && (!isLandscapeMobile || landscapeChatOpen) ? (
             <ReanimatedAnimated.View
               entering={isLandscapeMobile ? SlideInRight.duration(240) : undefined}
               exiting={isLandscapeMobile ? SlideOutRight.duration(180) : undefined}
@@ -1415,6 +1423,8 @@ const styles = StyleSheet.create({
   player: { width: "100%", aspectRatio: 16 / 9, backgroundColor: colors.black, overflow: "hidden" },
   /* No media: content height on the app background, not a black 16:9 slab. */
   playerCompact: { width: "100%", paddingVertical: ms(22), overflow: "hidden" },
+  /* Connecting: own the whole screen so there is one thing to look at. */
+  playerFill: { width: "100%", flex: 1, overflow: "hidden" },
   playerFs: {
     position: "absolute",
     top: 0,
