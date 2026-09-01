@@ -898,7 +898,14 @@ export default function Party() {
             style={styles.flex}
             data={chat.messages}
             keyExtractor={(m) => m.id}
-            contentContainerStyle={[styles.chatContent, isLandscapeMobile && styles.landscapeChatContent]}
+            contentContainerStyle={[
+              styles.chatContent,
+              // Messages stack from the BOTTOM, like every chat app. Top-aligned
+              // in a tall column, one message sat under the header with the rest
+              // of the screen empty below it. The empty state still centres.
+              chat.messages.length ? styles.chatContentFilled : styles.chatContentEmpty,
+              isLandscapeMobile && styles.landscapeChatContent,
+            ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -1580,6 +1587,8 @@ const styles = StyleSheet.create({
   // No flat gap here — per-message spacing comes from groupTight/groupGap so a
   // sender's consecutive bubbles sit tight and only a new sender gets a real break.
   chatContent: { padding: ms(14), flexGrow: 1 },
+  chatContentFilled: { justifyContent: "flex-end" },
+  chatContentEmpty: { justifyContent: "center" },
   chatEmpty: {
     flex: 1,
     alignItems: "center",

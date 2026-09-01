@@ -16,12 +16,12 @@ import { GifPicker } from "@/components/party/GifPicker";
 import { bubbleCorners, fmtClock, groupFlags, senderColor } from "@/components/party/chatFormat";
 import { generateRandomBearConfig } from "@/services/avatar/bearAvatar";
 import { usePartyChatSession, usePartySession } from "@/services/party/PartySession";
+import type { ChatMessage } from "@/services/party/usePartyChat";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { Image } from "expo-image";
-import type { ChatMessage } from "@/services/party/usePartyChat";
 
 const bearCache = new Map<string, ReturnType<typeof generateRandomBearConfig>>();
 function bearFor(userId: string) {
@@ -59,7 +59,7 @@ export function PartyChatThread({ compact = false }: { compact?: boolean }) {
         ref={listRef}
         data={chat.messages}
         keyExtractor={(m) => m.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, chat.messages.length ? styles.listFilled : styles.listEmpty]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -177,7 +177,9 @@ const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
-  list: { paddingHorizontal: ms(12), paddingBottom: ms(8), gap: ms(2) },
+  list: { paddingHorizontal: ms(12), paddingBottom: ms(8), gap: ms(2), flexGrow: 1 },
+  listFilled: { justifyContent: "flex-end" },
+  listEmpty: { justifyContent: "center" },
   empty: { alignItems: "center", justifyContent: "center", paddingVertical: ms(18), gap: ms(7) },
   emptyIcon: {
     width: ms(34),
