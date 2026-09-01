@@ -289,6 +289,11 @@ export default function Party() {
   // Only those who can drive playback get a tappable "jump to this moment" chip.
   const canSeek = isHost || selfMember?.permissions?.canControlPlayback === true;
   const hasMedia = !!(providerId && media);
+  // The player block only earns space when it has something to show. An idle room
+  // rendered a prompt bar here and then left ~60% of the screen empty below it;
+  // the empty state now lives IN that space instead (see ListEmptyComponent).
+  const showPlayerBlock = hasMedia || connecting || !!party.error;
+
   const pendingCount = guests.filter((g) => g.approved === false).length;
   const sessionStarted = useRef(false);
   const sessionTitleRef = useRef("Bearoom party");
@@ -602,9 +607,7 @@ export default function Party() {
           {/* Left / theater column */}
           <View style={[isWide && styles.desktopLeftCol, isLandscapeMobile && styles.landscapeMobilePlayerCol]}>
             {/* Player */}
-            {/* With nothing playing there is no video to reserve room for, so the
-                16:9 black box just pushes an empty chat down the screen and leaves
-                a void. Collapse to content height and let chat take the space. */}
+            {showPlayerBlock ? (
             <View
               style={
                 fullscreen
@@ -827,6 +830,7 @@ export default function Party() {
           </View>
 
         </View>
+          ) : null}
 
           {/* Host status bar (portrait / tablet only). */}
           {isHost && !isLandscapeMobile ? (
@@ -913,9 +917,47 @@ export default function Party() {
             );
           }}
           ListEmptyComponent={
+            // An empty room's dead space should do the two jobs you actually have:
+            // pick something, and get people in. "Say something to the pack" alone
+            // left most of the screen blank and unhelpful.
             <View style={styles.chatEmpty}>
-              <Ionicons name="chatbubbles-outline" size={26} color={colors.textFaint} />
-              <Text style={styles.chatEmptyText}>Say something to the pack</Text>
+              <View style={styles.chatEmptyGlyph}>
+                <Ionicons
+                  name={hasMedia ? "chatbubbles-outline" : "layers-outline"}
+                  size={ms(22)}
+                  color={colors.honey}
+                />
+              </View>
+              <Text style={styles.chatEmptyTitle}>
+                {hasMedia ? "Say something to the pack" : "Nothing queued yet"}
+              </Text>
+              <Text style={styles.chatEmptyText}>
+                {hasMedia
+                  ? "Reactions and messages show up here."
+                  : "Pick something to watch, then invite the pack."}
+              </Text>
+              {!hasMedia ? (
+                <View style={styles.chatEmptyActions}>
+                  <Pressable
+                    style={styles.emptyPrimary}
+                    onPress={openSearchTab}
+                    accessibilityRole="button"
+                    accessibilityLabel="Find something to watch"
+                  >
+                    <Ionicons name="search" size={ms(14)} color={colors.onHoney} />
+                    <Text style={styles.emptyPrimaryText}>Find something</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.emptySecondary}
+                    onPress={share}
+                    accessibilityRole="button"
+                    accessibilityLabel="Invite people to this room"
+                  >
+                    <Ionicons name="person-add-outline" size={ms(14)} color={colors.honey} />
+                    <Text style={styles.emptySecondaryText}>Invite</Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           }
         />
@@ -1538,8 +1580,51 @@ const styles = StyleSheet.create({
   // No flat gap here — per-message spacing comes from groupTight/groupGap so a
   // sender's consecutive bubbles sit tight and only a new sender gets a real break.
   chatContent: { padding: ms(14), flexGrow: 1 },
-  chatEmpty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 40 },
-  chatEmptyText: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13) },
+  chatEmpty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: ms(7),
+    paddingHorizontal: ms(32),
+    paddingVertical: ms(48),
+  },
+  chatEmptyGlyph: {
+    width: ms(52),
+    height: ms(52),
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.honeySoft,
+    marginBottom: ms(2),
+  },
+  chatEmptyTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(15) },
+  chatEmptyText: {
+    color: colors.textFaint,
+    fontFamily: font.body,
+    fontSize: ms(12.5),
+    textAlign: "center",
+  },
+  chatEmptyActions: { flexDirection: "row", gap: ms(9), marginTop: ms(10) },
+  emptyPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    paddingHorizontal: ms(15),
+    height: ms(38),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+  },
+  emptyPrimaryText: { color: colors.onHoney, fontFamily: font.label, fontSize: ms(12.5) },
+  emptySecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    paddingHorizontal: ms(15),
+    height: ms(38),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honeySoft,
+  },
+  emptySecondaryText: { color: colors.honey, fontFamily: font.label, fontSize: ms(12.5) },
 
   bubbleRow: { flexDirection: "row", alignItems: "flex-end", gap: ms(8), maxWidth: "86%" },
   bubbleRowMine: { alignSelf: "flex-end" },

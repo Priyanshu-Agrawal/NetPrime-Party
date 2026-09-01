@@ -60,6 +60,12 @@ export function usePartyChat(opts: {
   }, []);
 
   useEffect(() => {
+    // Reset FIRST: the thread is per-room, and without this the previous room's
+    // messages stay on screen after switching (the channel is torn down and
+    // rebuilt, but the state it filled was never cleared).
+    setMessages([]);
+    setReactions([]);
+    setReady(false);
     if (!code) return;
     let cancelled = false;
 
