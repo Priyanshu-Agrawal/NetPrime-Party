@@ -1,5 +1,6 @@
 import type { Provider } from "@/components/player/providerRegistry";
 import type { RemoteProviderRow } from "@/src/types/worker.types";
+import { devBridgeEnabled, withDevBridge } from "@/src/scripts/devGenericBridge";
 
 /**
  * Map a Supabase provider row (/config) to the app's playback `Provider` shape.
@@ -28,7 +29,10 @@ export function remoteToProviders(rows: RemoteProviderRow[]): Provider[] {
     // Drop rows missing the fields playback needs — a null url_movie/allowed_domain
     // would otherwise crash the player (fill().replace on undefined) or blank it
     // (empty host blocks the initial top-frame nav). Keep the app dumb but safe.
-    return rows
+    const providers = rows
         .filter((r) => r.enabled && r.url_movie && r.allowed_domain)
         .map(remoteToProvider);
+    // Dev builds only (folded away in release): try the generic bridge before it is published.
+    if (__DEV__ && devBridgeEnabled()) return withDevBridge(providers);
+    return providers;
 }

@@ -12,6 +12,7 @@
  */
 import { universalStorage as storage } from "@/services/storage/universalStorage";
 import { sha256Hex } from "@/utils/sha256";
+import { devBridgeEnabled } from "./devGenericBridge";
 
 const CACHE_KEY = "bridge.scripts.v1";
 // H2: the bridge is arbitrary JS injected into the provider WebView, so it must
@@ -76,7 +77,13 @@ function writeCache(m: CacheMap): void {
 
 /** The cached injection script for a provider (synchronous — for inject time). */
 export function getCachedScript(providerId: string): string | null {
-  return readCache()[providerId]?.script ?? null;
+  const cached = readCache()[providerId]?.script ?? null;
+  // Dev builds only (folded away in release): the bundled generic bridge for providers
+  // given a dev version by devGenericBridge (EXPO_PUBLIC_DEV_GENERIC_BRIDGE=1).
+  if (__DEV__ && cached == null && providerId !== "videasy" && devBridgeEnabled()) {
+    return (require("./generic-bridge") as typeof import("./generic-bridge")).GENERIC_BRIDGE;
+  }
+  return cached;
 }
 
 /** The cached script version (for telemetry / staleness checks). */
