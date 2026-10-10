@@ -47,18 +47,37 @@ const POST_INSTALL = [
   "    end",
 ].join("\n");
 
+const DEPLOYMENT_FLOOR = "15.1"; // raised to "16.4" at SDK 57 (the SDK 56+ app minimum)
+// SDK 53 passes `podfile_properties['apple.ccacheEnabled'] == 'true'`; SDK 54+ calls
+// `ccache_enabled?(podfile_properties)`. Either way the block lands after the
+// react_native_post_install(...) call's closing paren.
+const CCACHE_ANCHOR =
+  /:ccache_enabled => (?:podfile_properties\['apple\.ccacheEnabled'\] == 'true'|ccache_enabled\?\(podfile_properties\)),/;
+
+function postInstall(floor) {
+  return POST_INSTALL.replace(/'15\.1'/g, `'${floor}'`);
+}
+
+function addXcodeFixesToPodfile(contents, floor = DEPLOYMENT_FLOOR) {
+  if (!CCACHE_ANCHOR.test(contents)) {
+    throw new Error(`${PLUGIN_NAME}: anchor not found in Podfile (react_native_post_install :ccache_enabled)`);
+  }
+  return mergeContents({
+    tag: `${PLUGIN_NAME}-post-install`,
+    src: contents,
+    newSrc: postInstall(floor),
+    anchor: CCACHE_ANCHOR,
+    offset: 2,
+    comment: "#",
+  }).contents;
+}
+
 const withFmtXcodeFix = (config) =>
   withPodfile(config, (cfg) => {
-    const merged = mergeContents({
-      tag: `${PLUGIN_NAME}-post-install`,
-      src: cfg.modResults.contents,
-      newSrc: POST_INSTALL,
-      anchor: /:ccache_enabled => podfile_properties\['apple\.ccacheEnabled'\] == 'true',/,
-      offset: 2,
-      comment: "#",
-    });
-    cfg.modResults.contents = merged.contents;
+    cfg.modResults.contents = addXcodeFixesToPodfile(cfg.modResults.contents);
     return cfg;
   });
 
 module.exports = createRunOncePlugin(withFmtXcodeFix, PLUGIN_NAME);
+module.exports.addXcodeFixesToPodfile = addXcodeFixesToPodfile;
+module.exports.DEPLOYMENT_FLOOR = DEPLOYMENT_FLOOR;

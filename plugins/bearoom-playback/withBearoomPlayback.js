@@ -139,32 +139,45 @@ const withBearoomPlaybackSources = (config) =>
     },
   ]);
 
+// SDK 53 builds the list as `val packages = PackageList(this).packages` and adds with
+// `packages.add(...)`; SDK 54+ uses `PackageList(this).packages.apply { … }` and `add(...)`.
+const MODERN_PACKAGES = /PackageList\(this\)\.packages\.apply \{/;
+const LEGACY_PACKAGES = /val packages = PackageList\(this\)\.packages/;
+// Present in every template from SDK 53 to 57 (SDK 55 deletes ReactNativeHostWrapper).
+const IMPORT_ANCHOR = /import expo\.modules\.ApplicationLifecycleDispatcher/;
+
+function addPlaybackToMainApplication(contents, pkg) {
+  if (!IMPORT_ANCHOR.test(contents)) {
+    throw new Error(`${PLUGIN_NAME}: anchor not found in MainApplication (ApplicationLifecycleDispatcher import)`);
+  }
+  let out = mergeContents({
+    tag: `${PLUGIN_NAME}-main-application-import`,
+    src: contents,
+    newSrc: `import ${pkg}.playback.BearoomPlaybackPackage`,
+    anchor: IMPORT_ANCHOR,
+    offset: 1,
+    comment: "//",
+  }).contents;
+  const modern = MODERN_PACKAGES.test(out);
+  if (!modern && !LEGACY_PACKAGES.test(out)) {
+    throw new Error(`${PLUGIN_NAME}: anchor not found in MainApplication (PackageList)`);
+  }
+  out = mergeContents({
+    tag: `${PLUGIN_NAME}-main-application-package`,
+    src: out,
+    newSrc: modern
+      ? `              add(${pkg}.playback.BearoomPlaybackPackage())`
+      : `            packages.add(${pkg}.playback.BearoomPlaybackPackage())`,
+    anchor: modern ? MODERN_PACKAGES : LEGACY_PACKAGES,
+    offset: 1,
+    comment: "//",
+  }).contents;
+  return out;
+}
+
 const withBearoomPlaybackMainApplication = (config) =>
   withMainApplication(config, (cfg) => {
-    const pkg = getAndroidPackage(cfg);
-    let contents = cfg.modResults.contents;
-
-    const importMerge = mergeContents({
-      tag: `${PLUGIN_NAME}-main-application-import`,
-      src: contents,
-      newSrc: `import ${pkg}.playback.BearoomPlaybackPackage`,
-      anchor: /import expo\.modules\.ReactNativeHostWrapper/,
-      offset: 1,
-      comment: "//",
-    });
-    contents = importMerge.contents;
-
-    const packageMerge = mergeContents({
-      tag: `${PLUGIN_NAME}-main-application-package`,
-      src: contents,
-      newSrc: `            packages.add(${pkg}.playback.BearoomPlaybackPackage())`,
-      anchor: /val packages = PackageList\(this\)\.packages/,
-      offset: 1,
-      comment: "//",
-    });
-    contents = packageMerge.contents;
-
-    cfg.modResults.contents = contents;
+    cfg.modResults.contents = addPlaybackToMainApplication(cfg.modResults.contents, getAndroidPackage(cfg));
     return cfg;
   });
 
@@ -304,3 +317,4 @@ function withBearoomPlayback(config) {
 }
 
 module.exports = createRunOncePlugin(withBearoomPlayback, PLUGIN_NAME);
+module.exports.addPlaybackToMainApplication = addPlaybackToMainApplication;
