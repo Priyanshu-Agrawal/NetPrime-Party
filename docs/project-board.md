@@ -298,14 +298,23 @@ into `providers: []` — byte-identical to the operator's store-review killswitc
 
 **Done:**
 * `[x]` Worker separates "Supabase answered with an empty list" (explicit `killswitch: true`) from "Supabase didn't
-  answer" (`stale: true`, last-known-good from KV). Unit-tested (vitest, 14 tests). **KV binding + deploy pending
-  the owner's Cloudflare login** (the shell's API token has no access to this account; the saved OAuth login
-  expired 2026-08-28).
+  answer" (`stale: true`, last-known-good from KV). **Deployed** (`25bbec54`, then hardened in `f6569238`): KV
+  `CONFIG_LKG` holds the provider list *and* the bridge scripts; lane flags are read from KV `flags:v1` (dashboard
+  vars would be reset by every deploy); a non-list 2xx Supabase body is treated as an outage; a reorder alone never
+  costs a KV write. Deploys use the owner's wrangler OAuth login (`env -u CLOUDFLARE_API_TOKEN …`) — the shell's
+  `CLOUDFLARE_API_TOKEN` has no access to this account.
 * `[x]` App keeps its own last good `/config` in MMKV, boots from it, and only believes an empty list when it is an
   explicit killswitch. Remote lane flags (`embedApiLane`, `nativeLane`, `pluginHost`) land in the store, all off.
 * `[x]` One neutral `PlayerHandle` v2 (`components/player/types.ts`) with capabilities, tracks and a landed-position
   seek; the web twin's duplicated types removed.
-* `[x]` Test harnesses: `npm test` (jest-expo, 26 tests) and `cd worker && npm test` (vitest, 14 tests).
+* `[x]` Test harnesses: `npm test` (jest-expo, 28 tests) and `cd worker && npm test` (vitest, 26 tests, incl.
+  route-level tests of the real `/config` and `/scripts` handlers through the KV and error paths).
+* `[x]` Fresh whole-phase review: no critical issues; 4 important + 3 re-graded findings fixed (each with a
+  failing-first test). A killswitch first learned during an outage is now remembered on the device.
+* `[ ]` **iOS simulator launch — moved to the Expo SDK upgrade phase.** Builds on Xcode 27 after a pod
+  deployment-target fix (`9b18d71`), but iOS 27 kills it at launch: the iOS 27 SDK requires the UIScene lifecycle,
+  which Expo ships only from SDK 57.0.23 (`expo-build-properties` `ios.enableSceneSupport`; native in 58). SDK ≤56
+  gets no fix (expo/expo#46664).
 
 **Gate (Android emulator, 2026-10-10):**
 * Live: 14 providers, `source: live`, `stale: false`, flags all off; the device copy holds 14 providers.
