@@ -1,0 +1,235 @@
+/**
+ * generic-bridge.ts — the provider-agnostic injection bridge (Phase 1A, spec §6.2.4).
+ *
+ * The proven videasy bridge (legacy-videasy.ts) with every videasy-specific part
+ * replaced by a provider-agnostic one: paint only the <video> (chrome-off), bind the
+ * feature rather than an ad (longest duration wins, rebinding when a better one
+ * mounts), subtitles from textTracks, and a start click from data. Served OTA per
+ * provider via scripts/upload-bridge.ts; HijackPlayer sets window.__vlCfg (a
+ * BridgeConfig) in its prologue before this runs.
+ *
+ * NOT imported by the app — only the upload CLI and tests read it.
+ * It lives in a template literal: no backticks and no dollar-brace inside.
+ */
+export const GENERIC_BRIDGE_ID = "generic";
+
+export interface BridgeConfig {
+  /** Paint only the <video> from document-start (default true). */
+  chromeOff?: boolean;
+  /** Click the provider's start control at 3 s and 8 s if no <video> exists (default true). */
+  autoStart?: boolean;
+  /** Selectors tried in order before the centre-of-page fallback. */
+  startSelectors?: string[];
+}
+
+export const GENERIC_BRIDGE: string = `
+(function(){
+  if (window.__vlBridge) return; window.__vlBridge = true;
+  var CFG = window.__vlCfg || {};
+  var __vlN; try { __vlN = window.__vlMsgNonce; delete window.__vlMsgNonce; } catch(e){}
+  var __rnpost; try { __rnpost = window.ReactNativeWebView.postMessage.bind(window.ReactNativeWebView); } catch(e){}
+  function post(o){ try { if (__vlN !== undefined) o.__n = __vlN; (__rnpost || window.ReactNativeWebView.postMessage)(JSON.stringify(o)); } catch(e){} }
+  function snap(v, o){
+    o.currentTime = (v && v.currentTime) || 0;
+    o.duration = (v && isFinite(v.duration) && v.duration) || 0;
+    o.paused = v ? !!v.paused : true;
+    o.readyState = v ? v.readyState : 0;
+    return o;
+  }
+
+  try { window.open = function(){ return null; }; } catch(e){}
+  try {
+    document.addEventListener('click', function(ev){
+      var a = ev.target && ev.target.closest && ev.target.closest('a[target=_blank]');
+      if (a){ ev.preventDefault(); ev.stopPropagation(); }
+    }, true);
+  } catch(e){}
+  try {
+    var GEV = ['pointerdown', 'touchstart', 'click'];
+    var __g = function(){
+      post({ event: 'gesture' });
+      GEV.forEach(function(t){ document.removeEventListener(t, __g, true); });
+    };
+    GEV.forEach(function(t){ document.addEventListener(t, __g, true); });
+  } catch(e){}
+
+  var CHROME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}video{visibility:visible!important}';
+  var FRAME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}iframe{visibility:visible!important}';
+  var chromeOn = CFG.chromeOff !== false;
+  function styleEl(){
+    var el = document.getElementById('__vlChromeStyle');
+    if (!el){ el = document.createElement('style'); el.id = '__vlChromeStyle'; (document.head || document.documentElement).appendChild(el); }
+    return el;
+  }
+  function applyChrome(){
+    try {
+      var css = !chromeOn ? '' : (document.getElementsByTagName('video').length ? CHROME_CSS : FRAME_CSS);
+      var el = styleEl(); if (el.textContent !== css) el.textContent = css;
+    } catch(e){}
+  }
+  window.__vlChromeOff = function(on){ chromeOn = !!on; applyChrome(); };
+  window.__vlSetGuest = function(){};
+  applyChrome();
+  try { document.addEventListener('DOMContentLoaded', applyChrome); } catch(e){}
+
+  function collect(doc, out){
+    try {
+      var vs = doc.getElementsByTagName('video');
+      for (var i = 0; i < vs.length; i++) out.push(vs[i]);
+      var fs = doc.getElementsByTagName('iframe');
+      for (var j = 0; j < fs.length; j++){
+        var cd = null; try { cd = fs[j].contentDocument; } catch(e){}
+        if (cd) collect(cd, out);
+      }
+    } catch(e){}
+    return out;
+  }
+  function score(v){
+    var d = (isFinite(v.duration) && v.duration > 0) ? v.duration : 0;
+    var a = 0; try { var r = v.getBoundingClientRect(); a = r.width * r.height; } catch(e){}
+    return d * 1e6 + a;
+  }
+  function pickVideo(){
+    var all = collect(document, []), best = null;
+    for (var i = 0; i < all.length; i++){
+      if (all[i].isConnected === false) continue;
+      if (!best || score(all[i]) > score(best)) best = all[i];
+    }
+    return best;
+  }
+
+  var vid = null, applying = 0, wasPlaying = false;
+  function markApplying(){ applying = Date.now() + 500; }
+  function isApplying(){ return Date.now() < applying; }
+  function isSubTrack(t){ return !t.kind || t.kind === 'subtitles' || t.kind === 'captions'; }
+  function subsOf(v){
+    var out = [];
+    try {
+      var tt = v.textTracks || [];
+      for (var i = 0; i < tt.length; i++){
+        var t = tt[i];
+        if (!isSubTrack(t)) continue;
+        out.push({ id: String(i), label: t.label || t.language || ('Track ' + (i + 1)), language: t.language || '', selected: t.mode === 'showing' });
+      }
+    } catch(e){}
+    return out;
+  }
+  function postSubs(){ if (vid) post(snap(vid, { event: 'subs', subs: subsOf(vid) })); }
+  function postCaps(){
+    if (!vid) return;
+    post(snap(vid, { event: 'caps', caps: { quality: false, audio: false, subtitles: subsOf(vid).length > 0 } }));
+    postSubs();
+  }
+  function keepAlive(){
+    if (!vid) return;
+    if (document.hidden && wasPlaying && vid.paused){
+      markApplying();
+      var p = vid.play(); if (p && p.catch) p.catch(function(){});
+    }
+  }
+  window.__soloKeepAlive = keepAlive;
+  function bind(v){
+    if (!v || v === vid) return;
+    vid = v; wasPlaying = !v.paused;
+    if (!v.__vlBound){
+      v.__vlBound = true;
+      ['play','pause','seeking','seeked','ended','waiting','playing','canplay'].forEach(function(ev){
+        v.addEventListener(ev, function(){
+          if (v !== vid) return;
+          if (ev === 'pause' && document.hidden && wasPlaying){ keepAlive(); return; }
+          if (isApplying()) return;
+          if (ev === 'play' || ev === 'playing') wasPlaying = true;
+          if (ev === 'pause' || ev === 'ended') wasPlaying = false;
+          post(snap(v, { event: ev }));
+        });
+      });
+      try { v.addEventListener('loadedmetadata', function(){ if (v === vid) postCaps(); }); } catch(e){}
+      try { if (v.textTracks && v.textTracks.addEventListener) v.textTracks.addEventListener('addtrack', function(){ if (v === vid) postCaps(); }); } catch(e){}
+    }
+    applyChrome();
+    post(snap(v, { event: 'ready' }));
+    postCaps();
+  }
+  function better(c){
+    if (!vid || vid.isConnected === false) return true;
+    return c !== vid && score(c) > score(vid) * 1.5;
+  }
+  function scan(){
+    var c = pickVideo();
+    if (c && better(c)) bind(c);
+    else if (vid && vid.isConnected === false) vid = null;
+    applyChrome();
+  }
+  setInterval(scan, 700);
+  setInterval(function(){ keepAlive(); if (vid) post(snap(vid, { event: 'tick' })); }, 1000);
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) return;
+    keepAlive(); setTimeout(keepAlive, 50); setTimeout(keepAlive, 250); setTimeout(keepAlive, 1000);
+  });
+
+  function pointerHit(el){
+    try {
+      var r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      ['pointerover','pointerenter','pointerdown','pointerup','mousedown','mouseup','click'].forEach(function(t){
+        try {
+          var E = (t.indexOf('pointer') === 0 && typeof PointerEvent !== 'undefined') ? PointerEvent : MouseEvent;
+          el.dispatchEvent(new E(t, { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y }));
+        } catch(e){}
+      });
+    } catch(e){}
+  }
+  function clickStart(){
+    var sels = CFG.startSelectors || [];
+    for (var i = 0; i < sels.length; i++){
+      var el = null; try { el = document.querySelector(sels[i]); } catch(e){}
+      if (el){ pointerHit(el); return true; }
+    }
+    var c = null; try { c = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2); } catch(e){}
+    if (c && c.tagName !== 'IFRAME' && c !== document.body && c !== document.documentElement){ pointerHit(c); return true; }
+    return false;
+  }
+  if (CFG.autoStart !== false){
+    [3000, 8000].forEach(function(ms){ setTimeout(function(){ if (!vid) clickStart(); }, ms); });
+  }
+
+  window.__vlCmd = function(cmd){
+    try {
+      if (cmd.action === 'play'){
+        wasPlaying = true;
+        if (!vid){ clickStart(); return; }
+        markApplying();
+        var p = vid.play(); if (p && p.catch) p.catch(function(){});
+        return;
+      }
+      if (cmd.action === 'readQuality'){ post(snap(vid, { event: 'quality', qualities: [] })); return; }
+      if (cmd.action === 'readAudio'){ post(snap(vid, { event: 'audio', audios: [] })); return; }
+      if (cmd.action === 'readSubs'){ postSubs(); return; }
+      if (!vid) return;
+      if (cmd.action === 'pause'){ wasPlaying = false; markApplying(); vid.pause(); }
+      else if (cmd.action === 'seek'){ markApplying(); vid.currentTime = cmd.time; }
+      else if (cmd.action === 'rate'){ vid.playbackRate = cmd.rate; }
+      else if (cmd.action === 'setSub'){
+        var tt = vid.textTracks || [];
+        for (var i = 0; i < tt.length; i++){
+          if (!isSubTrack(tt[i])) continue;
+          tt[i].mode = (cmd.id != null && String(i) === String(cmd.id)) ? 'showing' : 'disabled';
+        }
+        postSubs();
+      }
+      else if (cmd.action === 'fullscreen'){
+        var fs = vid.requestFullscreen || vid.webkitRequestFullscreen || vid.webkitEnterFullscreen;
+        if (fs) fs.call(vid);
+      }
+    } catch(e){}
+  };
+  window.__soloCmd = function(cmd){
+    if (!vid || !cmd) return;
+    try {
+      if (cmd.action === 'play'){ wasPlaying = true; var up = vid.play(); if (up && up.catch) up.catch(function(){}); }
+      else if (cmd.action === 'pause'){ wasPlaying = false; vid.pause(); }
+      else if (cmd.action === 'seek' && typeof cmd.time === 'number'){ vid.currentTime = cmd.time; }
+    } catch(e){}
+  };
+  true;
+})();
+`;
