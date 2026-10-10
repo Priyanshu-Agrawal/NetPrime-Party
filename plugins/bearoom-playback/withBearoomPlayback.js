@@ -24,9 +24,10 @@ const {
   withDangerousMod,
   withMainActivity,
   withMainApplication,
-} = require("@expo/config-plugins");
-const { assignColorValue } = require("@expo/config-plugins/build/android/Colors");
-const { mergeContents } = require("@expo/config-plugins/build/utils/generateCode");
+} = require("expo/config-plugins");
+const requireInternal = require("../expoConfigPluginsInternal");
+const { assignColorValue } = requireInternal("build/android/Colors");
+const { mergeContents } = requireInternal("build/utils/generateCode");
 
 const PLUGIN_NAME = "bearoom-playback";
 const PLUGIN_ROOT = path.join(__dirname);

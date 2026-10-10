@@ -27,7 +27,8 @@ describe.each(["sdk53", "sdk57"])("xcode fixes on the %s Podfile", (sdk) => {
     const post = out.indexOf("post_install do |installer|");
     expect(post).toBeGreaterThan(-1);
     expect(out.indexOf("Bearoom Xcode 26 fmt workaround")).toBeGreaterThan(post);
-    expect(out).toMatch(/Gem::Version\.new\('1[56]\.\d'\)/);
+    expect(out).toContain("Gem::Version.new('16.4')");
+    expect(out).toContain("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.4'");
   });
   it("is idempotent", () => {
     expect(addXcodeFixesToPodfile(out)).toBe(out);

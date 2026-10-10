@@ -7,11 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "bearoom",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#100D0A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.scriptingbear.bearoom",
@@ -74,7 +69,16 @@
       "expo-font",
       "expo-asset",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -14,4 +14,16 @@ export {
   theme,
 } from "./bearoom";
 export { default } from "./bearoom";
-export * from "./styles";
+// Everything from ./styles except `layout` and `glass`, which come from ./bearoom
+// above (explicit exports always won over the old `export *`; this states it).
+export {
+  textVariant,
+  type TextVariant,
+  gridColumnWidth,
+  absoluteFill,
+  gradients,
+  type GradientName,
+  surfaces,
+  pressedStyle,
+  disabledStyle,
+} from "./styles";

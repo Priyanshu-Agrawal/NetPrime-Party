@@ -6,10 +6,10 @@
  *    as consteval; newer Clang rejects that.
  * 2. Xcode 27 rejects any pod target whose iOS deployment target is below 15.0
  *    (SDWebImage's resource bundle still declares 9.0) — raise every pod target to
- *    the app's 15.1 floor.
+ *    the app's deployment floor (16.4 from SDK 56).
  */
-const { createRunOncePlugin, withPodfile } = require("@expo/config-plugins");
-const { mergeContents } = require("@expo/config-plugins/build/utils/generateCode");
+const { createRunOncePlugin, withPodfile } = require("expo/config-plugins");
+const { mergeContents } = require("./expoConfigPluginsInternal")("build/utils/generateCode");
 
 const PLUGIN_NAME = "bearoom-fmt-xcode";
 
@@ -47,7 +47,7 @@ const POST_INSTALL = [
   "    end",
 ].join("\n");
 
-const DEPLOYMENT_FLOOR = "15.1"; // raised to "16.4" at SDK 57 (the SDK 56+ app minimum)
+const DEPLOYMENT_FLOOR = "16.4"; // the SDK 56+ app minimum
 // SDK 53 passes `podfile_properties['apple.ccacheEnabled'] == 'true'`; SDK 54+ calls
 // `ccache_enabled?(podfile_properties)`. Either way the block lands after the
 // react_native_post_install(...) call's closing paren.
