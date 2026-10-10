@@ -33,7 +33,7 @@ import {
   purgeProviders,
 } from "./supabase";
 import { getFranchiseCollections } from "./franchises";
-import { parseFlags } from "./flags";
+import { FLAGS_KEY, parseFlags, resolveFlags } from "./flags";
 import {
   AppConfigSchema,
   ErrorSchema,
@@ -128,6 +128,11 @@ const configRoute = createRoute({
 
 app.openapi(configRoute, async (c) => {
   const { providers, stale, killswitch } = await getProvidersResult(c.env, c.executionCtx);
+  // Lane switches: KV `flags:v1` overrides the FLAG_* var baseline (see flags.ts).
+  // KV reads are edge-cached for 60 s; a KV error just means "baseline".
+  const kvFlags = c.env.CONFIG_LKG
+    ? await c.env.CONFIG_LKG.get(FLAGS_KEY, { cacheTtl: 60 }).catch(() => null)
+    : null;
   // Cloudflare-detected client country (ISO 3166-1), for the client's "Popular in
   // your region" rail. Same accessor as /report. Null when cf is absent (local
   // `wrangler dev`) — the client then falls back to its own default region.
@@ -143,7 +148,7 @@ app.openapi(configRoute, async (c) => {
       providers,
       stale,
       killswitch,
-      flags: parseFlags(c.env as unknown as Record<string, unknown>),
+      flags: resolveFlags(parseFlags(c.env as unknown as Record<string, unknown>), kvFlags),
     },
     200,
   );

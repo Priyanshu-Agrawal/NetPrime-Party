@@ -1,19 +1,20 @@
 /**
  * @file configResolve.ts
- * Pure decisions behind GET /config's provider list.
+ * Pure decisions behind GET /config's provider list (and /scripts' bridge list).
  *
  * "Supabase answered with an empty list" and "Supabase didn't answer" used to look
  * identical (both became `providers: []`), so a paused Free-tier project silently
  * looked like the operator's killswitch and every app went dark (2026-10-10). Now:
  *   - a successful answer is the truth — an EMPTY one is the deliberate killswitch;
- *   - no answer → serve the last-known-good list from Workers KV, marked `stale`.
+ *   - no answer → serve the last-known-good copy from Workers KV, marked `stale`.
  */
 import type { Provider } from "./schemas";
 
 export type LiveOutcome = { ok: true; providers: Provider[] } | { ok: false; reason: string };
 
-export interface LkgRecord {
-  providers: Provider[];
+/** A last-known-good copy as stored in KV. */
+export interface LkgRecord<T> {
+  items: T[];
   savedAt: string;
 }
 
@@ -33,35 +34,48 @@ export type KvLike = {
 };
 
 export const LKG_KEY = "providers:lkg:v1";
+export const SCRIPTS_LKG_KEY = "scripts:lkg:v1";
 
-export function resolveProviders(live: LiveOutcome, lkg: LkgRecord | null): ProvidersResult {
+export function resolveProviders(live: LiveOutcome, lkg: LkgRecord<Provider> | null): ProvidersResult {
   if (live.ok) {
     return { providers: live.providers, stale: false, killswitch: live.providers.length === 0, source: "live" };
   }
   if (lkg) {
-    return { providers: lkg.providers, stale: true, killswitch: lkg.providers.length === 0, source: "lkg" };
+    return { providers: lkg.items, stale: true, killswitch: lkg.items.length === 0, source: "lkg" };
   }
   return { providers: [], stale: true, killswitch: false, source: "none" };
 }
 
-export function serializeLkg(providers: Provider[], now: Date): string {
-  return JSON.stringify({ providers, savedAt: now.toISOString() });
+export function serializeLkg<T>(items: T[], now: Date): string {
+  return JSON.stringify({ items, savedAt: now.toISOString() });
 }
 
-export function parseLkg(raw: string | null): LkgRecord | null {
+/** Reads `{ items }`, and the first deployed format `{ providers }` (2026-10-10). */
+export function parseLkg<T>(raw: string | null): LkgRecord<T> | null {
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as Partial<LkgRecord>;
-    return Array.isArray(v.providers) ? { providers: v.providers, savedAt: String(v.savedAt ?? "") } : null;
+    const v = JSON.parse(raw) as { items?: unknown; providers?: unknown; savedAt?: unknown };
+    const items = Array.isArray(v.items) ? v.items : Array.isArray(v.providers) ? v.providers : null;
+    return items ? { items: items as T[], savedAt: String(v.savedAt ?? "") } : null;
   } catch {
     return null;
   }
 }
 
-/** Persist the list only when it changed — KV's free tier allows ~1k writes/day. */
-export async function writeLkgIfChanged(kv: KvLike, providers: Provider[], now: Date): Promise<boolean> {
-  const prev = parseLkg(await kv.get(LKG_KEY));
-  if (prev && JSON.stringify(prev.providers) === JSON.stringify(providers)) return false;
-  await kv.put(LKG_KEY, serializeLkg(providers, now));
+/** Order-insensitive identity: health ordering flaps, and a reorder isn't worth a KV write. */
+function fingerprint<T extends { id: string }>(items: T[]): string {
+  return JSON.stringify([...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+}
+
+/** Persist only when the set changed — KV's free tier allows ~1k writes/day per account. */
+export async function writeLkgIfChanged<T extends { id: string }>(
+  kv: KvLike,
+  items: T[],
+  now: Date,
+  key: string = LKG_KEY,
+): Promise<boolean> {
+  const prev = parseLkg<T>(await kv.get(key));
+  if (prev && fingerprint(prev.items) === fingerprint(items)) return false;
+  await kv.put(key, serializeLkg(items, now));
   return true;
 }

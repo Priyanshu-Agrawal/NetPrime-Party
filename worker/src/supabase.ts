@@ -12,9 +12,11 @@
 import type { Provider } from "./schemas";
 import {
   LKG_KEY,
+  SCRIPTS_LKG_KEY,
   parseLkg,
   resolveProviders,
   writeLkgIfChanged,
+  type KvLike,
   type LiveOutcome,
   type LkgRecord,
   type ProvidersResult,
@@ -161,13 +163,27 @@ async function fetchLiveProviders(env: Bindings): Promise<LiveOutcome> {
       signal: AbortSignal.timeout(5000), // never let a hung Supabase call hang the worker
     });
     if (!res.ok) return { ok: false, reason: `supabase-${res.status}` };
-    const raw = (await res.json()) as Provider[];
+    const raw = (await res.json()) as unknown;
+    // A 2xx body that isn't a list (a gateway/maintenance JSON) must never be served
+    // to apps or stored over the good copy — treat it as an outage.
+    if (!Array.isArray(raw)) return { ok: false, reason: "bad-shape" };
     // Health-aware ordering: demote chronically-failing providers below healthy
     // ones (best-effort — no health data ⇒ plain priority order).
-    return { ok: true, providers: reorderByHealth(raw, await fetchHealth(env)) };
+    return { ok: true, providers: reorderByHealth(raw as Provider[], await fetchHealth(env)) };
   } catch (err) {
     console.error("Supabase request failed or timed out:", err);
     return { ok: false, reason: "network" };
+  }
+}
+
+/** Read a last-known-good copy; a missing binding or a KV error is just "no copy". */
+async function readLkg<T>(kv: KvLike | undefined, key: string): Promise<LkgRecord<T> | null> {
+  if (!kv) return null;
+  try {
+    return parseLkg<T>(await kv.get(key));
+  } catch (e) {
+    console.error(`LKG read failed (${key}):`, e);
+    return null;
   }
 }
 
@@ -198,12 +214,7 @@ export async function getProvidersResult(env: Bindings, ctx: Waitable): Promise<
     return resolveProviders(live, null);
   }
 
-  let lkg: LkgRecord | null = null;
-  try {
-    lkg = env.CONFIG_LKG ? parseLkg(await env.CONFIG_LKG.get(LKG_KEY)) : null;
-  } catch (e) {
-    console.error("LKG read failed:", e);
-  }
+  const lkg = await readLkg<Provider>(env.CONFIG_LKG, LKG_KEY);
   console.error(`Serving ${lkg ? "last-known-good" : "no"} providers: ${live.reason}`);
   return resolveProviders(live, lkg);
 }
@@ -229,46 +240,57 @@ export interface ProviderScript {
  */
 export async function getScripts(env: Bindings, ctx: Waitable): Promise<ProviderScript[]> {
   const cache = caches.default;
-  let response = await cache.match(SCRIPTS_CACHE_KEY);
+  const hit = await cache.match(SCRIPTS_CACHE_KEY);
+  if (hit) return hit.json();
 
-  if (!response) {
-    const { url, key } = resolveCredentials(env);
-    if (!url || !key) {
-      console.error("Missing Supabase environment variables.");
-      return [];
-    }
-    const endpoint =
-      `${url}/rest/v1/providers?select=id,script_version,bridge_script` +
-      `&enabled=eq.true&bridge_script=not.is.null&order=priority.asc`;
-    let res: Response;
-    try {
-      res = await fetch(endpoint, {
-        headers: { apikey: key, Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch (err) {
-      console.error("Supabase /scripts request failed or timed out:", err);
-      return [];
-    }
-    if (!res.ok) {
-      console.error(`Supabase responded ${res.status} for scripts.`);
-      return [];
-    }
-    const rows = (await res.json()) as {
-      id: string;
-      script_version: string | null;
-      bridge_script: string | null;
-    }[];
-    const scripts: ProviderScript[] = rows
-      .filter((r) => r.bridge_script)
-      .map((r) => ({ id: r.id, version: r.script_version, script: r.bridge_script as string }));
-    response = new Response(JSON.stringify(scripts), {
+  const live = await fetchLiveScripts(env);
+  if (live) {
+    const response = new Response(JSON.stringify(live), {
       headers: { "Content-Type": "application/json", "Cache-Control": "s-maxage=60" },
     });
-    ctx.waitUntil(cache.put(SCRIPTS_CACHE_KEY, response.clone()));
+    ctx.waitUntil(cache.put(SCRIPTS_CACHE_KEY, response));
+    if (env.CONFIG_LKG) {
+      ctx.waitUntil(
+        writeLkgIfChanged(env.CONFIG_LKG, live, new Date(), SCRIPTS_LKG_KEY).catch((e) =>
+          console.error("Scripts LKG write failed:", e),
+        ),
+      );
+    }
+    return live;
   }
+  // Outage: serve the last-known-good bridges, so a provider /config still lists
+  // as party-capable never binds without its script (the "badge lie").
+  return (await readLkg<ProviderScript>(env.CONFIG_LKG, SCRIPTS_LKG_KEY))?.items ?? [];
+}
 
-  return response.json();
+/** One Supabase read of the served bridge scripts. `null` = no usable answer. */
+async function fetchLiveScripts(env: Bindings): Promise<ProviderScript[] | null> {
+  const { url, key } = resolveCredentials(env);
+  if (!url || !key) {
+    console.error("Missing Supabase environment variables.");
+    return null;
+  }
+  const endpoint =
+    `${url}/rest/v1/providers?select=id,script_version,bridge_script` +
+    `&enabled=eq.true&bridge_script=not.is.null&order=priority.asc`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.error(`Supabase responded ${res.status} for scripts.`);
+      return null;
+    }
+    const rows = (await res.json()) as unknown;
+    if (!Array.isArray(rows)) return null;
+    return (rows as { id: string; script_version: string | null; bridge_script: string | null }[])
+      .filter((r) => r.bridge_script)
+      .map((r) => ({ id: r.id, version: r.script_version, script: r.bridge_script as string }));
+  } catch (err) {
+    console.error("Supabase /scripts request failed or timed out:", err);
+    return null;
+  }
 }
 
 /**

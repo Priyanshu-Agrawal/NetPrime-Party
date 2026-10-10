@@ -35,7 +35,7 @@ describe("resolveProviders", () => {
     });
   });
   it("treats a live EMPTY answer as the deliberate killswitch", () => {
-    expect(resolveProviders({ ok: true, providers: [] }, { providers: [p("a")], savedAt: "" })).toEqual({
+    expect(resolveProviders({ ok: true, providers: [] }, { items: [p("a")], savedAt: "" })).toEqual({
       providers: [],
       stale: false,
       killswitch: true,
@@ -43,7 +43,7 @@ describe("resolveProviders", () => {
     });
   });
   it("serves last-known-good when Supabase did not answer", () => {
-    expect(resolveProviders({ ok: false, reason: "timeout" }, { providers: [p("a")], savedAt: "x" })).toEqual({
+    expect(resolveProviders({ ok: false, reason: "timeout" }, { items: [p("a")], savedAt: "x" })).toEqual({
       providers: [p("a")],
       stale: true,
       killswitch: false,
@@ -51,7 +51,7 @@ describe("resolveProviders", () => {
     });
   });
   it("an empty last-known-good stays a killswitch through an outage", () => {
-    expect(resolveProviders({ ok: false, reason: "503" }, { providers: [], savedAt: "x" })).toEqual({
+    expect(resolveProviders({ ok: false, reason: "503" }, { items: [], savedAt: "x" })).toEqual({
       providers: [],
       stale: true,
       killswitch: true,
@@ -78,9 +78,12 @@ describe("resolveProviders", () => {
 
 describe("parseLkg", () => {
   it("round-trips serializeLkg", () => {
-    expect(parseLkg(serializeLkg([p("a")], now))).toEqual({ providers: [p("a")], savedAt: now.toISOString() });
+    expect(parseLkg(serializeLkg([p("a")], now))).toEqual({ items: [p("a")], savedAt: now.toISOString() });
   });
-  it("rejects null, junk and shapes without a providers array", () => {
+  it("still reads the first deployed format ({ providers })", () => {
+    expect(parseLkg(JSON.stringify({ providers: [p("a")], savedAt: "x" }))?.items).toEqual([p("a")]);
+  });
+  it("rejects null, junk and shapes without a list", () => {
     expect(parseLkg(null)).toBeNull();
     expect(parseLkg("{not json")).toBeNull();
     expect(parseLkg(JSON.stringify({ savedAt: "x" }))).toBeNull();
@@ -91,11 +94,16 @@ describe("writeLkgIfChanged", () => {
   it("writes when nothing is stored", async () => {
     const { kv, store } = fakeKv();
     expect(await writeLkgIfChanged(kv, [p("a")], now)).toBe(true);
-    expect(parseLkg(store[LKG_KEY])?.providers).toEqual([p("a")]);
+    expect(parseLkg(store[LKG_KEY])?.items).toEqual([p("a")]);
   });
   it("skips the write when the list is unchanged (KV write budget)", async () => {
     const { kv, puts } = fakeKv({ [LKG_KEY]: serializeLkg([p("a")], now) });
     expect(await writeLkgIfChanged(kv, [p("a")], new Date())).toBe(false);
+    expect(puts).toHaveLength(0);
+  });
+  it("a reorder alone is not a change (health ordering flaps; KV writes are budgeted)", async () => {
+    const { kv, puts } = fakeKv({ [LKG_KEY]: serializeLkg([p("a"), p("b")], now) });
+    expect(await writeLkgIfChanged(kv, [p("b"), p("a")], now)).toBe(false);
     expect(puts).toHaveLength(0);
   });
   it("writes when the list changed, including to empty (a new killswitch)", async () => {

@@ -14,11 +14,10 @@ compatibility_date = "2024-03-20"
 #                                reversible bare SHA-256 of the IP (M7). Rotate.
 [vars]
 # SUPABASE_URL = "https://your-project-id.supabase.co"
-# Remote lane switches sent in /config.flags ("1" = on). Flip in the Cloudflare
-# dashboard to turn a lane off for every installed app without a release.
-FLAG_EMBED_API_LANE = "0"
-FLAG_NATIVE_LANE = "0"
-FLAG_PLUGIN_HOST = "0"
+# Remote lane switches (/config.flags) live in KV, not here — dashboard vars are
+# reset by every `wrangler deploy`. Flip one with:
+#   npx wrangler kv key put --binding CONFIG_LKG flags:v1 '{"embedApiLane":true}' --remote
+# (see src/flags.ts). Everything defaults off.
 
 # Per-IP rate limit for POST /report (anti-poisoning first gate). The route
 # degrades gracefully if this binding is absent, so it's safe to remove.
