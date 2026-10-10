@@ -33,7 +33,13 @@ import {
   mediaKey,
   recordProviderFailure,
 } from "@/utils/failureMemory";
-import { pickInitialProvider as pickProvider } from "@/components/player/providerPick";
+import {
+  isStalledStart,
+  nextBindableProvider,
+  pickInitialProvider as pickProvider,
+} from "@/components/player/providerPick";
+import type { BridgeCaps, OS } from "@/components/player/capabilities";
+import type { SubtitleTrack } from "@/components/player/types";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
 import type { ReportArgs, ReportOutcome } from "@/src/types/worker.types";
 import Constants from "expo-constants";
@@ -150,6 +156,13 @@ export const PlayerScreen: React.FC = () => {
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
   const [showSettings, setShowSettings] = useState(false);
+  // What the generic bridge reports about the bound <video> (undefined = legacy bridge).
+  const [bridgeCaps, setBridgeCaps] = useState<BridgeCaps | undefined>(undefined);
+  const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
+  // Bind-or-move-on (solo): providers already tried for THIS title, and the start signals.
+  const triedRef = useRef<Set<string>>(new Set());
+  const playIntentAtRef = useRef<number | null>(null);
+  const progressAtRef = useRef<number | null>(null);
   const [autoplayNext, setAutoplayNextState] = useState(getAutoplayNext); // TV "autoplay next episode" pref
   const [fullscreen, setFullscreen] = useState(false);
   const { isLandscapeMobile } = useResponsive();
@@ -174,6 +187,10 @@ export const PlayerScreen: React.FC = () => {
     setRate(1);
     setQualities([]);
     setAudios([]);
+    setBridgeCaps(undefined);
+    setSubtitles([]);
+    playIntentAtRef.current = null;
+    progressAtRef.current = null;
     sessionStarted.current = false;
     initialOutcomeRef.current = false; // new provider session → allow one initial report
     stallReportedRef.current = false; // ...and one independent mid-stream stall report
@@ -226,12 +243,27 @@ export const PlayerScreen: React.FC = () => {
         initialOutcomeRef.current = true;
         report("no_bind", { timeToFailMs: 25000 });
       }
-      triggerFallback();
+      if (!moveOn()) triggerFallback();
     }, 25000);
     return () => {
       clearTimeout(soft);
       clearTimeout(hard);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerBound, selected?.id, season, ep]);
+
+  // Stalled start: bound, asked to play, but nothing ever advanced — the stream is dead
+  // under our controls, so treat it like a failed bind (move on, else the banner).
+  useEffect(() => {
+    if (!playerBound) return;
+    const iv = setInterval(() => {
+      if (!focusedRef.current || progressAtRef.current != null) return;
+      if (isStalledStart({ playIntentAt: playIntentAtRef.current, lastProgressAt: null, now: Date.now() })) {
+        clearInterval(iv);
+        if (!moveOn()) setFallbackBanner(true);
+      }
+    }, 5000);
+    return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerBound, selected?.id, season, ep]);
 
@@ -334,6 +366,35 @@ export const PlayerScreen: React.FC = () => {
 
   // Fallback: open the source picker, excluding the provider that just failed so
   // we never loop back to a corpse.
+  // A new title starts with a clean slate of tried providers.
+  useEffect(() => {
+    triedRef.current = new Set();
+  }, [id, type, season, ep]);
+
+  /**
+   * Solo bind-or-move-on: a provider that won't bind (or binds but never starts) is
+   * skipped silently — the loading cover stays up — while another bindable provider
+   * remains for this title. Returns false when none is left, so the caller can fall
+   * back to today's picker / provider page.
+   */
+  const moveOn = useCallback((): boolean => {
+    if (!selected || triedRef.current.has(selected.id)) return false;
+    triedRef.current.add(selected.id);
+    recordProviderFailure(mediaKey(media), selected.id);
+    if (__DEV__) logBind(selected.id, false, mountTsRef.current);
+    const next = nextBindableProvider(providers, selected.id, triedRef.current, OS_NAME);
+    if (!next) return false;
+    setSelected(next);
+    return true;
+  }, [selected, media, providers]);
+  const hasNextBindable = useMemo(
+    () =>
+      selected
+        ? !!nextBindableProvider(providers, selected.id, new Set([...triedRef.current, selected.id]), OS_NAME)
+        : false,
+    [providers, selected],
+  );
+
   const triggerFallback = useCallback(() => {
     if (selected) {
       setExcludedIds((prev) => (prev.includes(selected.id) ? prev : [...prev, selected.id]));
@@ -388,6 +449,14 @@ export const PlayerScreen: React.FC = () => {
   }, [armResume]);
 
   const onEvent = (e: PlayerEvent) => {
+    if (e.event === "caps") {
+      if (e.caps) setBridgeCaps(e.caps);
+      return;
+    }
+    if (e.event === "subs") {
+      setSubtitles(e.subs ?? []);
+      return;
+    }
     if (e.event === "gesture") {
       userGesturedRef.current = true; // play-intent — gates the no-bind hard-timeout
       return;
@@ -424,7 +493,13 @@ export const PlayerScreen: React.FC = () => {
     }
     // Track real playback progress for stall detection + play-intent.
     const t = Number(e.currentTime) || 0;
-    if (t > posRef.current + 0.25) lastProgressTsRef.current = Date.now();
+    if (t > posRef.current + 0.25) {
+      lastProgressTsRef.current = Date.now();
+      progressAtRef.current = Date.now();
+    }
+    if ((e.event === "play" || e.event === "playing") && playIntentAtRef.current == null) {
+      playIntentAtRef.current = Date.now();
+    }
     if (Number.isFinite(e.currentTime)) posRef.current = e.currentTime;
     pausedRef.current = !!e.paused;
     if (e.event === "play" || e.event === "playing" || t > 0) anyPlaybackRef.current = true;
@@ -606,7 +681,14 @@ export const PlayerScreen: React.FC = () => {
                 season={media.season}
                 episode={media.episode}
                 onPlayerEvent={onEvent}
-                onBound={() => setPlayerBound(true)}
+                onBound={() => {
+                  setPlayerBound(true);
+                  if (__DEV__) logBind(selected.id, true, mountTsRef.current);
+                }}
+                onBindFailed={() => {
+                  moveOn();
+                }}
+                revealProviderUiOnBindFail={!hasNextBindable}
                 onFatalError={onFatalError}
                 onSwitchSource={triggerFallback}
                 onRecovered={() =>
@@ -620,8 +702,14 @@ export const PlayerScreen: React.FC = () => {
                   ref={controlsRef}
                   canControl
                   roomPlaying={false}
-                  onPlay={() => playerRef.current?.play()}
-                  onPause={() => playerRef.current?.pause()}
+                  onPlay={() => {
+                    playIntentAtRef.current ??= Date.now();
+                    playerRef.current?.play();
+                  }}
+                  onPause={() => {
+                    if (progressAtRef.current == null) playIntentAtRef.current = null;
+                    playerRef.current?.pause();
+                  }}
                   onSeekTo={(sec) => playerRef.current?.seek(sec)}
                   onSeekBy={(d) => playerRef.current?.seek(Math.max(0, posRef.current + d))}
                   onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
@@ -740,6 +828,10 @@ export const PlayerScreen: React.FC = () => {
           setPreferredAudio(label);
           applyAudio(label);
         }}
+        showAudio={bridgeCaps ? bridgeCaps.audio : true}
+        showQuality={bridgeCaps ? bridgeCaps.quality : true}
+        subtitles={subtitles}
+        onSetSubtitle={(sid) => playerRef.current?.setSubtitle(sid)}
         showAutoplay={media.type === "tv"}
         autoplayNext={autoplayNext}
         onToggleAutoplayNext={() => {
@@ -779,6 +871,16 @@ export const PlayerScreen: React.FC = () => {
     </>
   );
 };
+
+const OS_NAME: OS = Platform.OS === "ios" ? "ios" : "android";
+
+/** Dev-only bind log, read over CDP by the Phase 1A gate (which providers bind, how fast). */
+function logBind(providerId: string, ok: boolean, since: number) {
+  const g = globalThis as unknown as {
+    __bindLog?: { providerId: string; ok: boolean; ms: number; os: OS }[];
+  };
+  (g.__bindLog ??= []).push({ providerId, ok, ms: Date.now() - since, os: OS_NAME });
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.black },

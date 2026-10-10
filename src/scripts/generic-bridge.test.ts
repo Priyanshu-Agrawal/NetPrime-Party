@@ -12,7 +12,6 @@ function load(cfg: Record<string, unknown> = {}) {
   (window as any).__vlMsgNonce = "n1";
   (window as any).__vlCfg = cfg;
   delete (window as any).__vlBridge;
-  // eslint-disable-next-line no-new-func
   new Function(GENERIC_BRIDGE)();
 }
 

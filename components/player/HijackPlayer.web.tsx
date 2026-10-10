@@ -130,6 +130,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(function HijackPlaye
       // A browser reaches only same-origin frames — the Android rule.
       getCapabilities: (): PlayerCapabilities => hijackCapabilities(getProvider(providerId), "android"),
       getTracks: (): MediaTrack[] => [],
+      // No bridge on the web twin, so no subtitle tracks to switch.
+      setSubtitle: () => {},
     }),
     [providerId],
   );

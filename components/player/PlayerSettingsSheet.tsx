@@ -6,6 +6,7 @@
  * the HijackPlayer bridge (hls.js isn't reachable, so pointer-dispatch the option).
  */
 import type { QualityLevel } from "@/components/player/HijackPlayer";
+import type { SubtitleTrack } from "@/components/player/types";
 import GlassCard from "@/components/ui/GlassCard";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import React from "react";
@@ -28,6 +29,12 @@ export interface PlayerSettingsSheetProps {
   audios: QualityLevel[];
   onSetAudio: (label: string) => void;
   /** "Autoplay next episode" pref (TV only) — applies to the NEXT stream load. */
+  /** Audio / Quality rows appear only when the source can switch them (default: shown). */
+  showAudio?: boolean;
+  showQuality?: boolean;
+  /** Subtitle tracks on the bound video; the row hides when there are none. */
+  subtitles?: SubtitleTrack[];
+  onSetSubtitle?: (id: string | null) => void;
   showAutoplay?: boolean;
   autoplayNext?: boolean;
   onToggleAutoplayNext?: () => void;
@@ -43,6 +50,10 @@ export default function PlayerSettingsSheet({
   onSetQuality,
   audios,
   onSetAudio,
+  showAudio = true,
+  showQuality = true,
+  subtitles = [],
+  onSetSubtitle,
   showAutoplay,
   autoplayNext,
   onToggleAutoplayNext,
@@ -75,39 +86,74 @@ export default function PlayerSettingsSheet({
                 </>
               ) : null}
 
-              <Text style={styles.section}>AUDIO</Text>
-              <View style={styles.row}>
-                {audios.length ? (
-                  audios.map((a) => (
-                    <Pressable
-                      key={a.label}
-                      style={[styles.chip, a.active && styles.chipOn]}
-                      onPress={() => onSetAudio(a.label)}
-                    >
-                      <Text style={[styles.chipText, a.active && styles.chipTextOn]}>{a.label}</Text>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text style={styles.dim}>Loading…</Text>
-                )}
-              </View>
+              {showAudio ? (
+                <>
+                  <Text style={styles.section}>AUDIO</Text>
+                  <View style={styles.row}>
+                    {audios.length ? (
+                      audios.map((a) => (
+                        <Pressable
+                          key={a.label}
+                          style={[styles.chip, a.active && styles.chipOn]}
+                          onPress={() => onSetAudio(a.label)}
+                        >
+                          <Text style={[styles.chipText, a.active && styles.chipTextOn]}>{a.label}</Text>
+                        </Pressable>
+                      ))
+                    ) : (
+                      <Text style={styles.dim}>Loading…</Text>
+                    )}
+                  </View>
+                </>
+              ) : null}
 
-              <Text style={styles.section}>QUALITY</Text>
-              <View style={styles.row}>
-                {qualities.length ? (
-                  qualities.map((q) => (
+              {showQuality ? (
+                <>
+                  <Text style={styles.section}>QUALITY</Text>
+                  <View style={styles.row}>
+                    {qualities.length ? (
+                      qualities.map((q) => (
+                        <Pressable
+                          key={q.label}
+                          style={[styles.chip, q.active && styles.chipOn]}
+                          onPress={() => onSetQuality(q.label)}
+                        >
+                          <Text style={[styles.chipText, q.active && styles.chipTextOn]}>{q.label}</Text>
+                        </Pressable>
+                      ))
+                    ) : (
+                      <Text style={styles.dim}>Loading…</Text>
+                    )}
+                  </View>
+                </>
+              ) : null}
+
+              {subtitles.length ? (
+                <>
+                  <Text style={styles.section}>SUBTITLES</Text>
+                  <View style={styles.row}>
                     <Pressable
-                      key={q.label}
-                      style={[styles.chip, q.active && styles.chipOn]}
-                      onPress={() => onSetQuality(q.label)}
+                      accessibilityLabel="Subtitles off"
+                      style={[styles.chip, !subtitles.some((t) => t.selected) && styles.chipOn]}
+                      onPress={() => onSetSubtitle?.(null)}
                     >
-                      <Text style={[styles.chipText, q.active && styles.chipTextOn]}>{q.label}</Text>
+                      <Text style={[styles.chipText, !subtitles.some((t) => t.selected) && styles.chipTextOn]}>
+                        Off
+                      </Text>
                     </Pressable>
-                  ))
-                ) : (
-                  <Text style={styles.dim}>Loading…</Text>
-                )}
-              </View>
+                    {subtitles.map((t) => (
+                      <Pressable
+                        key={t.id}
+                        accessibilityLabel={`Subtitles ${t.label}`}
+                        style={[styles.chip, t.selected && styles.chipOn]}
+                        onPress={() => onSetSubtitle?.(t.id)}
+                      >
+                        <Text style={[styles.chipText, t.selected && styles.chipTextOn]}>{t.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : null}
 
               {showAutoplay ? (
                 <>

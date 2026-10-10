@@ -44,8 +44,15 @@ import {
   providerHosts,
   type MediaRef,
 } from "./providerRegistry";
-import { hijackCapabilities } from "./capabilities";
-import type { FatalError, MediaTrack, PlayerCapabilities, PlayerEvent, PlayerHandle } from "./types";
+import { hijackCapabilities, isBindableOn, type BridgeCaps, type OS } from "./capabilities";
+import type {
+  FatalError,
+  MediaTrack,
+  PlayerCapabilities,
+  PlayerEvent,
+  PlayerHandle,
+  SubtitleTrack,
+} from "./types";
 
 export type {
   EngineId,
@@ -88,7 +95,12 @@ interface Props extends MediaRef {
   nativeControls?: boolean;
   /** Party embed (autoplay-off so members sync) vs. plain solo embed. Default true. */
   party?: boolean;
+  /** No other provider is left to try: if no <video> binds, show the provider's own
+   *  page (chrome back on) rather than a blank frame. */
+  revealProviderUiOnBindFail?: boolean;
 }
+
+const OS_NAME: OS = Platform.OS === "ios" ? "ios" : "android";
 
 /** If no <video> binds within this window, show a soft "still trying" banner
  *  (we DON'T unmount — the finder keeps polling, so a slow provider still binds). */
@@ -151,6 +163,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       hideTransportControls,
       nativeControls,
       party = true,
+      revealProviderUiOnBindFail,
     },
     ref,
   ) => {
@@ -182,7 +195,9 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // never binds (the <video> plays under the provider's OWN controls, never our skin).
     // Gate the WebView mount on a cached script. Warm cache — the common case, and
     // every Watch Party mount (snapshot-gated, so seconds later) — is ready immediately.
-    const [scriptReady, setScriptReady] = useState(() => getCachedScript(providerId) != null);
+    const [scriptReady, setScriptReady] = useState(
+      () => !isBindableOn(getProvider(providerId), OS_NAME) || getCachedScript(providerId) != null,
+    );
     // The "still syncing" banner appears at the 30s bind timeout. Some providers
     // (e.g. videasy on iOS) autoplay in a frame our bridge can't reach — the video
     // is PLAYING even though we never bound — so the banner is misleading and must
@@ -190,6 +205,21 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // source pill stays as the real escape hatch).
     const [bannerRetired, setBannerRetired] = useState(false);
     const provider = getProvider(providerId);
+    // Inject a bridge only where it can bind: on a platform where this provider's
+    // <video> is unreachable, the generic bridge's chrome-off would blank the very
+    // page the user falls back to.
+    const bindable = isBindableOn(provider, OS_NAME);
+    const bridgeScript = bindable ? (getCachedScript(providerId) ?? "") : "";
+    const bridgeCfgJs = `;window.__vlCfg=${JSON.stringify({
+      chromeOff: !!nativeControls,
+      autoStart: true,
+      startSelectors: provider?.hijack.startSelectors ?? [],
+    })};`;
+    // What the generic bridge reported for the bound <video> (legacy bridge: nothing).
+    const reportedCapsRef = useRef<BridgeCaps | undefined>(undefined);
+    const subsRef = useRef<SubtitleTrack[]>([]);
+    const revealRef = useRef(revealProviderUiOnBindFail);
+    revealRef.current = revealProviderUiOnBindFail;
 
     // Branded error + recovery. On a fatal main-frame failure we cover the
     // WebView's raw "net::ERR" page with our own overlay (Retry / Try another
@@ -374,8 +404,16 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         setAudio: (label: string) => cmd({ action: "setAudio", label }),
         reload: () => manualRetry(),
         getCapabilities: (): PlayerCapabilities =>
-          hijackCapabilities(getProvider(providerId), Platform.OS === "ios" ? "ios" : "android"),
-        getTracks: (): MediaTrack[] => [],
+          hijackCapabilities(getProvider(providerId), OS_NAME, reportedCapsRef.current),
+        getTracks: (): MediaTrack[] =>
+          subsRef.current.map((t) => ({
+            id: t.id,
+            label: t.label,
+            language: t.language || undefined,
+            kind: "text" as const,
+            selected: t.selected,
+          })),
+        setSubtitle: (id: string | null) => cmd({ action: "setSub", id }),
       }),
       [cmd, manualRetry, providerId],
     );
@@ -472,7 +510,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // window we mount anyway, so an unreachable /scripts still degrades to the
     // provider's own page instead of hanging on the loader forever.
     useEffect(() => {
-      if (getCachedScript(providerId) != null) {
+      if (!isBindableOn(getProvider(providerId), OS_NAME) || getCachedScript(providerId) != null) {
         setScriptReady(true);
         return;
       }
@@ -499,6 +537,9 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       const t = setTimeout(() => {
         if (!boundRef.current) {
           setSlow(true);
+          // Nothing left to move on to: show the provider's own page (chrome back on)
+          // rather than a blank frame painted by chrome-off.
+          if (revealRef.current) relayInject("window.__vlChromeOff&&window.__vlChromeOff(false)");
           onBindFailed?.();
         }
       }, BIND_TIMEOUT_MS);
@@ -512,6 +553,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // carried from the previous episode.
     useEffect(() => {
       setFatalError(null);
+      reportedCapsRef.current = undefined;
+      subsRef.current = [];
       hadErrorRef.current = false;
       erroredThisLoadRef.current = false;
       retryAttemptRef.current = 0;
@@ -563,6 +606,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           setNoSource(false);
           onBound?.();
         }
+        if (e.event === "caps" && e.caps) reportedCapsRef.current = e.caps;
+        if (e.event === "subs" && e.subs) subsRef.current = e.subs;
         onPlayerEvent?.(e);
       },
       [onPlayerEvent, onBound, relayNonce],
@@ -609,8 +654,9 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             // can capture + delete it at documentStart, before any page/ad script
             // runs. Then the cached bridge, then the command-relay listener.
             `;window.__vlMsgNonce=${JSON.stringify(relayNonce)};` +
+            bridgeCfgJs +
             WALL_WATCH_JS +
-            (getCachedScript(providerId) ?? "") +
+            bridgeScript +
             relayListenerJs
           }
           // Inject the bridge into EVERY frame, not just the main one. On iOS videasy
@@ -628,7 +674,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           // frame; idempotent — a no-op when the pre-load injection already ran (the
           // bridge guards on window.__vlBridge). Empty during a grace-window scriptless
           // load (getCachedScript null) — same graceful degrade as before.
-          injectedJavaScript={getCachedScript(providerId) ?? ""}
+          injectedJavaScript={bridgeScript}
           onMessage={(ev) => handleMessage(ev.nativeEvent.data)}
           onLoadStart={(ev) => {
             erroredThisLoadRef.current = false; // fresh load — clear the per-load error flag

@@ -24,7 +24,9 @@ export type PlayerEventType =
   | "gesture" // first user interaction inside the WebView (play-intent signal)
   | "notFound" // provider "we couldn't find that" wall — no <video> will ever bind
   | "buffering" // v2: raw stall start/end; the party sync engine debounces it
-  | "tracks"; // v2: the active stream's real tracks
+  | "tracks" // v2: the active stream's real tracks
+  | "caps" // generic bridge: what the bound <video> supports
+  | "subs"; // generic bridge: its subtitle tracks
 
 /** A fatal, main-frame playback failure surfaced to the host for fallback. */
 export interface FatalError {
@@ -40,6 +42,14 @@ export interface QualityLevel {
 }
 
 /** v2: one audio or text track of the active stream. */
+/** A subtitle track the generic bridge found on the bound <video> (textTracks). */
+export interface SubtitleTrack {
+  id: string;
+  label: string;
+  language: string;
+  selected: boolean;
+}
+
 export interface MediaTrack {
   id: string;
   /** ISO-639-1 when known, e.g. "hi". Unknown stays undefined — never guessed. */
@@ -69,6 +79,8 @@ export interface PlayerEvent {
   bufferedAheadSec?: number;
   /** v2, on "tracks". */
   tracks?: MediaTrack[];
+  caps?: { quality: boolean; audio: boolean; subtitles: boolean }; // on "caps" (generic bridge)
+  subs?: SubtitleTrack[]; // on "subs"
 }
 
 /** v2: which engine is playing. UI and sync read capabilities, never this id. */
@@ -108,4 +120,6 @@ export interface PlayerHandle {
   getCapabilities(): PlayerCapabilities;
   /** v2 */
   getTracks(): MediaTrack[];
+  /** Show a subtitle track by id, or none (`null`). */
+  setSubtitle(id: string | null): void;
 }
