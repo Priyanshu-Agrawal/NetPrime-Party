@@ -14,7 +14,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { PlayerStackParamList } from "@/src/navigation/types";
 import { usePersonDetailsQuery, usePersonCreditsQuery } from "@/src/store/services/tmdbApi";
 import { openDetails, goBack } from "@/src/navigation/actions";
-import Animated, { useAnimatedStyle, interpolate, Extrapolation, LinearTransition } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, interpolate, Extrapolation } from "react-native-reanimated";
 
 type Props = NativeStackScreenProps<PlayerStackParamList, "PersonDetails">;
 
@@ -136,7 +136,7 @@ export default function PersonDetailsScreen({ route }: Props) {
           <LinearGradient
             colors={["transparent", "rgba(16,13,10,0.8)", colors.bg]}
             locations={[0, 0.5, 1]}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
           
           {/* Name & Basic Info */}
@@ -158,7 +158,7 @@ export default function PersonDetailsScreen({ route }: Props) {
         {/* Biography */}
         {details.biography ? (
           <Appear index={0}>
-          <Animated.View layout={LinearTransition.springify().damping(18).stiffness(150)}>
+          <Animated.View>
             <Pressable onPress={() => setBioExpanded(!bioExpanded)} style={styles.bioContainer}>
               <Text style={styles.sectionTitle}>Biography</Text>
               <Text

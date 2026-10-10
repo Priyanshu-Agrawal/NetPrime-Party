@@ -85,7 +85,7 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS !== "web") {
-      void SystemUI.setBackgroundColorAsync(colors.bg);
+      SystemUI.setBackgroundColorAsync(colors.bg).catch(() => {});
       // Lock portrait globally; only the Player / Party (and their alerts) may rotate.
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
     }
@@ -117,10 +117,7 @@ export default function App() {
             <MovieContextProvider>
               <ConfigBootstrap />
               <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme} onStateChange={handleNavStateChange}>
-                <StatusBar
-                  style={colorScheme === "light" ? "dark" : "light"}
-                  translucent
-                />
+                <StatusBar style={colorScheme === "light" ? "dark" : "light"} />
                 {/* The watch-party session lives ABOVE the navigator so leaving
                     PartyScreen no longer destroys the room. `children` is a stable
                     element, so session state changes re-render only the components

@@ -53,7 +53,7 @@ export default React.memo(function HomePage() {
   if (showOffline) {
     return (
       <View style={styles.root}>
-        <StatusBar style="light" translucent />
+        <StatusBar style="light" />
         <OfflineState offline={offline} onRetry={onRefresh} />
       </View>
     );
@@ -61,7 +61,7 @@ export default React.memo(function HomePage() {
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" translucent />
+      <StatusBar style="light" />
 
       <Animated.ScrollView
         style={styles.scroll}

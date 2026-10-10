@@ -22,3 +22,10 @@ export function gridColumnWidth(
 ): number {
   return Math.floor((SCREEN_W - pad * 2 - gap * (cols - 1)) / cols);
 }
+
+/**
+ * `position: absolute` with zero insets, as a plain object — spreadable on every RN
+ * version. `StyleSheet.absoluteFillObject` is removed in RN 0.85, and
+ * `StyleSheet.absoluteFill` is typed as a registered style (not spreadable) before that.
+ */
+export const absoluteFill = { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 } as const;

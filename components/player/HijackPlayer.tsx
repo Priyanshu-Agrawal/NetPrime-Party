@@ -11,6 +11,7 @@
  */
 import { getCachedScript } from "@/src/scripts/bridgeCache";
 import { colors, font, ms } from "@/theme/bearoom";
+import { absoluteFill } from "@/theme/styles/layout";
 import { getAutoplayNext } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -786,7 +787,7 @@ const styles = StyleSheet.create({
     // a normal flex sibling of the native WebView inside a column container, so a
     // flex:1 loader splits the space 50/50 (WebView top half, loader bottom half).
     // Overlaying it edge-to-edge makes the branded loading screen full-bleed.
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.bg, // solid base under the blurred poster (no poster → flat)

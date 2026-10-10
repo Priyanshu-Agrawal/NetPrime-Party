@@ -15,6 +15,7 @@ import { Appear, Button } from "@/src/ui";
 import { DetailsSkeleton, EpisodeRowSkeleton } from "@/src/ui";
 import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
+import { absoluteFill } from "@/theme/styles/layout";
 import { addToWatchHistory } from "@/utils/history";
 import { RAIL_LIST_PROPS } from "@/utils/listPerf";
 import { isReleased, releaseLabel } from "@/utils/release";
@@ -603,7 +604,7 @@ const styles = StyleSheet.create({
   epStill: { width: 120, height: 68, borderRadius: radius.md, backgroundColor: colors.bgElevated },
   epNoStill: { alignItems: "center", justifyContent: "center" },
   epPlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.overlay,

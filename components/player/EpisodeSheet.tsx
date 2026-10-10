@@ -16,6 +16,7 @@
  * parent mounts this only for shows), so the list is ready the instant it opens.
  */
 import { colors, font, ms, radius } from "@/theme/bearoom";
+import { absoluteFill } from "@/theme/styles/layout";
 import { img } from "@/utils/tmdbDetails";
 import { useDetailsQuery, useSeasonQuery } from "@/src/store/services/tmdbApi";
 import { Ionicons } from "@expo/vector-icons";
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
   },
   thumb: { width: "100%", height: "100%" },
   thumbPlaying: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.episodeActive,

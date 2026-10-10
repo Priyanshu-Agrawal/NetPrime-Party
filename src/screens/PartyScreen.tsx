@@ -41,7 +41,7 @@ import {
 } from "@/services/party/PartySession";
 import type { ChatMessage, FloatingReaction } from "@/services/party/usePartyChat";
 import { colors, chat, font, ms, radius } from "@/theme/bearoom";
-import ReanimatedAnimated, { FadeIn, FadeOut, SlideInRight, SlideOutRight } from "react-native-reanimated";
+import ReanimatedAnimated from "react-native-reanimated";
 import { useResponsive } from "@/hooks/useResponsive";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -763,8 +763,6 @@ export default function Party() {
                       <>
                         {!landscapeChatOpen && reactionsOn && canParticipate ? (
                           <ReanimatedAnimated.View
-                            entering={FadeIn.duration(200)}
-                            exiting={FadeOut.duration(150)}
                             style={[styles.landscapeQuickReactions, { right: Math.max(insets.right, ms(16)), bottom: ms(66) }]}
                             pointerEvents="box-none"
                           >
@@ -890,8 +888,6 @@ export default function Party() {
               void, and you can't talk to a room you haven't joined. */}
           {!connecting && (!isLandscapeMobile || landscapeChatOpen) ? (
             <ReanimatedAnimated.View
-              entering={isLandscapeMobile ? SlideInRight.duration(240) : undefined}
-              exiting={isLandscapeMobile ? SlideOutRight.duration(180) : undefined}
               style={
                 isWide
                   ? styles.desktopRightCol

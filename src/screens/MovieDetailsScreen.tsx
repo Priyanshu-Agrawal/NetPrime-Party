@@ -15,6 +15,7 @@ import { Appear, Button } from "@/src/ui";
 import { DetailsSkeleton } from "@/src/ui";
 import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { colors, ms, font, glow, radius } from "@/theme/bearoom";
+import { absoluteFill } from "@/theme/styles/layout";
 import { addToWatchHistory } from "@/utils/history";
 import { RAIL_LIST_PROPS } from "@/utils/listPerf";
 import { isReleased, releaseLabel } from "@/utils/release";
@@ -541,7 +542,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  clipScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay },
+  clipScrim: { ...absoluteFill, backgroundColor: colors.overlay },
   clipPlay: {
     width: 44,
     height: 44,

@@ -5,6 +5,7 @@
  * rendering a responsive, sandboxed iframe with fullscreen and postMessage bridge support.
  */
 import { colors } from "@/theme/bearoom";
+import { absoluteFill } from "@/theme/styles/layout";
 import React, {
   forwardRef,
   useCallback,
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",

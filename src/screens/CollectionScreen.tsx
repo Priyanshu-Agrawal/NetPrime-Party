@@ -11,7 +11,7 @@ import { openDetails } from "@/src/navigation/actions";
 import { useCollectionQuery } from "@/src/store/services/tmdbApi";
 import { Button, LibraryScreenHeader, PosterCard, PosterSkeleton, Screen, Text } from "@/src/ui";
 import { colors, ms, radius, spacing } from "@/theme/bearoom";
-import { gridColumnWidth, layout } from "@/theme/styles/layout";
+import { absoluteFill, gridColumnWidth, layout } from "@/theme/styles/layout";
 import { itemTitle, type MediaItem } from "@/utils/tmdbLists";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 import type { PlayerStackParamList } from "@/src/navigation/types";
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     backgroundColor: colors.bgElevated,
   },
-  backdropScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
+  backdropScrim: { ...absoluteFill, backgroundColor: colors.scrim },
   overview: { marginBottom: spacing.md, lineHeight: ms(20) },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: layout.screenPadding },
 });

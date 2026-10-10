@@ -600,7 +600,7 @@ export const PlayerScreen: React.FC = () => {
 
   return (
     <>
-      <StatusBar style="light" translucent hidden={isImmersive} />
+      <StatusBar style="light" hidden={isImmersive} />
       {/* Immersive: the player + its loading backdrop go full-bleed to the top (behind
           the translucent status bar), like the detail screens — only the floating back
           button and the bottom control bar respect the safe area (top edge dropped). */}

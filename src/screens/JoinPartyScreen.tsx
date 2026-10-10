@@ -11,7 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useRef, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, TextInput, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming, FadeIn } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -141,7 +141,7 @@ export default function JoinParty() {
         </Appear>
 
         {error ? (
-          <Animated.Text entering={FadeIn} style={styles.errorText}>
+          <Animated.Text style={styles.errorText}>
             {error}
           </Animated.Text>
         ) : (

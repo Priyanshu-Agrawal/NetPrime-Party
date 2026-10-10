@@ -16,6 +16,7 @@
  */
 import GlassCard from "@/components/ui/GlassCard";
 import { colors, font, ms, radius } from "@/theme/bearoom";
+import { absoluteFill } from "@/theme/styles/layout";
 import { gradients } from "@/theme/styles/gradients";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -455,8 +456,8 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
 PlayerControls.displayName = "PlayerControls";
 
 const styles = StyleSheet.create({
-  center: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
-  bufferLayer: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  center: { ...absoluteFill, alignItems: "center", justifyContent: "center" },
+  bufferLayer: { ...absoluteFill, alignItems: "center", justifyContent: "center" },
   bufferBadge: {
     width: ms(78),
     height: ms(78),
