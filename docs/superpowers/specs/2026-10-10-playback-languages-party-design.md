@@ -1,7 +1,7 @@
 # Playback, Languages & Watch Party — Design Spec
 
 **Status:** Revision 2 — **native-first**, approved by the owner 2026-10-10 evening. Phase 0 is built and deployed; the
-Expo SDK 57 upgrade is in progress. Revision 1 put an embed-API lane (VidFast's postMessage API) first; the owner chose
+Expo SDK 57 upgrade is done (`upgrade/expo-57`, 2026-10-10). Revision 1 put an embed-API lane (VidFast's postMessage API) first; the owner chose
 the native player first instead, so that lane is now deferred (§6.2.3).
 **Supersedes:** the engine and lane parts of [`docs/architecture/native-player.md`](../../architecture/native-player.md)
 and Program 1 · P2/P3 sequencing in [`ROADMAP.md`](../../ROADMAP.md). The P1 queue spine (`0008`/`0009`, `PartySession`)
@@ -133,7 +133,7 @@ no native source exists for a title.
                      ┌──────────────── PlayerHandle v2 (neutral contract) ────────────────┐
                      │ NativePlayer (expo-video)        HijackPlayer (WebView)            │
                      │   PRIMARY: plugin streams          FALLBACK only: plain embed,      │
-                     │   (+ dev test streams, Phase 1)    solo, provider UI (today's flow) │
+                     │   (+ dev test streams, Phase 1)    solo unless bridged (today's flow)│
                      └──────────────────────────────────────────────────────────────────┘
                                                 ▼
                          PlayerControls + PlayerSettingsSheet (unchanged shape, new rows)
@@ -342,7 +342,8 @@ video screen.
     in a party).
   - Auto-hide after 3 s of no touch while playing; never while paused or scrubbing. A **lock** button disables touches
     except an unlock pill.
-  - Landscape on fullscreen; rotation follows the device on the player screen (Task 2 behaviour).
+  - Landscape on fullscreen; rotation follows the device on the player screen (as verified in the SDK 57 upgrade
+    plan's Task 2 and Task 7).
 - **Settings sheet** (`PlayerSettingsSheet`): Audio · Subtitles (off / list / offset / size) · Quality (Auto + list) ·
   Speed · Source. Rows render only when the capability exists (§6.3) and always show their current value.
 - **States:** buffering = a small centre spinner after 300 ms (no flash on short stalls); errors = the §7 card (Retry ·
@@ -459,9 +460,9 @@ the physical Android phone; a physical two-phone gate (and an iPhone, once avail
 | Phase | Scope | Gate (all must pass) |
 |---|---|---|
 | **0 — Foundations** ✅ | **Config resilience** (worker last-known-good in Workers KV with `stale:true`; explicit `killswitch:true`; app MMKV copy); `components/player/types.ts` (PlayerHandle v2); `jest-expo` + worker `vitest`; `/config` flags (`embedApiLane`, `nativeLane`, `pluginHost`) | Done 2026-10-10: deployed (worker `f6569238`), outage gate passed on the emulator |
-| **0.5 — Expo SDK 57** (in progress) | The upgrade plan's Tasks 6–7 (SDK 57 + iOS `enableSceneSupport`, gate, merge); plus the two pre-existing fixes found during it: search keeps the old scroll offset on a new query; party Realtime `send()` relies on the deprecated REST fallback before the channel joins | App launches on the iOS 27 simulator; Home/search/player/party pass on emulator + simulator; both fixes covered by tests |
+| **0.5 — Expo SDK 57** ✅ | The upgrade plan's Tasks 6–7 (SDK 57 + iOS `enableSceneSupport`, gate, merge); plus the two pre-existing fixes found during it: search keeps the old scroll offset on a new query; party Realtime `send()` relies on the deprecated REST fallback before the channel joins | Done 2026-10-10: launches on the iOS 27 simulator; Home/search/player/party pass on both; both fixes covered by tests |
 | **1 — Native player + full skin** | `NativePlayer` (expo-video) behind PlayerHandle v2 with synthesised `seeked`/`buffering`; the §6.2.1 controls layer, settings sheet rows (Audio / Subtitles incl. `SubtitleOverlay` / Quality / Speed / Source), loading card → first-frame crossfade, double-tap seek, lock, auto-hide; `/report` fields (`lane`, `stage`, `ttffMs`); dev-only Test-streams entry (§6.2.2); fix `providerRegistry.ts:113` (`nextEpisode` gated on `!opts.party`) | On all three devices with the test streams: audio switch by language, subtitle switch (in-stream and sidecar), Auto + manual quality, speed, landed-seek error ≤ 0.25 s, test-stream TTFF p50 ≤ 3 s; F4/F7/F8 tested; screenshots of every control state reviewed against the quality bar |
-| **2 — Sources for the native player** | NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page "▶ Play in Hindi" preview; **repo scorecard** (dev tool: paste a repo URL → sandboxed benchmark run → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update). **Owner decision:** yes/no per repo from the scorecard. Titles with a native candidate open natively; the rest fall back to today's WebView | S1, S2 (≥ 95 %), S3 (0), S4, S8 on the benchmark; T1–T3 re-run on the iOS simulator inside the app; T4 Android DASH + Cookie plays; F1–F10 tested |
+| **2 — Sources for the native player** | NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page "▶ Play in Hindi" preview; the dev-only **benchmark runner** (§10; plays each benchmark title for 20 s and records lane, source, language heard, TTFF, outcome); **repo scorecard** (dev tool: paste a repo URL → sandboxed benchmark run → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update). **Owner decision:** yes/no per repo from the scorecard. Titles with a native candidate open natively; the rest fall back to today's WebView | S1, S2 (≥ 95 %), S3 (0), S4, S8 on the benchmark; T1–T3 re-run on the iOS simulator inside the app; T4 Android DASH + Cookie plays; F1–F10 tested |
 | **3 — Party on native** (built while the owner reviews the Phase 2 scorecard; uses test streams until repos are on) | Room stream key + private-channel URL handoff; guest re-resolve + ±2.5 s check; buffering debounce, scheduled transitions, ready barrier; lobby, attributed toasts, Resync, pass-the-remote; party UI in the §6.2.1 layer; migration `0010` (+ SQL tests) | S5 drift p95 ≤ 0.5 s over 10 min across emulator + simulator + phone; guest stall / host stall / 30 s barrier scenarios pass; F11/F12 tested |
 | **4 — Polish** | PiP / background audio / lock-screen via expo-video; final animation pass; physical-device gate | Owner sign-off on screenshots; physical two-phone gate (§11 R1) |
 

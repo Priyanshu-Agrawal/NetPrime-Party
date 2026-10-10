@@ -375,3 +375,16 @@ FlashList 2 · TypeScript 6 · webview 13.16.1 · CI on Node 22. Stepped 53 → 
 * Lint now reports 112 warnings (77 are React Compiler hints while the compiler is off).
 * Android still registers an old `exp+netprime` dev-client scheme next to `exp+bearoom`.
 * Embeds are flaky today (VidFast 500 / "fetching", VidLink and VidNest no media) — the native-first spec's reason.
+* From the final review (minor):
+  * iOS portrait before JS loads: consider `["expo-screen-orientation", { "initialOrientation": "PORTRAIT_UP" }]`;
+    verify Home stays portrait when an iPhone rotates, and that the fullscreen player hides the iOS status bar.
+  * `sendBroadcast` swallows errors and its REST path (`httpSend`, Realtime ≥ 2.97) is only unit-tested — add a
+    `__DEV__` warning and watch one 202 on device; rename `BroadcastChannel` (shadows the DOM type).
+  * Re-run the plan's "no false *Try another source* overlay in 60 s" check on VidFast once it is back up.
+  * `with-fmt-xcode-fix.js`: the fmt half is dead on RN 0.86 (fmt ships inside the prebuilt deps pod) — trim it.
+  * Add MainActivity fixtures for the playback plugin (its anchors are the kind SDK 55 broke in MainApplication).
+  * Stale docs still name the 13.13.5 webview patch (`HANDBOOK.md`, `plans/party-background-audio.md`) and the
+    deleted `devtools/execbro.ts` (`architecture/README.md`, `architecture/app-shell-and-data.md`).
+* **Before the next `v*` tag (CI ships a release APK):** release build on the Nothing Phone 1 — Home while a video
+  plays keeps audio (the keep-alive was last proven on an emulator debug build), and VidFast plays 60 s with no false
+  overlay.
