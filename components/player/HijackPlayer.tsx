@@ -373,7 +373,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         readAudio: () => cmd({ action: "readAudio" }),
         setAudio: (label: string) => cmd({ action: "setAudio", label }),
         reload: () => manualRetry(),
-        getCapabilities: (): PlayerCapabilities => hijackCapabilities(getProvider(providerId)),
+        getCapabilities: (): PlayerCapabilities =>
+          hijackCapabilities(getProvider(providerId), Platform.OS === "ios" ? "ios" : "android"),
         getTracks: (): MediaTrack[] => [],
       }),
       [cmd, manualRetry, providerId],

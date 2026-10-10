@@ -3,21 +3,39 @@ import type { PlayerCapabilities } from "./types";
 
 type ProviderLike = Pick<Provider, "hijack" | "scriptVersion"> | undefined;
 
-/** The provider renders a <video> our injected bridge can reach. */
+export type OS = "ios" | "android";
+
+/** What the generic bridge reports about the bound <video> (its `caps` event). */
+export interface BridgeCaps {
+  quality: boolean;
+  audio: boolean;
+  subtitles: boolean;
+}
+
+/** The provider renders a <video> our injected bridge can reach (on some platform). */
 export function isHijackable(p: ProviderLike): boolean {
   return !!p?.hijack.supported;
 }
 
 /**
- * PARTY-capable = hijackable AND we actually serve an injection script for it
- * (`scriptVersion` set). Only these can bind the bridge and drive a synced watch
- * party; a hijackable provider with no served script injects nothing and never
- * binds (see F1 — currently only `videasy` qualifies). The 🐾 Party badge, the
- * "Watch Party" button, and party launch all gate on THIS, not bare
- * `isHijackable`, so the app never offers a party that silently can't sync.
+ * Our skin can drive this provider on `os`: hijack support + a served script, and the
+ * <video> is reachable there. Measured `platforms` data wins; otherwise a cross-origin
+ * frame is reachable only on iOS (WKWebView injects into every frame; Android's
+ * react-native-webview injects into the main frame only).
+ */
+export function isBindableOn(p: ProviderLike, os: OS): boolean {
+  if (!isHijackable(p) || !p?.scriptVersion) return false;
+  const measured = p.hijack.platforms?.[os];
+  if (measured !== undefined) return measured;
+  return p.hijack.videoLocation !== "cross-origin-iframe" || os === "ios";
+}
+
+/**
+ * PARTY-capable = bindable on BOTH platforms, so any member — iPhone or Android — can
+ * bind it. The 🐾 badge, the "Watch Party" button and party launch gate on this.
  */
 export function isPartyCapable(p: ProviderLike): boolean {
-  return isHijackable(p) && !!p?.scriptVersion;
+  return isBindableOn(p, "ios") && isBindableOn(p, "android");
 }
 
 export const NO_CAPABILITIES: PlayerCapabilities = {
@@ -29,16 +47,19 @@ export const NO_CAPABILITIES: PlayerCapabilities = {
   partySync: false,
 };
 
-/** What the WebView hijack player can do for a given provider. */
-export function hijackCapabilities(p: ProviderLike): PlayerCapabilities {
-  if (!isPartyCapable(p)) return NO_CAPABILITIES;
-  // A bound bridge drives the provider's own <video> (rate, seek) and its menus (quality, dubs).
+/**
+ * What the WebView hijack player can do for a provider on this platform. The generic
+ * bridge reports quality/audio/subtitle support for the bound <video>; the legacy
+ * videasy bridge reports nothing, so it keeps the full set it has always driven.
+ */
+export function hijackCapabilities(p: ProviderLike, os: OS, reported?: BridgeCaps): PlayerCapabilities {
+  if (!isBindableOn(p, os)) return NO_CAPABILITIES;
   return {
     fractionalRate: true,
     preciseSeek: true,
-    audioTracks: true,
-    qualitySelect: true,
-    subtitles: false,
-    partySync: true,
+    audioTracks: reported ? reported.audio : true,
+    qualitySelect: reported ? reported.quality : true,
+    subtitles: reported ? reported.subtitles : false,
+    partySync: isPartyCapable(p),
   };
 }

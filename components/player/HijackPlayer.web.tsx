@@ -127,7 +127,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(function HijackPlaye
         const f = iframeRef.current;
         if (f) f.src = f.src; // re-navigating the iframe is a full reload of the embed
       },
-      getCapabilities: (): PlayerCapabilities => hijackCapabilities(getProvider(providerId)),
+      // A browser reaches only same-origin frames — the Android rule.
+      getCapabilities: (): PlayerCapabilities => hijackCapabilities(getProvider(providerId), "android"),
       getTracks: (): MediaTrack[] => [],
     }),
     [providerId],

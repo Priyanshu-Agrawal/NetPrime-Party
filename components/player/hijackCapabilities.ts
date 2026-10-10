@@ -17,7 +17,14 @@ export interface HijackCapability {
   /** Do we have a verified hijack (video reachable + controllable)? */
   supported: boolean;
   /** Where the <video> lives, when supported. */
-  videoLocation?: "top" | "same-origin-iframe";
+  videoLocation?: "top" | "same-origin-iframe" | "cross-origin-iframe";
+  /**
+   * Measured per-platform bind result; overrides the location rule. iOS injects into every
+   * frame (so cross-origin frames bind); Android injects into the main frame only.
+   */
+  platforms?: { ios?: boolean; android?: boolean };
+  /** Selectors the generic bridge clicks (in order) to start the provider's player. */
+  startSelectors?: string[];
   /** Extra hostnames the top frame may navigate to (redirect/CDN), for popup blocking. */
   navHosts?: string[];
   /** Query param that disables the provider's autoplay (so party starts in unison). */

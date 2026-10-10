@@ -27,11 +27,13 @@ import { z } from "@hono/zod-openapi";
 export const HijackSchema = z
   .object({
     supported: z.boolean().openapi({ example: true }),
-    videoLocation: z.enum(["top", "same-origin-iframe"]).optional(),
+    videoLocation: z.enum(["top", "same-origin-iframe", "cross-origin-iframe"]).optional(),
     navHosts: z.array(z.string()).optional().openapi({ example: ["player.videasy.to"] }),
     autoplayParam: z.string().optional().openapi({ example: "autoplay=false" }),
     unstable: z.boolean().optional(),
     notes: z.string().optional(),
+    platforms: z.object({ ios: z.boolean().optional(), android: z.boolean().optional() }).optional(),
+    startSelectors: z.array(z.string()).optional(),
   })
   .openapi("Hijack");
 

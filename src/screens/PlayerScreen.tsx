@@ -33,6 +33,7 @@ import {
   mediaKey,
   recordProviderFailure,
 } from "@/utils/failureMemory";
+import { pickInitialProvider as pickProvider } from "@/components/player/providerPick";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
 import type { ReportArgs, ReportOutcome } from "@/src/types/worker.types";
 import Constants from "expo-constants";
@@ -121,8 +122,8 @@ export const PlayerScreen: React.FC = () => {
   const [fallbackBanner, setFallbackBanner] = useState(false); // actionable "try another source"
   const [excludedIds, setExcludedIds] = useState<string[]>([]); // providers that failed this session
   const providers = useProviders();
-  // Pick the initial/default source: prefer a provider that binds our skin
-  // (party-capable), biasing away from ones that recently failed for THIS title
+  // Pick the initial/default source (rules in providerPick.ts): a provider our skin
+  // binds on this platform, biased away from ones that recently failed for THIS title
   // (cross-session, MMKV). Never strands — always yields a provider for a non-empty list.
   const pickInitialProvider = useCallback(
     (list: Provider[]): Provider | undefined => {
@@ -135,20 +136,7 @@ export const PlayerScreen: React.FC = () => {
           episode: ep ? Number(ep) : undefined,
         }),
       );
-      const requested = providerId ? list.find((p) => p.id === providerId) : undefined;
-      if (requested && !failed.has(requested.id)) return requested;
-      // Prefer a provider that actually binds our skin (party-capable). Failure
-      // memory biases WITHIN a tier (pickFresh) but never demotes a bindable
-      // provider below a script-less one — a transient videasy blip must not strand
-      // the title under the provider's own web controls. Script-less providers are
-      // auto-picked only when none bind (the user can still hand-pick one via "Try
-      // another source"). pickFresh([]) is undefined, so an empty tier falls through.
-      const pickFresh = (arr: Provider[]) => arr.find((p) => !failed.has(p.id)) ?? arr[0];
-      return (
-        pickFresh(list.filter(isPartyCapable)) ??
-        pickFresh(list.filter((p) => !isPartyCapable(p))) ??
-        list[0]
-      );
+      return pickProvider(list, { requestedId: providerId, failed, os: Platform.OS === "ios" ? "ios" : "android" });
     },
     [id, type, season, ep, providerId],
   );
