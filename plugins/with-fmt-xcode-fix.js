@@ -1,8 +1,12 @@
 /**
- * CNG-safe iOS fix for fmt 11.0.2 + Xcode 26 / Apple Clang 21.
+ * CNG-safe iOS fixes for building on current Xcode. Survive `expo prebuild --clean`
+ * via withPodfile post_install.
  *
- * RN's vendored fmt treats FMT_STRING as consteval; newer Clang rejects that.
- * Survives `expo prebuild --clean` via withPodfile post_install.
+ * 1. fmt 11.0.2 + Xcode 26 / Apple Clang 21: RN's vendored fmt treats FMT_STRING
+ *    as consteval; newer Clang rejects that.
+ * 2. Xcode 27 rejects any pod target whose iOS deployment target is below 15.0
+ *    (SDWebImage's resource bundle still declares 9.0) — raise every pod target to
+ *    the app's 15.1 floor.
  */
 const { createRunOncePlugin, withPodfile } = require("@expo/config-plugins");
 const { mergeContents } = require("@expo/config-plugins/build/utils/generateCode");
@@ -29,6 +33,15 @@ const POST_INSTALL = [
   "        if patched != content",
   "          File.chmod(0644, fmt_base)",
   "          File.write(fmt_base, patched)",
+  "        end",
+  "      end",
+  "    end",
+  "    # Xcode 27: pod targets below iOS 15.0 fail to build (SDWebImage's bundle says 9.0).",
+  "    installer.pods_project.targets.each do |target|",
+  "      target.build_configurations.each do |config|",
+  "        dt = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']",
+  "        if dt.nil? || Gem::Version.new(dt) < Gem::Version.new('15.1')",
+  "          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'",
   "        end",
   "      end",
   "    end",
