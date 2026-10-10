@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "bearoom",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -53,7 +52,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#100D0A"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.scriptingbear.bearoom"
     },
     "web": {
@@ -74,7 +72,9 @@
         }
       ],
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-image",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {
