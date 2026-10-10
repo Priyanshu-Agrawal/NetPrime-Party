@@ -311,6 +311,16 @@ into `providers: []` — byte-identical to the operator's store-review killswitc
   route-level tests of the real `/config` and `/scripts` handlers through the KV and error paths).
 * `[x]` Fresh whole-phase review: no critical issues; 4 important + 3 re-graded findings fixed (each with a
   failing-first test). A killswitch first learned during an outage is now remembered on the device.
+* **Deferred from the Phase 0 review (minor; pick up where noted):**
+  * Phase 1 must gate lanes on *fresh* flags (or let cached flags only turn a lane off) — at boot the device copy can
+    re-enable a remotely killed lane for the ~7.6 s before `/config` lands.
+  * Before Phase 1's audio menu: `hijackCapabilities` says `audioTracks: true` while `HijackPlayer.getTracks()`
+    returns `[]` (the WebView reports dubs through the `"audio"` event) — reconcile.
+  * An outage answer keeps old providers but also drops the worker-owned `region`/`flags`/`maintenanceMode`.
+  * Tidy: the accept check is written twice (slice matcher + `reduceConfig`); `source: "live"` also labels the
+    worker's stale copy; one empty first frame before cache hydration (`preloadedState` would remove it).
+  * Spec F1's "banner only if neither copy exists" is not built yet (`useConfigStale()` is ready for it).
+  * Worker: fetch provider health in parallel with the provider list (~9 s → ~5 s worst-case cold `/config`).
 * `[ ]` **iOS simulator launch — moved to the Expo SDK upgrade phase.** Builds on Xcode 27 after a pod
   deployment-target fix (`9b18d71`), but iOS 27 kills it at launch: the iOS 27 SDK requires the UIScene lifecycle,
   which Expo ships only from SDK 57.0.23 (`expo-build-properties` `ios.enableSceneSupport`; native in 58). SDK ≤56
