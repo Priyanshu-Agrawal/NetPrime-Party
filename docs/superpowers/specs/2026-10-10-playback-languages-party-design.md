@@ -66,7 +66,12 @@ must not be able to tell which, except where §6.3 says a capability is missing.
   `entering`/`exiting`/`layout` props. Never touch `src/ui/BearAlert.tsx` or `.codex/`.
 - Off-store distribution (GitHub Releases + the custom `secure-ota` channel). Grey apps get store-pulled — see
   `competitor-teardown-2026-10.md` §pitfalls.
-- Operator holds all secrets. `/config` with an empty source list = listing-only app (store-review killswitch).
+- **Operator** = the developer/owner who runs Bearoom's backend (holds the secrets, controls `/config`, the provider
+  table and the plugin-repo table) — never the app's end users. Operator holds all secrets. `/config` with an empty
+  source list = listing-only app (store-review killswitch).
+- **Division of work (owner, 2026-10-10):** the agent builds, tests and verifies every phase; the owner connects a
+  physical device when a gate needs one and gives the yes/no on which plugin repos are switched on (from the §9
+  Phase 2 scorecard).
 - Supabase is on the Free plan and auto-pauses after ~7 idle days (memory `supabase-free-tier-pause`). Anything the
   party depends on must degrade cleanly when the backend is unreachable (§7).
 
@@ -402,7 +407,7 @@ same gates re-run on physical devices before any release.
 |---|---|---|
 | **0 — Foundations** | **Config resilience** (worker: a Supabase error serves the last-known-good list from a long-lived edge-cache key with `stale:true`; only a *successful* empty query is the killswitch, signalled by an explicit `killswitch:true`; app: persist the last good `/config` in MMKV and boot from it); `components/player/types.ts` (PlayerHandle v2, neutral types); `jest-expo` unit-test harness; `/config` flags (`embedApiLane`, `nativeLane`, `pluginHost`) + worker schema; `/report` fields; benchmark runner (dev-only screen) | Pausing Supabase no longer empties the app (tested by pointing the worker at a bad key in `wrangler dev`); `tsc` + lint clean; unit tests pass via `npm test`; existing Play/party unchanged on both devices |
 | **1 — Embed-API lane** | HijackPlayer `embedApi` mode + host page; VidFast enabled via data; sync engine capability read (no-nudge, 2 s band); fix `providerRegistry.ts:113` (`nextEpisode` must be gated on `!opts.party`) | Benchmark S1 ≥ 90 % via embed lanes; party 10 min emulator↔sim, drift p95 ≤ 2 s (S6); F4/F13/F14 tested |
-| **2 — Native lane** | `NativePlayer` (expo-video, seek patch, synthesised `seeked`); NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page preview; Settings rows; SubtitleOverlay | S1, S2 (≥ 95 %), S3 (0), S4 on the benchmark; T1–T3 re-run on the **iOS simulator inside the app**; T4 Android DASH + Cookie plays; F1–F10 tested |
+| **2 — Native lane** | `NativePlayer` (expo-video, seek patch, synthesised `seeked`); NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page preview; Settings rows; SubtitleOverlay; **repo scorecard** (dev tools: paste a repo URL → sandboxed run of the benchmark → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update — the owner's yes/no on enabling a repo is made from this) | S1, S2 (≥ 95 %), S3 (0), S4 on the benchmark; T1–T3 re-run on the **iOS simulator inside the app**; T4 Android DASH + Cookie plays; F1–F10 tested |
 | **3 — Party on native** | Room stream key + private-channel URL handoff; guest re-resolve + ±2.5 s check; buffering debounce, scheduled transitions, ready barrier; lobby, toasts, resync, pass-the-remote; migration `0010` (+ SQL tests) | S5 drift p95 ≤ 0.5 s over 10 min; buffering scenarios (guest stall, host stall, 30 s barrier) pass; F11/F12 tested |
 | **4 — Polish** | UI/animation pass (device-verified screenshots per the quality bar); PiP / background audio / lock-screen via expo-video; physical-device gate | Owner sign-off on screenshots; physical 2-phone gate (§11 R1) |
 
