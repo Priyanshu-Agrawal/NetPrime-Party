@@ -135,6 +135,25 @@ describe("generic bridge", () => {
     expect(v.pause).toHaveBeenCalled();
   });
 
+  it("keeps a play asked for before the stream was ready, until a pause cancels it", () => {
+    load();
+    const v = addVideo(8349);
+    jest.advanceTimersByTime(700);
+    (window as any).__vlCmd({ action: "play" });
+    expect(v.play).toHaveBeenCalledTimes(1); // too early — the provider hasn't attached the stream
+    v.dispatchEvent(new Event("canplay"));
+    expect(v.play).toHaveBeenCalledTimes(2); // now it can, so ask again
+    (window as any).__vlCmd({ action: "pause" });
+    v.dispatchEvent(new Event("canplay"));
+    expect(v.play).toHaveBeenCalledTimes(2); // a pause cancels the pending play
+    (window as any).__soloCmd({ action: "play" }); // lock-screen play arms it again…
+    v.dispatchEvent(new Event("canplay"));
+    expect(v.play).toHaveBeenCalledTimes(4);
+    (window as any).__soloCmd({ action: "pause" }); // …and lock-screen pause cancels it
+    v.dispatchEvent(new Event("canplay"));
+    expect(v.play).toHaveBeenCalledTimes(4);
+  });
+
   it("answers quality and audio reads with empty lists (no provider menus driven)", () => {
     load();
     addVideo(8349);

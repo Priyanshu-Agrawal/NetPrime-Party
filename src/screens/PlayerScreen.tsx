@@ -423,8 +423,11 @@ export const PlayerScreen: React.FC = () => {
           timeToFailMs: Date.now() - mountTsRef.current,
         });
       }
+      // Solo: a provider whose page failed is skipped like one that won't bind; the
+      // error card (Retry · Try another source) shows only when none is left.
+      moveOn();
     },
-    [report, selected, media],
+    [report, selected, media, moveOn],
   );
 
   // Resume-after-switch. A dub/quality/provider switch makes the provider reload
@@ -495,6 +498,7 @@ export const PlayerScreen: React.FC = () => {
     const t = Number(e.currentTime) || 0;
     if (t > posRef.current + 0.25) {
       lastProgressTsRef.current = Date.now();
+      if (__DEV__ && progressAtRef.current == null && selected) logBind(selected.id, true, mountTsRef.current, "playing");
       progressAtRef.current = Date.now();
     }
     if ((e.event === "play" || e.event === "playing") && playIntentAtRef.current == null) {
@@ -683,6 +687,11 @@ export const PlayerScreen: React.FC = () => {
                 onPlayerEvent={onEvent}
                 onBound={() => {
                   setPlayerBound(true);
+                  // The user pressed Play on the title: start as soon as we can drive the
+                  // video (some providers bind paused, e.g. TV episodes). That makes binding
+                  // the play intent — a bound provider that never advances is skipped.
+                  playIntentAtRef.current ??= Date.now();
+                  playerRef.current?.play();
                   if (__DEV__) logBind(selected.id, true, mountTsRef.current);
                 }}
                 onBindFailed={() => {
@@ -874,12 +883,12 @@ export const PlayerScreen: React.FC = () => {
 
 const OS_NAME: OS = Platform.OS === "ios" ? "ios" : "android";
 
-/** Dev-only bind log, read over CDP by the Phase 1A gate (which providers bind, how fast). */
-function logBind(providerId: string, ok: boolean, since: number) {
+/** Dev-only bind log, read over CDP by the Phase 1A gate (which providers bind / play, how fast). */
+function logBind(providerId: string, ok: boolean, since: number, stage: "bind" | "playing" = "bind") {
   const g = globalThis as unknown as {
-    __bindLog?: { providerId: string; ok: boolean; ms: number; os: OS }[];
+    __bindLog?: { providerId: string; ok: boolean; ms: number; os: OS; stage: string }[];
   };
-  (g.__bindLog ??= []).push({ providerId, ok, ms: Date.now() - since, os: OS_NAME });
+  (g.__bindLog ??= []).push({ providerId, ok, ms: Date.now() - since, os: OS_NAME, stage });
 }
 
 const styles = StyleSheet.create({

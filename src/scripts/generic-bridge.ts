@@ -98,7 +98,10 @@ export const GENERIC_BRIDGE: string = `
     return best;
   }
 
-  var vid = null, applying = 0, wasPlaying = false;
+  // wantPlay: a play was asked for and not cancelled by a pause. A provider may attach its
+  // stream after we bind, so the first play() can land too early (iOS drops it); retry
+  // when the video says it can play.
+  var vid = null, applying = 0, wasPlaying = false, wantPlay = false;
   function markApplying(){ applying = Date.now() + 500; }
   function isApplying(){ return Date.now() < applying; }
   function isSubTrack(t){ return !t.kind || t.kind === 'subtitles' || t.kind === 'captions'; }
@@ -144,6 +147,13 @@ export const GENERIC_BRIDGE: string = `
         });
       });
       try { v.addEventListener('loadedmetadata', function(){ if (v === vid) postCaps(); }); } catch(e){}
+      ['canplay', 'loadeddata'].forEach(function(ev){
+        v.addEventListener(ev, function(){
+          if (v !== vid || !wantPlay || !v.paused) return;
+          markApplying();
+          var p = v.play(); if (p && p.catch) p.catch(function(){});
+        });
+      });
       try { if (v.textTracks && v.textTracks.addEventListener) v.textTracks.addEventListener('addtrack', function(){ if (v === vid) postCaps(); }); } catch(e){}
     }
     applyChrome();
@@ -195,7 +205,7 @@ export const GENERIC_BRIDGE: string = `
   window.__vlCmd = function(cmd){
     try {
       if (cmd.action === 'play'){
-        wasPlaying = true;
+        wasPlaying = true; wantPlay = true;
         if (!vid){ clickStart(); return; }
         markApplying();
         var p = vid.play(); if (p && p.catch) p.catch(function(){});
@@ -205,7 +215,7 @@ export const GENERIC_BRIDGE: string = `
       if (cmd.action === 'readAudio'){ post(snap(vid, { event: 'audio', audios: [] })); return; }
       if (cmd.action === 'readSubs'){ postSubs(); return; }
       if (!vid) return;
-      if (cmd.action === 'pause'){ wasPlaying = false; markApplying(); vid.pause(); }
+      if (cmd.action === 'pause'){ wasPlaying = false; wantPlay = false; markApplying(); vid.pause(); }
       else if (cmd.action === 'seek'){ markApplying(); vid.currentTime = cmd.time; }
       else if (cmd.action === 'rate'){ vid.playbackRate = cmd.rate; }
       else if (cmd.action === 'setSub'){
@@ -225,8 +235,8 @@ export const GENERIC_BRIDGE: string = `
   window.__soloCmd = function(cmd){
     if (!vid || !cmd) return;
     try {
-      if (cmd.action === 'play'){ wasPlaying = true; var up = vid.play(); if (up && up.catch) up.catch(function(){}); }
-      else if (cmd.action === 'pause'){ wasPlaying = false; vid.pause(); }
+      if (cmd.action === 'play'){ wasPlaying = true; wantPlay = true; var up = vid.play(); if (up && up.catch) up.catch(function(){}); }
+      else if (cmd.action === 'pause'){ wasPlaying = false; wantPlay = false; vid.pause(); }
       else if (cmd.action === 'seek' && typeof cmd.time === 'number'){ vid.currentTime = cmd.time; }
     } catch(e){}
   };

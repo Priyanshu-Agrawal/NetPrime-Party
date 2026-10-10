@@ -86,3 +86,10 @@ export function getRecentlyFailed(key: string): Set<string> {
       .map(([id]) => id),
   );
 }
+
+// Dev builds only: lets device test scripts start each pinned-provider run from a clean
+// slate (globalThis.__resetFailureMemory() over CDP). Folded away in release builds.
+if (__DEV__) {
+  (globalThis as unknown as { __resetFailureMemory?: () => void }).__resetFailureMemory = () =>
+    storage.set(KEY, "{}");
+}
