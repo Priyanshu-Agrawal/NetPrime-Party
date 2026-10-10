@@ -30,7 +30,6 @@
     "@supabase/supabase-js": "^2.109.0",
     "expo": "~53.0.14",
     "expo-asset": "~11.1.7",
-    "expo-blur": "~14.1.5",
     "expo-constants": "~17.1.8",
     "expo-dev-client": "~5.2.4",
     "expo-file-system": "~18.1.11",
@@ -49,7 +48,6 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.6",
-    "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-get-random-values": "~1.11.0",
     "react-native-keyboard-controller": "^1.22.3",
@@ -71,7 +69,6 @@
     "@types/react": "~19.0.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
-    "execbro-sdk": "^0.6.0",
     "jest": "~29.7.0",
     "jest-expo": "~53.0.14",
     "patch-package": "^8.0.1",
@@ -91,5 +88,17 @@
     "transformIgnorePatterns": [
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|immer|@reduxjs/toolkit|reselect|redux|redux-thunk|react-redux)"
     ]
+  },
+  "expo": {
+    "install": {
+      "exclude": [
+        "react-native-keyboard-controller"
+      ]
+    },
+    "autolinking": {
+      "exclude": [
+        "react-native-linear-gradient"
+      ]
+    }
   }
 }

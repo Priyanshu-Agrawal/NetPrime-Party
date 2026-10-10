@@ -1,4 +1,3 @@
-import "./devtools/execbro";
 import "react-native-get-random-values";
 import "react-native-url-polyfill/auto";
 import { AlertHost } from "@/components/ui/BearAlert";
