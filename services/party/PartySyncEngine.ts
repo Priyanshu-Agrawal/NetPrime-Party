@@ -103,6 +103,12 @@ export class PartySyncEngine {
       this.handleUserControl(e);
     }
     if (e.event !== "tick") return;
+    if (__DEV__) {
+      // Party-gate instrumentation (read over CDP): playback position on the shared
+      // server clock, so host and guests can be compared without trusting device clocks.
+      const g = globalThis as unknown as { __partyPos?: { t: number; ct: number }[] };
+      (g.__partyPos ??= []).push({ t: this.client.now(), ct: e.currentTime });
+    }
     if (this.detached) {
       this.setRate(1);
       return;
@@ -182,6 +188,11 @@ export class PartySyncEngine {
     const base = this.anchor.rate || 1;
     const exp = this.expectedSec();
     const rawDrift = e.currentTime - exp;
+    if (__DEV__) {
+      // Party-gate instrumentation (read over CDP): every raw drift sample, in seconds.
+      const g = globalThis as unknown as { __partyDrift?: { t: number; d: number }[] };
+      (g.__partyDrift ??= []).push({ t: Date.now(), d: rawDrift });
+    }
     this.driftSamples.push(rawDrift);
     if (this.driftSamples.length > MEDIAN_N) this.driftSamples.shift();
     const medDrift = median(this.driftSamples);
