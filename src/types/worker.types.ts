@@ -26,6 +26,15 @@ export interface RemoteProviderRow {
     script_version: string | null;
 }
 
+/** Remote lane switches from /config.flags (worker/src/flags.ts). */
+export interface FeatureFlags {
+    embedApiLane: boolean;
+    nativeLane: boolean;
+    pluginHost: boolean;
+}
+
+export const DEFAULT_FLAGS: FeatureFlags = { embedApiLane: false, nativeLane: false, pluginHost: false };
+
 /** `GET /config` — app bootstrap config + provider registry. */
 export interface AppConfig {
     appVersion: string;
@@ -39,6 +48,11 @@ export interface AppConfig {
      * client renders its baked-in fallback via `normalizeManifest(undefined)`.
      */
     homeFeed?: FeedManifest;
+    /** True when the worker couldn't reach Supabase and sent its last-known-good list. */
+    stale?: boolean;
+    /** True only when the operator deliberately emptied the list. Absent on old workers. */
+    killswitch?: boolean;
+    flags?: FeatureFlags;
 }
 
 /** Per-provider resolution outcome from `GET /scrape`. */
