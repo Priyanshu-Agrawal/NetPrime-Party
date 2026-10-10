@@ -14,10 +14,10 @@ import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
 
 import expo.modules.ApplicationLifecycleDispatcher
-import expo.modules.ReactNativeHostWrapper
 // @generated begin bearoom-playback-main-application-import - expo prebuild (DO NOT MODIFY) sync-3e7f5c180cdd1116b7d9c8c41cc8cff2e96c9db9
 import com.scriptingbear.bearoom.playback.BearoomPlaybackPackage
 // @generated end bearoom-playback-main-application-import
+import expo.modules.ReactNativeHostWrapper
 
 class MainApplication : Application(), ReactApplication {
 
