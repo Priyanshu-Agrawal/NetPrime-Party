@@ -35,3 +35,9 @@ simple = { limit = 30, period = 60 }
 [[services]]
 binding = "TMDB_PROXY"
 service = "tmdb"
+
+# Durable last-known-good provider list (see src/configResolve.ts). Served when
+# Supabase doesn't answer, so a paused project can't empty every app.
+[[kv_namespaces]]
+binding = "CONFIG_LKG"
+id = "5d654448c50f4e5eb069ec5e963372ee"
