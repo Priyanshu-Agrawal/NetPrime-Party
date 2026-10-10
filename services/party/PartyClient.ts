@@ -25,6 +25,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getInstallationId } from "./identity";
 import { sendBroadcast } from "./broadcast";
 import { genRoomCode } from "@/utils/roomCode";
+import { hostLooksGone } from "./election";
 import { LEASE_RENEW_INTERVAL_MS } from "./protocol";
 import type {
   HostLease,
@@ -59,7 +60,6 @@ export interface RoomSnapshot {
 type WireSnapshot = Omit<RoomSnapshot, "queue" | "currentItemId" | "queueRev"> &
   Partial<Pick<RoomSnapshot, "queue" | "currentItemId" | "queueRev">>;
 
-const HOST_TIMEOUT_MS = 7000; // no host heartbeat this long -> consider host gone
 const CLOCK_PING_BURST = 5; // initial offset-estimation pings
 const CLOCK_PING_INTERVAL_MS = 10000;
 const WATCHDOG_INTERVAL_MS = 1500;
@@ -79,6 +79,8 @@ export class PartyClient {
   private offset = 0;
   private clockSamples: { offset: number; rtt: number }[] = [];
   private lastSnapAt = 0;
+  /** When our channel started listening for host heartbeats (see election.ts). */
+  private listeningSince = 0;
 
   private leaseTimer: ReturnType<typeof setInterval> | null = null;
   private watchdog: ReturnType<typeof setInterval> | null = null;
@@ -193,6 +195,7 @@ export class PartyClient {
     // that we're listening, so the host (and others) pick up our membership.
     if (this.snap) this.broadcast(this.snap);
     this.clockTimer = setInterval(() => void this.pingClock(), CLOCK_PING_INTERVAL_MS);
+    this.listeningSince = Date.now();
     this.watchdog = setInterval(() => this.checkHost(), WATCHDOG_INTERVAL_MS);
     this.reconcileRole();
   }
@@ -518,9 +521,13 @@ export class PartyClient {
   private checkHost(): void {
     if (this.destroyed || this.kicked || this.isHost || !this.snap || this.claiming) return;
     const s = this.snap;
-    const leaseExpired = !s.lease.leaseExpiresAt || s.lease.leaseExpiresAt < this.now();
-    const staleHeartbeat = Date.now() - this.lastSnapAt > HOST_TIMEOUT_MS;
-    if (!leaseExpired && !staleHeartbeat) return;
+    if (!this.hostLooksGone()) return;
+    if (__DEV__) {
+      console.log(
+        "[party] host looks gone — lease lapsed ms:", this.now() - (s.lease.leaseExpiresAt ?? 0),
+        "silent ms:", Date.now() - Math.max(this.lastSnapAt, this.listeningSince),
+      );
+    }
 
     // Deterministic backoff: earliest-joined eligible guest claims first. The DB
     // row lock guarantees a single winner even if two fire together.
@@ -531,14 +538,21 @@ export class PartyClient {
     setTimeout(() => void this.tryClaim(), rank * CLAIM_BACKOFF_MS);
   }
 
+  private hostLooksGone(): boolean {
+    if (!this.snap) return false;
+    return hostLooksGone({
+      leaseExpiresAt: this.snap.lease.leaseExpiresAt,
+      serverNow: this.now(),
+      lastHeardAt: this.lastSnapAt,
+      listeningSince: this.listeningSince,
+      now: Date.now(),
+    });
+  }
+
   private async tryClaim(force = false): Promise<void> {
     if (this.destroyed || this.kicked || this.isHost || this.claiming) return;
     if (!force) {
-      const s = this.snap;
-      const stillHosted =
-        s && s.lease.leaseExpiresAt && s.lease.leaseExpiresAt >= this.now() &&
-        Date.now() - this.lastSnapAt < HOST_TIMEOUT_MS;
-      if (stillHosted) return; // someone renewed/took over in the backoff window
+      if (!this.hostLooksGone()) return; // someone renewed/took over in the backoff window
     }
     this.claiming = true;
     try {
