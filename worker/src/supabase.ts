@@ -56,6 +56,10 @@ export type Bindings = {
   /** Durable last-known-good provider list (Workers KV). Optional: without it an
    *  outage degrades to an empty, non-killswitch list. See configResolve.ts. */
   CONFIG_LKG?: KVNamespace;
+  /** Remote lane switches ("1"/"true"/"on"/"yes" = on). See flags.ts. */
+  FLAG_EMBED_API_LANE?: string;
+  FLAG_NATIVE_LANE?: string;
+  FLAG_PLUGIN_HOST?: string;
 };
 
 /**

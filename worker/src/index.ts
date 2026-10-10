@@ -33,6 +33,7 @@ import {
   purgeProviders,
 } from "./supabase";
 import { getFranchiseCollections } from "./franchises";
+import { parseFlags } from "./flags";
 import {
   AppConfigSchema,
   ErrorSchema,
@@ -135,7 +136,15 @@ app.openapi(configRoute, async (c) => {
   // and the client falls back to its baked-in Home layout when absent. To
   // server-drive Home, populate `homeFeed: FeedManifest` (see schemas.ts) here.
   return c.json(
-    { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, region, providers, stale, killswitch },
+    {
+      appVersion: APP_VERSION,
+      maintenanceMode: MAINTENANCE_MODE,
+      region,
+      providers,
+      stale,
+      killswitch,
+      flags: parseFlags(c.env as unknown as Record<string, unknown>),
+    },
     200,
   );
 });

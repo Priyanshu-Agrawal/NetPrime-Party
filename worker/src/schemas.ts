@@ -127,6 +127,14 @@ export const FeedManifestSchema = z
   .openapi("FeedManifest");
 
 /** App-level configuration returned to the mobile/web client on launch. */
+export const FeatureFlagsSchema = z
+  .object({
+    embedApiLane: z.boolean().openapi({ example: false }),
+    nativeLane: z.boolean().openapi({ example: false }),
+    pluginHost: z.boolean().openapi({ example: false }),
+  })
+  .openapi("FeatureFlags");
+
 export const AppConfigSchema = z
   .object({
     appVersion: z.string().openapi({ example: "2.0.0" }),
@@ -139,6 +147,8 @@ export const AppConfigSchema = z
     stale: z.boolean().optional().openapi({ example: false }),
     /** True only when the operator deliberately emptied the list (store-review killswitch). */
     killswitch: z.boolean().optional().openapi({ example: false }),
+    /** Remote lane switches (worker vars FLAG_*). All off by default. */
+    flags: FeatureFlagsSchema.optional(),
     /** Optional server-driven Home feed. Omitted → client renders its fallback. */
     homeFeed: FeedManifestSchema.optional(),
   })
