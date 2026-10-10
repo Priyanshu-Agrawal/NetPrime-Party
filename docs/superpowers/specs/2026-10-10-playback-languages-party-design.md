@@ -1,8 +1,10 @@
 # Playback, Languages & Watch Party — Design Spec
 
-**Status:** Revision 2 — **native-first**, approved by the owner 2026-10-10 evening. Phase 0 is built and deployed; the
-Expo SDK 57 upgrade is done (`upgrade/expo-57`, 2026-10-10). Revision 1 put an embed-API lane (VidFast's postMessage API) first; the owner chose
-the native player first instead, so that lane is now deferred (§6.2.3).
+**Status:** Revision 3 (2026-10-11) — approved by the owner, who delegated every decision except one that stays with the
+operator: which plugin repos (stream sources) are enabled. Phase 0 is built and deployed; the Expo SDK 57 upgrade is done
+(`b0a7e72`). Revision 1 put an embed-API lane first; revision 2 made the native player first; revision 3 adds **Phase 1A**
+— our skin and party on the providers the operator already runs — because real titles can only reach the native player
+once a repo is enabled (§6.2.4). The embed-API lane stays deferred (§6.2.3).
 **Supersedes:** the engine and lane parts of [`docs/architecture/native-player.md`](../../architecture/native-player.md)
 and Program 1 · P2/P3 sequencing in [`ROADMAP.md`](../../ROADMAP.md). The P1 queue spine (`0008`/`0009`, `PartySession`)
 is kept as-is and built on.
@@ -133,7 +135,7 @@ no native source exists for a title.
                      ┌──────────────── PlayerHandle v2 (neutral contract) ────────────────┐
                      │ NativePlayer (expo-video)        HijackPlayer (WebView)            │
                      │   PRIMARY: plugin streams          FALLBACK only: plain embed,      │
-                     │   (+ dev test streams, Phase 1)    solo unless bridged (today's flow)│
+                     │   (+ dev test streams, Phase 1B)   bridged = our skin + party (1A)   │
                      └──────────────────────────────────────────────────────────────────┘
                                                 ▼
                          PlayerControls + PlayerSettingsSheet (unchanged shape, new rows)
@@ -351,11 +353,11 @@ video screen.
 - **Party in the player:** a Watch Party button → create room → share sheet (WhatsApp first) → lobby (§6.4) → synced
   play; avatars, attributed toasts, Resync, and the existing chat tray live in the same layer.
 
-#### 6.2.2 Test streams (Phase 1)
+#### 6.2.2 Test streams (Phase 1B)
 
-Phase 1 builds and gates the player before any plugin repo exists, on **public test streams** (HLS with alternate audio
+Phase 1B builds and gates the player before any plugin repo exists, on **public test streams** (HLS with alternate audio
 languages, multiple variants, and WebVTT subtitles; one MP4; one DASH for Android) reachable from a dev-only "Test
-streams" entry behind the `nativeLane` flag. The exact list is chosen in the Phase 1 plan from publisher-provided test
+streams" entry behind the `nativeLane` flag. The exact list is chosen in the Phase 1B plan from publisher-provided test
 assets.
 
 #### 6.2.3 Deferred lanes
@@ -363,10 +365,28 @@ assets.
 - **Embed-API lane** (revision 1's Phase 1: VidFast's documented postMessage API in a host page): deferred by the owner's
   native-first choice. The design notes remain valid if it returns: integer-second seeks, no rate control, the
   provider's chrome stays visible on Android.
-- **Skinned-WebView bridge for VidFast:** VidFast's `<video>` is reachable in the main frame (§4), so a bridge script
-  could put our controls over it with full sync. Parked; cheap to add later through the existing OTA script channel.
-- Plain embeds (no API, no bridge) keep today's behaviour and `partySync:false`; they are the fallback while a title has
-  no native source.
+- **Skinned-WebView bridge:** no longer deferred — it is Phase 1A (§6.2.4).
+- Plain embeds (no API, no bridge) keep today's behaviour and `partySync:false`; they are the last fallback.
+
+#### 6.2.4 Our skin on existing providers (Phase 1A)
+
+The operator's provider table already lists embed providers; when a provider's `<video>` is reachable from our WebView,
+a bridge script binds to it, hides the provider's own UI, and drives it from our controls — the videasy technique that
+shipped in August (memories `videasy-ios-bind-fix`, `verify-hijack-bind`), generalised:
+
+- **Reachability is platform-specific** (measured §4): main frame or same-origin frames on both platforms; cross-origin
+  frames on iOS only (WKWebView injects into every frame). A provider is "bindable" per platform, and a party offers
+  only providers bindable on **every** member's platform.
+- **One generic bridge** (OTA via the existing `/scripts` channel and `scripts` table, pinned version): find the playing
+  `<video>`, bind play/pause/seek/rate/timeupdate/buffering events and `textTracks` (subtitles), hide everything but
+  the video (`visibility` on all other elements), block popups. Per-provider extras (a start click, a server choice)
+  are small data entries, not code forks.
+- **Bind or move on:** if no `<video>` binds within the existing grace window, the player tries the next bindable
+  provider before ever showing provider UI; only when none binds does today's plain-embed flow appear.
+- **Capabilities:** HTML5 video gives fractional rate, precise seek and subtitles; quality and audio come only where
+  the provider exposes them, so those rows hide otherwise (§6.3). Party sync uses the native-lane bands.
+- **Scope line:** the bridge drives a page already loaded in our WebView; it does not fetch, decrypt or re-host
+  streams and does not touch a provider's anti-bot measures.
 
 ### 6.3 What the user sees when a capability is missing
 
@@ -449,7 +469,7 @@ the existing `supabase/tests` pattern. **Flagged for owner review** — stored-s
   the RLS-gated private channel only.
 - Embed-API host page (deferred lane): `postMessage` target origins restricted to the provider's documented origins;
   inbound events accepted only from those origins (VidFast publishes its origin list).
-- Test streams (Phase 1) are dev-only and never shipped in a release build's UI.
+- Test streams (Phase 1B) are dev-only and never shipped in a release build's UI.
 - Minimal Android permissions (no new ones for this spec).
 
 ## 9. Phases and gates
@@ -461,14 +481,16 @@ the physical Android phone; a physical two-phone gate (and an iPhone, once avail
 |---|---|---|
 | **0 — Foundations** ✅ | **Config resilience** (worker last-known-good in Workers KV with `stale:true`; explicit `killswitch:true`; app MMKV copy); `components/player/types.ts` (PlayerHandle v2); `jest-expo` + worker `vitest`; `/config` flags (`embedApiLane`, `nativeLane`, `pluginHost`) | Done 2026-10-10: deployed (worker `f6569238`), outage gate passed on the emulator |
 | **0.5 — Expo SDK 57** ✅ | The upgrade plan's Tasks 6–7 (SDK 57 + iOS `enableSceneSupport`, gate, merge); plus the two pre-existing fixes found during it: search keeps the old scroll offset on a new query; party Realtime `send()` relies on the deprecated REST fallback before the channel joins | Done 2026-10-10: launches on the iOS 27 simulator; Home/search/player/party pass on both; both fixes covered by tests |
-| **1 — Native player + full skin** | `NativePlayer` (expo-video) behind PlayerHandle v2 with synthesised `seeked`/`buffering`; the §6.2.1 controls layer, settings sheet rows (Audio / Subtitles incl. `SubtitleOverlay` / Quality / Speed / Source), loading card → first-frame crossfade, double-tap seek, lock, auto-hide; `/report` fields (`lane`, `stage`, `ttffMs`); dev-only Test-streams entry (§6.2.2); fix `providerRegistry.ts:113` (`nextEpisode` gated on `!opts.party`) | On all three devices with the test streams: audio switch by language, subtitle switch (in-stream and sidecar), Auto + manual quality, speed, landed-seek error ≤ 0.25 s, test-stream TTFF p50 ≤ 3 s; F4/F7/F8 tested; screenshots of every control state reviewed against the quality bar |
-| **2 — Sources for the native player** | NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page "▶ Play in Hindi" preview; the dev-only **benchmark runner** (§10; plays each benchmark title for 20 s and records lane, source, language heard, TTFF, outcome); **repo scorecard** (dev tool: paste a repo URL → sandboxed benchmark run → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update). **Owner decision:** yes/no per repo from the scorecard. Titles with a native candidate open natively; the rest fall back to today's WebView | S1, S2 (≥ 95 %), S3 (0), S4, S8 on the benchmark; T1–T3 re-run on the iOS simulator inside the app; T4 Android DASH + Cookie plays; F1–F10 tested |
-| **3 — Party on native** (built while the owner reviews the Phase 2 scorecard; uses test streams until repos are on) | Room stream key + private-channel URL handoff; guest re-resolve + ±2.5 s check; buffering debounce, scheduled transitions, ready barrier; lobby, attributed toasts, Resync, pass-the-remote; party UI in the §6.2.1 layer; migration `0010` (+ SQL tests) | S5 drift p95 ≤ 0.5 s over 10 min across emulator + simulator + phone; guest stall / host stall / 30 s barrier scenarios pass; F11/F12 tested |
+| **1A — Our skin + party on existing providers** | Generic bridge (§6.2.4) via the `/scripts` channel; per-platform bindability + bind-or-move-on failover; HijackPlayer generalised beyond videasy (chrome hiding, popup blocking, capabilities from the bound `<video>`); party capability gate per room; fix `providerRegistry.ts:113` (`nextEpisode` gated on `!opts.party`) | Fight Club + 2 series episodes open in our controls with no provider UI on Android emulator, iOS simulator and the phone; party across all three, drift p95 ≤ 1 s over 10 min; a dead provider is skipped without showing its UI; F4 tested |
+| **1B — Native player + full skin** | `NativePlayer` (expo-video) behind PlayerHandle v2 with synthesised `seeked`/`buffering`; the §6.2.1 controls layer, settings sheet rows (Audio / Subtitles incl. `SubtitleOverlay` / Quality / Speed / Source), loading card → first-frame crossfade, double-tap seek, lock, auto-hide; `/report` fields (`lane`, `stage`, `ttffMs`); dev-only Test-streams entry (§6.2.2); the 1A bridge lane moves onto the new controls layer | On all three devices with the test streams: audio switch by language, subtitle switch (in-stream and sidecar), Auto + manual quality, speed, landed-seek error ≤ 0.25 s, test-stream TTFF p50 ≤ 3 s; F4/F7/F8 tested; screenshots of every control state reviewed against the quality bar |
+| **2 — Sources for the native player** | NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page "▶ Play in Hindi" preview; the dev-only **benchmark runner** (§10; plays each benchmark title for 20 s and records lane, source, language heard, TTFF, outcome); **repo scorecard** (dev tool: paste a repo URL → sandboxed benchmark run → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update). **Operator decision:** yes/no per repo from the scorecard (the owner has not chosen; built and parked until a repo is enabled). Titles with a native candidate open natively; the rest use the 1A bridge, then plain embeds | S1, S2 (≥ 95 %), S3 (0), S4, S8 on the benchmark; T1–T3 re-run on the iOS simulator inside the app; T4 Android DASH + Cookie plays; F1–F10 tested |
+| **3 — Party on native** (built alongside Phase 2; uses test streams until a repo is enabled) | Room stream key + private-channel URL handoff; guest re-resolve + ±2.5 s check; buffering debounce, scheduled transitions, ready barrier; lobby, attributed toasts, Resync, pass-the-remote; party UI in the §6.2.1 layer; migration `0010` (+ SQL tests) | S5 drift p95 ≤ 0.5 s over 10 min across emulator + simulator + phone; guest stall / host stall / 30 s barrier scenarios pass; F11/F12 tested |
 | **4 — Polish** | PiP / background audio / lock-screen via expo-video; final animation pass; physical-device gate | Owner sign-off on screenshots; physical two-phone gate (§11 R1) |
 
-Order rationale (revision 2): the owner chose native first. Phase 1 builds and perfects the player people will see on
-every title, on test streams, so it doesn't wait on sources; Phase 2 brings real titles onto it (and Hindi) once the
-owner picks repos; Phase 3 runs alongside the owner's scorecard review, so that decision isn't on the critical path.
+Order rationale (revision 3): Phase 1A puts every title the operator's providers can serve into our skin with a synced
+party within days, without any new source decision. Phase 1B builds the native player and the final controls layer on
+test streams (the 1A lane adopts that layer). Phase 2 is built and parked until the operator enables a repo; Phase 3
+proceeds on test streams meanwhile.
 
 ## 10. Testing
 
@@ -485,7 +507,7 @@ owner picks repos; Phase 3 runs alongside the owner's scorecard review, so that 
 - **Device:** Android emulator, iOS simulator (built with `xcodebuild` + `simctl`; no Simulator.app on this Mac) and the
   physical Android phone; party runs use all three at once. Every visual change is checked by screenshot before it is
   called done.
-- **Test streams (Phase 1):** §6.2.2 — the player's gate doesn't depend on any plugin repo.
+- **Test streams (Phase 1B):** §6.2.2 — the player's gate doesn't depend on any plugin repo.
 
 ## 11. Risks
 
@@ -496,7 +518,8 @@ owner picks repos; Phase 3 runs alongside the owner's scorecard review, so that 
 | R3 | VidFast and its template siblings are one operator | Treat as one failure domain in health; native lane is the real answer |
 | R4 | iOS header behaviour differs in-app from the macOS spike | Phase 2 gate re-runs T1 in the app on the iOS simulator; fallback = loopback HLS rewrite proxy (kunai pattern), only if the gate fails |
 | R5 | expo-video gaps that remain on SDK 57 (read-only `videoTrack`, no `seeked` event, no sidecar subtitles) | Workarounds in §6.2 (variant reload + seek, synthesised `seeked`, `SubtitleOverlay`) |
-| R9 | Native-first means real titles keep the WebView fallback until the owner enables repos | Phase 3 proceeds in parallel; the scorecard makes the decision quick; plain embeds stay as the floor |
+| R9 | Real titles reach the native player only after the operator enables a repo, which the owner has not chosen | Phase 1A gives real titles our skin + party on existing providers meanwhile; Phase 2 is built and parked; plain embeds stay as the floor |
+| R10 | The bridge depends on providers keeping a reachable `<video>`; providers die or move often (§4: VidFast down, VidLink/VidNest empty on 2026-10-10) | Per-platform bindability measured in-app, bind-or-move-on failover, provider list is server data; the native player is the durable answer |
 | R6 | A repo the operator adds serves MKV / AC-3 | `platforms` false on both → ranked out; libVLC/mpv lane becomes a separate spec |
 | R7 | Supabase Free auto-pause kills the party backend after idle weeks | F1/F11 behaviour; operator decision on keep-alive or Pro plan |
 | R8 | Store removal / takedown pressure | Off-store channel already in place; no title artwork in any store listing |
@@ -504,7 +527,8 @@ owner picks repos; Phase 3 runs alongside the owner's scorecard review, so that 
 ## 12. Open items (decide in the phase plans, not now)
 
 - The extra 8 benchmark titles (Phase 2 plan; Phase 0 shipped without them).
-- The exact public test streams (Phase 1 plan).
+- The exact public test streams (Phase 1B plan).
+- Which providers bind on which platform today (Phase 1A plan measures it in-app).
 - Which plugin repos the operator enables for Phase 2 testing (operator's choice; `github-scraper-landscape`,
   `indexes-beyond-fmhy` and `fmhy-github-index` list candidates as information).
 - Whether `0008`/`0009` already carry enough of the room stream key to skip `0010` (Phase 3 plan verifies).
