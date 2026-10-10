@@ -24,13 +24,6 @@ export interface Provider extends RawProvider {
   scriptVersion?: string | null;
 }
 
-export interface MediaRef {
-  tmdbId: string;
-  type: "movie" | "tv";
-  season?: number;
-  episode?: number;
-  startAt?: number;
-}
 
 /**
  * The live provider list — read straight from the Redux store, the SINGLE source
@@ -53,6 +46,7 @@ export function getProvider(id: string): Provider | undefined {
 // The capability predicates are pure, so they live in capabilities.ts (testable
 // without the store); re-exported here so existing imports keep working.
 export { isHijackable, isPartyCapable } from "./capabilities";
+export { buildEmbedUrl, type MediaRef } from "./embedUrl";
 
 /**
  * A sensible default provider for launching a watch party directly from a title
@@ -74,39 +68,6 @@ export function defaultHijackProvider(): Provider | undefined {
 /** Hijackable but flaky (has an internal server picker) — warn in the UI. */
 export function isUnstable(p: Provider | undefined): boolean {
   return !!p?.hijack.supported && !!p?.hijack.unstable;
-}
-
-function fill(template: string, m: MediaRef): string {
-  if (!template) return ""; // defensive: a malformed provider row shouldn't crash the player
-  return template
-    .replace(/\$\{id\}/g, m.tmdbId)
-    .replace(/\$\{season\}/g, String(m.season ?? 1))
-    .replace(/\$\{episode\}/g, String(m.episode ?? 1));
-}
-
-/**
- * Build the embed URL for a provider + title. `party` mode appends the provider's
- * autoplay-off param (so members don't each auto-start before the party syncs).
- */
-export function buildEmbedUrl(
-  p: Provider,
-  m: MediaRef,
-  opts: { party?: boolean; autoplayNext?: boolean } = {},
-): string {
-  let url = m.type === "tv" ? fill(p.urls.tv, m) : fill(p.urls.movie, m);
-  const extra: string[] = [];
-  if (p.id === "videasy" && m.type === "tv") {
-    extra.push("episodeSelector=true");
-    // Respect the "autoplay next episode" pref (default on). videasy advances
-    // internally, so we gate its params rather than hooking the `ended` event.
-    if (opts.autoplayNext !== false) extra.push("nextEpisode=true", "autoplayNextEpisode=true");
-  }
-  if (opts.party && p.hijack.autoplayParam) extra.push(p.hijack.autoplayParam);
-  if (opts.party && m.startAt && m.startAt > 5) {
-    extra.push(`startAt=${Math.floor(m.startAt)}`);
-  }
-  if (extra.length) url += (url.includes("?") ? "&" : "?") + extra.join("&");
-  return url;
 }
 
 /** Bare hostnames the top frame may navigate to for this provider (popup blocking). */
