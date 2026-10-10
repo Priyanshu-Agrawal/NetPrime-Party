@@ -7,6 +7,7 @@
  * `isHijackable` ones. `providers.json` + `HIJACK_CAPS` remain in the repo purely
  * as the Supabase seed source, not imported at runtime.
  */
+import { isPartyCapable } from "./capabilities";
 import { type HijackCapability } from "./hijackCapabilities";
 import { store } from "@/src/store";
 
@@ -49,21 +50,9 @@ export function getProvider(id: string): Provider | undefined {
   return getActiveProviders().find((p) => p.id === id);
 }
 
-export function isHijackable(p: Provider | undefined): boolean {
-  return !!p?.hijack.supported;
-}
-
-/**
- * PARTY-capable = hijackable AND we actually serve an injection script for it
- * (`scriptVersion` set). Only these can bind the bridge and drive a synced watch
- * party; a hijackable provider with no served script injects nothing and never
- * binds (see F1 — currently only `videasy` qualifies). The 🐾 Party badge, the
- * "Watch Party" button, and party launch all gate on THIS, not bare
- * `isHijackable`, so the app never offers a party that silently can't sync.
- */
-export function isPartyCapable(p: Provider | undefined): boolean {
-  return isHijackable(p) && !!p?.scriptVersion;
-}
+// The capability predicates are pure, so they live in capabilities.ts (testable
+// without the store); re-exported here so existing imports keep working.
+export { isHijackable, isPartyCapable } from "./capabilities";
 
 /**
  * A sensible default provider for launching a watch party directly from a title

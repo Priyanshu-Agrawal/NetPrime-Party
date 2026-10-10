@@ -43,71 +43,19 @@ import {
   providerHosts,
   type MediaRef,
 } from "./providerRegistry";
+import { hijackCapabilities } from "./capabilities";
+import type { FatalError, MediaTrack, PlayerCapabilities, PlayerEvent, PlayerHandle } from "./types";
 
-export type PlayerEventType =
-  | "ready"
-  | "play"
-  | "pause"
-  | "seeking"
-  | "seeked"
-  | "ended"
-  | "waiting"
-  | "playing"
-  | "canplay"
-  | "tick"
-  | "enterfullscreen"
-  | "exitfullscreen"
-  | "quality"
-  | "audio"
-  | "gesture" // first user interaction inside the WebView (play-intent signal)
-  | "notFound"; // provider "we couldn't find that" wall — no <video> will ever bind
-
-/** A fatal, main-frame playback failure surfaced to the host for fallback. */
-export interface FatalError {
-  kind: "http_error" | "render_crash";
-  statusCode?: number;
-  description?: string;
-}
-
-export interface QualityLevel {
-  /** Clean label — "1080p"/"Auto" for quality, "Hindi"/"Original" for audio/dub. */
-  label: string;
-  active: boolean;
-}
-
-export interface PlayerEvent {
-  event: PlayerEventType;
-  currentTime: number;
-  duration: number;
-  paused: boolean;
-  /** HTMLMediaElement.readyState. <3 while playing ⇒ the stream stalled/buffering
-   *  (segment starvation) — drives the buffering spinner. */
-  readyState?: number;
-  /** Only on a "quality" event — the provider's available quality levels. */
-  qualities?: QualityLevel[];
-  /** Only on an "audio" event — the provider's available audio/dub tracks. */
-  audios?: QualityLevel[];
-}
-
-export interface PlayerHandle {
-  play(): void;
-  pause(): void;
-  seek(seconds: number): void;
-  setRate(rate: number): void;
-  /** Ask the provider's <video> to enter native HTML5 fullscreen. */
-  fullscreen(): void;
-  /** Read the provider's quality levels → emits a "quality" PlayerEvent. */
-  readQuality(): void;
-  /** Switch quality by label (drives videasy's DOM via pointer-dispatch). */
-  setQuality(label: string): void;
-  /** Read audio/dub tracks → emits an "audio" PlayerEvent. */
-  readAudio(): void;
-  /** Switch audio/dub by language label (per-device, not synced across the room). */
-  setAudio(label: string): void;
-  /** Force a fresh load — used to retry the same provider (e.g. re-picked from
-   *  the source sheet after it failed), which otherwise wouldn't remount. */
-  reload(): void;
-}
+export type {
+  EngineId,
+  FatalError,
+  MediaTrack,
+  PlayerCapabilities,
+  PlayerEvent,
+  PlayerEventType,
+  PlayerHandle,
+  QualityLevel,
+} from "./types";
 
 interface Props extends MediaRef {
   /** The (hijackable) provider id from providers.json to play + control. */
@@ -411,7 +359,12 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       () => ({
         play: () => cmd({ action: "play" }),
         pause: () => cmd({ action: "pause" }),
-        seek: (seconds: number) => cmd({ action: "seek", time: seconds }),
+        // The WebView can't report where the provider's <video> actually landed,
+        // so v2's landed-position promise resolves with the requested target.
+        seek: (seconds: number) => {
+          cmd({ action: "seek", time: seconds });
+          return Promise.resolve(seconds);
+        },
         setRate: (rate: number) => cmd({ action: "rate", rate }),
         fullscreen: () => cmd({ action: "fullscreen" }),
         readQuality: () => cmd({ action: "readQuality" }),
@@ -419,8 +372,10 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         readAudio: () => cmd({ action: "readAudio" }),
         setAudio: (label: string) => cmd({ action: "setAudio", label }),
         reload: () => manualRetry(),
+        getCapabilities: (): PlayerCapabilities => hijackCapabilities(getProvider(providerId)),
+        getTracks: (): MediaTrack[] => [],
       }),
-      [cmd, manualRetry],
+      [cmd, manualRetry, providerId],
     );
 
     // Native Hub also injects __soloCmd; this JS path matches solo player.tsx.

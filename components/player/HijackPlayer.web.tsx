@@ -20,49 +20,10 @@ import {
   type MediaRef,
 } from "./providerRegistry";
 import { getAutoplayNext } from "@/utils/prefs";
+import { hijackCapabilities } from "./capabilities";
+import type { MediaTrack, PlayerCapabilities, PlayerEvent, PlayerHandle } from "./types";
 
-export type PlayerEventType =
-  | "ready"
-  | "play"
-  | "pause"
-  | "seeking"
-  | "seeked"
-  | "ended"
-  | "waiting"
-  | "playing"
-  | "canplay"
-  | "tick"
-  | "enterfullscreen"
-  | "exitfullscreen"
-  | "quality"
-  | "audio";
-
-export interface QualityLevel {
-  label: string;
-  active: boolean;
-}
-
-export interface PlayerEvent {
-  event: PlayerEventType;
-  currentTime: number;
-  duration: number;
-  paused: boolean;
-  readyState?: number;
-  qualities?: QualityLevel[];
-  audios?: QualityLevel[];
-}
-
-export interface PlayerHandle {
-  play(): void;
-  pause(): void;
-  seek(seconds: number): void;
-  setRate(rate: number): void;
-  fullscreen(): void;
-  readQuality(): void;
-  setQuality(label: string): void;
-  readAudio(): void;
-  setAudio(label: string): void;
-}
+export type { PlayerEvent, PlayerEventType, PlayerHandle, QualityLevel } from "./types";
 
 interface Props extends MediaRef {
   providerId: string;
@@ -137,6 +98,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(function HijackPlaye
         try {
           iframeRef.current?.contentWindow?.postMessage({ action: "seek", time: seconds }, "*");
         } catch {}
+        // The iframe can't report where it landed; resolve with the target.
+        return Promise.resolve(seconds);
       },
       setRate: (rate: number) => {
         try {
@@ -159,8 +122,14 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(function HijackPlaye
       setQuality: () => {},
       readAudio: () => {},
       setAudio: () => {},
+      reload: () => {
+        const f = iframeRef.current;
+        if (f) f.src = f.src; // re-navigating the iframe is a full reload of the embed
+      },
+      getCapabilities: (): PlayerCapabilities => hijackCapabilities(getProvider(providerId)),
+      getTracks: (): MediaTrack[] => [],
     }),
-    [],
+    [providerId],
   );
 
   const handleLoad = useCallback(() => {
