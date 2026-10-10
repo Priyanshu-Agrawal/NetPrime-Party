@@ -321,10 +321,8 @@ into `providers: []` — byte-identical to the operator's store-review killswitc
     worker's stale copy; one empty first frame before cache hydration (`preloadedState` would remove it).
   * Spec F1's "banner only if neither copy exists" is not built yet (`useConfigStale()` is ready for it).
   * Worker: fetch provider health in parallel with the provider list (~9 s → ~5 s worst-case cold `/config`).
-* `[ ]` **iOS simulator launch — moved to the Expo SDK upgrade phase.** Builds on Xcode 27 after a pod
-  deployment-target fix (`9b18d71`), but iOS 27 kills it at launch: the iOS 27 SDK requires the UIScene lifecycle,
-  which Expo ships only from SDK 57.0.23 (`expo-build-properties` `ios.enableSceneSupport`; native in 58). SDK ≤56
-  gets no fix (expo/expo#46664).
+* `[x]` **iOS simulator launch** — done in the Expo SDK 57 upgrade below (it needed the UIScene lifecycle, which Expo
+  ships only from SDK 57.0.23; SDK ≤56 gets no fix, expo/expo#46664).
 
 **Gate (Android emulator, 2026-10-10):**
 * Live: 14 providers, `source: live`, `stale: false`, flags all off; the device copy holds 14 providers.
@@ -334,3 +332,46 @@ into `providers: []` — byte-identical to the operator's store-review killswitc
 * Cold start against the real worker: `/config` took **7.6 s** to land — the device copy now covers that window.
 * Note: metro-mcp attaches to whichever app connected first (GoTrade on the iOS simulator here); Bearoom's runtime
   was read over Metro's CDP proxy instead (`/json/list` → `Runtime.evaluate`).
+
+---
+
+## `[x]` Expo SDK 53 → 57 upgrade (2026-10-10)
+**Plan:** [`superpowers/plans/2026-10-10-expo-sdk57-upgrade.md`](superpowers/plans/2026-10-10-expo-sdk57-upgrade.md) ·
+**Evidence:** [`research/sdk57-upgrade-impact-2026-10.md`](research/sdk57-upgrade-impact-2026-10.md)
+
+**Why:** iOS 27 kills SDK 53 apps at launch (UIScene lifecycle required), so nothing could be tested on iOS; the
+native-first playback spec also wants SDK 57's expo-video.
+
+**Now on:** expo 57.0.27 · RN 0.86.3 · React 19.2.3 · Hermes V1 (250829098.0.17) · Reanimated 4.5 / worklets 0.10 ·
+FlashList 2 · TypeScript 6 · webview 13.16.1 · CI on Node 22. Stepped 53 → 54 → 55 → 57, one commit per SDK.
+
+**Done:**
+* `[x]` `app.json` is the source of truth for the native projects (privacy manifest declared; orientation lock lives in
+  JS, so iPhone players can now rotate); every SDK step regenerates `android/` + `ios/` with `prebuild --clean`.
+* `[x]` Build plugins hold on every template from SDK 53 to 57 (fixture tests) and load Expo's own
+  `@expo/config-plugins` copy; pods get a 16.4 deployment floor; iOS gets `enableSceneSupport`.
+* `[x]` Code moved off APIs the bumps remove (`absoluteFillObject`, Reanimated layout props, `StatusBar translucent`,
+  `runOnJS` → `scheduleOnRN`, FlashList `estimatedItemSize`); unused native deps removed.
+* `[x]` Two pre-existing bugs found on the way, fixed with tests: search kept the old scroll offset on a new query
+  (`0c1e473`); party broadcasts sent before the channel joined relied on supabase-js's deprecated REST fallback
+  (`5a7ee0a`).
+
+**Gate (2026-10-10):**
+* Android emulator: Home, search grid + infinite scroll, Fight Club plays (VidCore — VidFast was down at its end),
+  fullscreen rotates, audio keeps playing after Home (keep-alive patch), party room opens, chat sends, tray
+  swipe-dismiss works.
+* iOS 27 simulator: launches and stays up, onboarding → Home, `bearoom://movie/550` deep link, Fight Club plays,
+  player rotates to landscape, party room opens.
+* Both runtimes: `new Function` → 1 and indirect `eval` → 2 under Hermes V1 (the Phase 2 plugin host stays viable);
+  `/config` 200 with 14 providers, `stale: false`.
+* `npm test` 47/47 · worker 26/26 · `tsc` clean · lint 0 errors · `expo-doctor` 20/21 (the one notice is the expected
+  "native folders + app config" message).
+* iOS crash triage: 3 reports = the SDK 53 UIScene crash (fixed); 1 = a dev-launcher reload race caused by test
+  automation (not reproducible in 9 tries, dev-build only).
+
+**Deferred (minor):**
+* iOS: with the keyboard open, the server sheet grows under the status bar ("Select Server" overlaps the clock).
+* Dev-only: expo-dev-client's floating Tools button sits over the header room chip / player back button.
+* Lint now reports 112 warnings (77 are React Compiler hints while the compiler is off).
+* Android still registers an old `exp+netprime` dev-client scheme next to `exp+bearoom`.
+* Embeds are flaky today (VidFast 500 / "fetching", VidLink and VidNest no media) — the native-first spec's reason.
