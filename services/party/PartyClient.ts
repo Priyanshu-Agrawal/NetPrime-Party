@@ -23,6 +23,7 @@
 import { ensurePartyAuth, supabase } from "@/services/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getInstallationId } from "./identity";
+import { sendBroadcast } from "./broadcast";
 import { genRoomCode } from "@/utils/roomCode";
 import { LEASE_RENEW_INTERVAL_MS } from "./protocol";
 import type {
@@ -383,7 +384,7 @@ export class PartyClient {
     const payload: WireSnapshot = lite
       ? { ...s, queue: undefined, currentItemId: undefined, queueRev: undefined }
       : s;
-    void this.channel?.send({ type: "broadcast", event: "snap", payload });
+    void sendBroadcast(this.channel, "snap", payload);
   }
 
   /**

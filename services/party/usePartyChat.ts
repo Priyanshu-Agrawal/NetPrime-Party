@@ -9,6 +9,7 @@
 import { ensurePartyAuth, supabase } from "@/services/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sendBroadcast } from "./broadcast";
 
 export interface ChatMessage {
   id: string;
@@ -115,7 +116,7 @@ export function usePartyChat(opts: {
       const msg = { id: `${userId}-${uid()}`, userId, name, text: trimmed, ts: Date.now() };
       // optimistic local echo (channel is self:false)
       setMessages((m) => [...m, { ...msg, mine: true }].slice(-200));
-      void channelRef.current?.send({ type: "broadcast", event: "chat", payload: msg });
+      void sendBroadcast(channelRef.current, "chat", msg);
     },
     [userId, name],
   );
@@ -136,7 +137,7 @@ export function usePartyChat(opts: {
         sticker,
       };
       setMessages((m) => [...m, { ...msg, mine: true }].slice(-200));
-      void channelRef.current?.send({ type: "broadcast", event: "chat", payload: msg });
+      void sendBroadcast(channelRef.current, "chat", msg);
     },
     [userId, name],
   );
@@ -144,7 +145,7 @@ export function usePartyChat(opts: {
   const sendReaction = useCallback(
     (emoji: string) => {
       popReaction(emoji); // show my own immediately
-      void channelRef.current?.send({ type: "broadcast", event: "reaction", payload: { emoji } });
+      void sendBroadcast(channelRef.current, "reaction", { emoji });
     },
     [popReaction],
   );
