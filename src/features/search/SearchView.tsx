@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import { View, FlatList, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import AppHeader from "@/components/ui/AppHeader";
 import { Appear, PosterSkeleton, Text, BouncyPressable, Chip } from "@/src/ui";
 import { OfflineState } from "@/src/ui/OfflineState";
 import { useBrowseOfflineGate } from "@/hooks/useBrowseOfflineGate";
+import { useScrollToTopOnChange } from "@/hooks/useScrollToTopOnChange";
 import { colors, ms, spacing, radius } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
 import type { MediaItem } from "@/utils/tmdbLists";
@@ -29,7 +30,7 @@ const YEAR_OPTIONS: { value: number | null; label: string }[] = [
   ...Array.from({ length: 8 }, (_, i) => ({ value: CURRENT_YEAR - i, label: String(CURRENT_YEAR - i) })),
 ];
 
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type FlashListRef } from "@shopify/flash-list";
 
 // We need an array of dummy skeleton objects for the initial loading empty state
 const SKELETON_DATA = Array.from({ length: 12 }, (_, i) => ({
@@ -66,6 +67,14 @@ const SearchView: React.FC = () => {
   } = useSearchData();
 
   const [showFilters, setShowFilters] = React.useState(false);
+
+  // Anything that replaces or reorders the results starts the grid at the top;
+  // loading more pages doesn't change this key.
+  const listRef = useRef<FlashListRef<ListItem>>(null);
+  useScrollToTopOnChange(
+    listRef,
+    [searchQuery, searchType, selectedProvider, browseGenre, browseSort, searchSort, searchYear].join("|"),
+  );
 
   const handleClearSearch = useCallback(() => {
     handleSearch("");
@@ -268,6 +277,7 @@ const SearchView: React.FC = () => {
 
       <View style={styles.flex1}>
         <FlashList
+          ref={listRef}
           data={listData}
           renderItem={renderItem}
           keyExtractor={(item) =>
