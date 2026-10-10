@@ -1,6 +1,8 @@
 # Playback, Languages & Watch Party — Design Spec
 
-**Status:** DRAFT for owner review (2026-10-10). Nothing in here is built yet.
+**Status:** Revision 2 — **native-first**, approved by the owner 2026-10-10 evening. Phase 0 is built and deployed; the
+Expo SDK 57 upgrade is in progress. Revision 1 put an embed-API lane (VidFast's postMessage API) first; the owner chose
+the native player first instead, so that lane is now deferred (§6.2.3).
 **Supersedes:** the engine and lane parts of [`docs/architecture/native-player.md`](../../architecture/native-player.md)
 and Program 1 · P2/P3 sequencing in [`ROADMAP.md`](../../ROADMAP.md). The P1 queue spine (`0008`/`0009`, `PartySession`)
 is kept as-is and built on.
@@ -26,6 +28,11 @@ TMDB catalog → title page → [▶ Play] → Bearoom's own player (our control
 Either a **WebView hijack** (a provider's page driven by our controls) or a **native player** may do the playing; the user
 must not be able to tell which, except where §6.3 says a capability is missing.
 
+**Owner direction, 2026-10-10 evening:** *"the title must open with our skinned controls and watch party fully synced and
+controllable … fully work on UX and UI"*, and, given the choice, **native player first**. So the native player (expo-video)
+is the primary engine and gets the full UX treatment (§6.2.1); a provider's own player UI is only ever the fallback while
+no native source exists for a title.
+
 **Design principle, ranked (owner, 2026-10-10): robust and most stable first.** Concretely:
 
 1. **No single point of failure.** No provider, plugin, repo or domain is required for Play to work.
@@ -44,9 +51,10 @@ must not be able to tell which, except where §6.3 says a capability is missing.
 | S2 | "Play in Hindi" plays **real** Hindi audio when any configured source has Hindi | **≥ 95 %** |
 | S3 | Wrong content (trailer, wrong title, wrong cut) reaches the screen | **0** on the benchmark |
 | S4 | Language never changes silently | 0 occurrences — every fallback is announced |
-| S5 | Party drift, native lane (two devices, 10 min) | p95 **≤ 0.5 s** |
-| S6 | Party drift, embed-API lane (two devices, 10 min) | p95 **≤ 2 s** |
+| S5 | Party drift, native lane (three devices: Android emulator, iOS simulator, physical Android; 10 min) | p95 **≤ 0.5 s** |
+| S6 | ~~Party drift, embed-API lane~~ — deferred with that lane (§6.2.3) | — |
 | S7 | Every failure path in §7 ends on a visible recovery action | 100 % of the §7 table, tested |
+| S8 | No provider UI is ever visible when a native source exists for the title | 0 occurrences on the benchmark |
 
 ## 2. Non-goals (YAGNI — explicitly out of this spec)
 
@@ -61,7 +69,10 @@ must not be able to tell which, except where §6.3 says a capability is missing.
 
 ## 3. Constraints and standing rules
 
-- Expo SDK 53 · RN 0.79.6 · New Architecture · Hermes · `expo-video ~2.2.3` (SDK 53's bundled version).
+- **Expo SDK 57** (upgrade plan `docs/superpowers/plans/2026-10-10-expo-sdk57-upgrade.md`; SDK 53 cannot launch on the
+  iOS 27 simulator) · RN 0.86 · New Architecture · Hermes V1 · the `expo-video` version SDK 57 bundles.
+- **Test devices:** Android emulator (`Medium_Phone_API_36.1`), iOS 27 simulator, and a physical Android phone (Nothing
+  Phone 1, connected 2026-10-10). Party runs use all three.
 - **No live blur and no elevation/glow on any screen that plays video** (proven stutter cause). No Reanimated
   `entering`/`exiting`/`layout` props. Never touch `src/ui/BearAlert.tsx` or `.codex/`.
 - Off-store distribution (GitHub Releases + the custom `secure-ota` channel). Grey apps get store-pulled — see
@@ -83,7 +94,7 @@ must not be able to tell which, except where §6.3 says a capability is missing.
 | iOS gets headers on **every** segment request, incl. cross-host and post-302; **Origin is dropped after a 302** | AVFoundation spike T1 (memory `player-engine-decision-2026-10`) |
 | iOS cannot switch audio tracks **muxed inside one TS**; disguised `.jpg/.html` segments play | Spikes T2, T6 |
 | DASH plays on Android only | expo-video types; AVPlayer has no DASH |
-| SDK 53 iOS seeks are imprecise (loose tolerance) | `similar-apps-architecture` §1.12 (fixed in SDK 54) |
+| SDK 53 iOS seeks are imprecise (loose tolerance) — moot on SDK 57 | `similar-apps-architecture` §1.12 (fixed in SDK 54) |
 | VidFast publishes an **official postMessage control API** ("perfect for watch party") but offers **original audio only** | VidFast docs (verified) + live in-app check; Reddit low-signal corroboration (`reddit-deep` §5) |
 | Plugins had **Hindi for 12/12** benchmark titles; ~10 % of streams are wrong content | `plugin-catalog-measurement` §3, §9 |
 | Sandbox shape: hidden WebView + per-call worker + native fetch with per-hop private-IP check + per-plugin cookie jars; attach the plugin's cookies as the stream's `Cookie` | `vega-cloudstream-teardown` §1, §3 |
@@ -94,6 +105,8 @@ must not be able to tell which, except where §6.3 says a capability is missing.
 | Sources die every few weeks; domains move/clone | `reddit-deep` §4; `indexes-beyond-fmhy` §5 |
 | Free health feed exists (IbbyLabs JSON `/v1/status`, ~5 min) | `indexes-beyond-fmhy` §4 (verified live) |
 | Party UX: stable room code + link, readiness lobby, attributed toasts, one-tap resync, pass the remote, private by default | `competitor-teardown` patterns |
+| expo-video (SDK 56/57 docs): `headers` on the source; selectable `audioTrack`/`subtitleTrack` with change events; **`videoTrack` read-only**; **no sidecar-subtitle field** on `VideoSource`; **no `seeked` event**; iOS seeks chase the exact target with a seek tolerance | Context7 `/expo/expo` sdk-56 branch, `VideoPlayer.types.ts`, `VideoPlayerEvents.types.ts`, `VideoPlayerSeeker.swift` (read 2026-10-10) |
+| Which embed providers a WebView skin could drive (for the deferred bridge, §6.2.3) | In-app WebView probe, Android emulator, 2026-10-10: **VidFast** = `<video>` in the main frame, loaded, 19 text tracks; VidLink / VidNest = main-frame `<video>` but no media arrived; vidsrc.to / vidcore / vidphantom = cross-origin iframes (unreachable on Android); vixsrc, multiembed, 111movies dead; MyCineBy = videasy backend (dead) |
 
 ## 5. Architecture
 
@@ -119,8 +132,8 @@ must not be able to tell which, except where §6.3 says a capability is missing.
                                                 ▼
                      ┌──────────────── PlayerHandle v2 (neutral contract) ────────────────┐
                      │ NativePlayer (expo-video)        HijackPlayer (WebView)            │
-                     │   plugin streams                   ├─ embedApi mode (VidFast API)   │
-                     │                                    └─ plain embed (solo only)       │
+                     │   PRIMARY: plugin streams          FALLBACK only: plain embed,      │
+                     │   (+ dev test streams, Phase 1)    solo, provider UI (today's flow) │
                      └──────────────────────────────────────────────────────────────────┘
                                                 ▼
                          PlayerControls + PlayerSettingsSheet (unchanged shape, new rows)
@@ -138,11 +151,11 @@ source-compatible; additions are marked **new**.
 export type EngineId = "native" | "embedApi" | "embed";
 
 export interface PlayerCapabilities {            // new — the UI and sync engine read these, never the engine id
-  fractionalRate: boolean;     // native: true · embedApi: false · embed: depends on bridge
-  preciseSeek: boolean;        // native: true after the §8 seek patch · embedApi: false (integer seconds)
+  fractionalRate: boolean;     // native: true · embedApi (deferred): false · embed: depends on bridge
+  preciseSeek: boolean;        // native: true (SDK 57) · embedApi (deferred): false (integer seconds)
   audioTracks: boolean;        // in-stream track switching available for THIS stream on THIS platform
-  qualitySelect: boolean;      // native: variant URLs (§6.2) · embedApi: false
-  subtitles: boolean;          // native: our overlay · embedApi: provider menu only
+  qualitySelect: boolean;      // native: variant URLs (§6.2) · embedApi (deferred): false
+  subtitles: boolean;          // native: in-stream tracks + our overlay · embedApi (deferred): provider menu only
   partySync: boolean;          // embed (no API, no bridge): false
 }
 
@@ -293,35 +306,73 @@ data-saver / metered connections unless the user opts in (setting).
 `PlayerControls` keeps its imperative `setPlayback()` shape. `PlayerSettingsSheet` gains rows that render **only when
 the active player's capabilities allow** them (no dead buttons):
 
-- **Language / Audio:** one row per language (Netflix pattern), backed by either an in-stream track (Android, muxed)
+- **Language / Audio:** one row per language (Netflix pattern), backed by either an in-stream track (expo-video
+  `audioTrack`: HLS alternate-audio renditions on both platforms; several tracks muxed into one TS only on Android, T2)
   or a sibling candidate. Choosing a sibling = `replaceAsync` + seek to the same position. The choice is remembered
   **per title** and becomes the next default. If the chosen language disappears on failover, a toast says so — never
   silent.
 - **Quality:** "Auto" (ABR) + the HLS master's variants. expo-video's `videoTrack` is read-only, so manual quality =
   load that variant's media playlist + seek (local only, never on the party anchor).
-- **Subtitles:** plugin subtitle lists rendered by **our own overlay** (`SubtitleOverlay`, WebVTT/SRT, driven by
-  `tick`), because expo-video has no sidecar API. Includes an offset control.
+- **Subtitles:** in-stream text tracks through expo-video `subtitleTrack`; sidecar lists from plugins (WebVTT/SRT)
+  through **our own overlay** (`SubtitleOverlay`, driven by `tick`), because `VideoSource` has no sidecar field. One list
+  in the UI whatever the origin, with an offset control and a size setting.
 - **Speed**, **Source** (existing ProviderSheet, now listing candidates with language/quality/lane badges).
 - Labels show the **current** value: "Audio · Hindi", "Quality · 720p (Auto)".
 
-**NativePlayer specifics (expo-video):** `timeUpdateEventInterval = 0.5 s`; `seeked` synthesised from `statusChange`
-(loading → readyToPlay) plus `timeUpdate` crossing the target; `buffering` from `statusChange`; `preservesPitch: true`.
-**SDK 53 iOS seek patch:** a `patch-package` patch setting `toleranceBefore/After: .zero` in expo-video's
-`VideoPlayer.swift` (the one-line SDK 54 fix), removed when the app moves to SDK 54.
+**NativePlayer specifics (expo-video, SDK 57):** `timeUpdateEventInterval = 0.25 s` while a party is active, 0.5 s solo;
+`seeked` synthesised (expo-video has no seek event) from `statusChange` (loading → readyToPlay) plus `timeUpdate`
+landing within 0.25 s of the target; `buffering` from `statusChange`; `preservesPitch: true`. The SDK 53 seek patch is
+no longer needed (SDK 54+ seeks exactly).
 
-**HijackPlayer `embedApi` mode (new):** for providers whose `/config` entry declares `hijack.api = "vidfast-postmessage"`
-(VidFast first; VidCore.io/VidZen/CinemaOS use the same documented command set and can be enabled by data alone once
-verified). The WebView loads a tiny **host page** (`source={{ html, baseUrl }}`) that iframes the embed URL with
-`autoPlay`, `startAt`, `hideServer`, `chromecast=false`, `fullscreenButton=false`, relays `play/pause/seek{int}/getStatus`
-in, and validates `PLAYER_EVENT` by origin out. Capabilities: `fractionalRate:false`, `preciseSeek:false`,
-`audioTracks:false`, `qualitySelect:false`, `partySync:true`. The provider's own settings gear stays reachable for its
-quality menu. Plain embeds (no API, no bridge) keep today's behaviour and `partySync:false`.
+#### 6.2.1 Player experience (owner: "fully work on UX and UI")
+
+The bar is the existing `ui-animation-quality-bar` memory: device-verified screenshots for every visual, Bearoom's
+honey-on-dark brand, Reanimated 4 for motion — **no** `entering`/`exiting`/`layout` props, **no** blur or glow on any
+video screen.
+
+- **Open:** pressing Play shows a branded loading card at once (blurred-poster backdrop rendered as a static image, not a
+  live blur; title; "Finding the best source…" → "Starting…"), then **crossfades** (opacity, 250 ms) into the first frame.
+  The provider's UI never appears when the native lane plays.
+- **Controls layer** (one component for solo and party, portrait and landscape):
+  - Top: back · title / "S1 · E3 Title" · (party) member avatars.
+  - Centre: −10 s · play/pause · +10 s; **double-tap** left/right third = ∓10 s with a ripple counter (stacking taps add
+    10 s each).
+  - Bottom: scrub bar with buffered range and a time bubble while dragging (thumb scales up); elapsed / remaining;
+    quick chips "Hindi · CC · 1080p" that open the settings sheet at that row; Episodes; **Next episode** (solo, or host
+    in a party).
+  - Auto-hide after 3 s of no touch while playing; never while paused or scrubbing. A **lock** button disables touches
+    except an unlock pill.
+  - Landscape on fullscreen; rotation follows the device on the player screen (Task 2 behaviour).
+- **Settings sheet** (`PlayerSettingsSheet`): Audio · Subtitles (off / list / offset / size) · Quality (Auto + list) ·
+  Speed · Source. Rows render only when the capability exists (§6.3) and always show their current value.
+- **States:** buffering = a small centre spinner after 300 ms (no flash on short stalls); errors = the §7 card (Retry ·
+  Try another source · Report); end of film = credits-aware "Up next" card for series.
+- **Party in the player:** a Watch Party button → create room → share sheet (WhatsApp first) → lobby (§6.4) → synced
+  play; avatars, attributed toasts, Resync, and the existing chat tray live in the same layer.
+
+#### 6.2.2 Test streams (Phase 1)
+
+Phase 1 builds and gates the player before any plugin repo exists, on **public test streams** (HLS with alternate audio
+languages, multiple variants, and WebVTT subtitles; one MP4; one DASH for Android) reachable from a dev-only "Test
+streams" entry behind the `nativeLane` flag. The exact list is chosen in the Phase 1 plan from publisher-provided test
+assets.
+
+#### 6.2.3 Deferred lanes
+
+- **Embed-API lane** (revision 1's Phase 1: VidFast's documented postMessage API in a host page): deferred by the owner's
+  native-first choice. The design notes remain valid if it returns: integer-second seeks, no rate control, the
+  provider's chrome stays visible on Android.
+- **Skinned-WebView bridge for VidFast:** VidFast's `<video>` is reachable in the main frame (§4), so a bridge script
+  could put our controls over it with full sync. Parked; cheap to add later through the existing OTA script channel.
+- Plain embeds (no API, no bridge) keep today's behaviour and `partySync:false`; they are the fallback while a title has
+  no native source.
 
 ### 6.3 What the user sees when a capability is missing
 
 | Situation | UI |
 |---|---|
-| Playing via embedApi (e.g. VidFast) | Audio row reads "Original audio (this source)"; Quality row opens the provider's menu |
+| No native source for this title yet (before Phase 2, or every candidate failed) | Today's WebView flow: provider UI, "Watch Party isn't supported on this source" |
+| Stream has one audio track | Audio row reads "Original audio (this source)" and lists sibling candidates in other languages, if any |
 | No Hindi anywhere | Toast once: "Hindi isn't available for this title — playing original audio" |
 | Chosen language lost on failover | Toast: "Switched to <source> — Hindi isn't on this one. Change ▸" |
 | iOS member in a room whose best stream is DASH | Host's picker greys DASH with "Not playable on iPhone" |
@@ -347,7 +398,8 @@ shown disabled with "Different cut — would desync".
 **Sync engine extensions** (`services/party/PartySyncEngine.ts`; keep current bands: dead-band 0.2 s, rate 0.9–1.1×,
 hard seek ≥ 3 s × 3 samples, 8 s cooldown):
 
-- Read `getCapabilities()`: when `fractionalRate` is false (embedApi), skip nudging and use a **2 s seek dead-band**.
+- Read `getCapabilities()`: when `fractionalRate` is false (a WebView engine without rate control), skip nudging and use
+  a **2 s seek dead-band**.
 - **Buffering protocol (Jellyfin SyncPlay):** a stall counts only after **3 s**; a guest's long stall never pauses the
   room — the guest catches up by seeking to the live anchor (+1 s for HLS); a **host** stall pauses the room
   ("Waiting for <host>…").
@@ -384,7 +436,7 @@ the existing `supabase/tests` pattern. **Flagged for owner review** — stored-s
 | F10 | Plugin repo hash mismatch / download fails | Keep last-known-good version; mark repo degraded | Nothing |
 | F11 | Party backend unreachable mid-room | Local playback continues; reconnect with backoff; re-anchor on return | "Reconnecting to room…" |
 | F12 | Host leaves | Existing lease (6 s) → guests run `party_claim_host` (joinedAt-ranked, `PartyClient.claimHost`) | "<name> is now the host" |
-| F13 | Embed-API provider stops answering `getStatus` | Mark `partySync:false` for this session, offer another source | "Sync lost on this source — switch?" |
+| F13 | ~~Embed-API provider stops answering~~ — deferred with that lane | — | — |
 | F14 | Lane flag turned off remotely | Resolver skips that lane on next resolve | Nothing |
 
 ## 8. Security
@@ -394,25 +446,28 @@ the existing `supabase/tests` pattern. **Flagged for owner review** — stored-s
   TLS anywhere (the Nuvio anti-pattern).
 - Stream URLs and cookies are never logged, never sent to `/report`, never written to Postgres; party transfer is over
   the RLS-gated private channel only.
-- Embed-API host page: `postMessage` target origins restricted to the provider's documented origins; inbound events
-  accepted only from those origins (VidFast publishes its origin list).
+- Embed-API host page (deferred lane): `postMessage` target origins restricted to the provider's documented origins;
+  inbound events accepted only from those origins (VidFast publishes its origin list).
+- Test streams (Phase 1) are dev-only and never shipped in a release build's UI.
 - Minimal Android permissions (no new ones for this spec).
 
 ## 9. Phases and gates
 
-Each phase gets its own implementation plan (`writing-plans`). Gates run on the Android emulator + iOS simulator; the
-same gates re-run on physical devices before any release.
+Each phase gets its own implementation plan (`writing-plans`). Gates run on the Android emulator, the iOS simulator and
+the physical Android phone; a physical two-phone gate (and an iPhone, once available) re-runs before any release.
 
 | Phase | Scope | Gate (all must pass) |
 |---|---|---|
-| **0 — Foundations** | **Config resilience** (worker: a Supabase error serves the last-known-good list from **Workers KV** — durable and global, unlike the per-colo evictable edge cache — with `stale:true`; only a *successful* empty query is the killswitch, signalled by an explicit `killswitch:true`; app: persist the last good `/config` in MMKV and boot from it); `components/player/types.ts` (PlayerHandle v2, neutral types); `jest-expo` + worker `vitest` unit-test harnesses; `/config` flags (`embedApiLane`, `nativeLane`, `pluginHost`) + worker schema; iOS simulator dev build | Pausing Supabase no longer empties the app (tested by pointing a local worker at an unreachable Supabase URL); `tsc` + lint clean; unit tests pass via `npm test` (app) and `npm test` (worker); existing Play/party unchanged on both devices |
-| **1 — Embed-API lane** | HijackPlayer `embedApi` mode + host page; VidFast enabled via data; sync engine capability read (no-nudge, 2 s band); fix `providerRegistry.ts:113` (`nextEpisode` must be gated on `!opts.party`); `/report` fields (`lane`, `stage`, `ttffMs`); dev-only benchmark runner (moved from Phase 0: both need this phase's player events to measure anything) | Benchmark S1 ≥ 90 % via embed lanes; party 10 min emulator↔sim, drift p95 ≤ 2 s (S6); F4/F13/F14 tested |
-| **2 — Native lane** | `NativePlayer` (expo-video, seek patch, synthesised `seeked`); NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page preview; Settings rows; SubtitleOverlay; **repo scorecard** (dev tools: paste a repo URL → sandboxed run of the benchmark → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update — the owner's yes/no on enabling a repo is made from this) | S1, S2 (≥ 95 %), S3 (0), S4 on the benchmark; T1–T3 re-run on the **iOS simulator inside the app**; T4 Android DASH + Cookie plays; F1–F10 tested |
-| **3 — Party on native** | Room stream key + private-channel URL handoff; guest re-resolve + ±2.5 s check; buffering debounce, scheduled transitions, ready barrier; lobby, toasts, resync, pass-the-remote; migration `0010` (+ SQL tests) | S5 drift p95 ≤ 0.5 s over 10 min; buffering scenarios (guest stall, host stall, 30 s barrier) pass; F11/F12 tested |
-| **4 — Polish** | UI/animation pass (device-verified screenshots per the quality bar); PiP / background audio / lock-screen via expo-video; physical-device gate | Owner sign-off on screenshots; physical 2-phone gate (§11 R1) |
+| **0 — Foundations** ✅ | **Config resilience** (worker last-known-good in Workers KV with `stale:true`; explicit `killswitch:true`; app MMKV copy); `components/player/types.ts` (PlayerHandle v2); `jest-expo` + worker `vitest`; `/config` flags (`embedApiLane`, `nativeLane`, `pluginHost`) | Done 2026-10-10: deployed (worker `f6569238`), outage gate passed on the emulator |
+| **0.5 — Expo SDK 57** (in progress) | The upgrade plan's Tasks 6–7 (SDK 57 + iOS `enableSceneSupport`, gate, merge); plus the two pre-existing fixes found during it: search keeps the old scroll offset on a new query; party Realtime `send()` relies on the deprecated REST fallback before the channel joins | App launches on the iOS 27 simulator; Home/search/player/party pass on emulator + simulator; both fixes covered by tests |
+| **1 — Native player + full skin** | `NativePlayer` (expo-video) behind PlayerHandle v2 with synthesised `seeked`/`buffering`; the §6.2.1 controls layer, settings sheet rows (Audio / Subtitles incl. `SubtitleOverlay` / Quality / Speed / Source), loading card → first-frame crossfade, double-tap seek, lock, auto-hide; `/report` fields (`lane`, `stage`, `ttffMs`); dev-only Test-streams entry (§6.2.2); fix `providerRegistry.ts:113` (`nextEpisode` gated on `!opts.party`) | On all three devices with the test streams: audio switch by language, subtitle switch (in-stream and sidecar), Auto + manual quality, speed, landed-seek error ≤ 0.25 s, test-stream TTFF p50 ≤ 3 s; F4/F7/F8 tested; screenshots of every control state reviewed against the quality bar |
+| **2 — Sources for the native player** | NativeFetch module; PluginHost + registry table; StreamProbe; `rankCandidates`; language prefs + per-title memory; title-page "▶ Play in Hindi" preview; **repo scorecard** (dev tool: paste a repo URL → sandboxed benchmark run → titles played, real-Hindi rate, wrong-content rate, iOS playability, speed, readable-vs-obfuscated, last update). **Owner decision:** yes/no per repo from the scorecard. Titles with a native candidate open natively; the rest fall back to today's WebView | S1, S2 (≥ 95 %), S3 (0), S4, S8 on the benchmark; T1–T3 re-run on the iOS simulator inside the app; T4 Android DASH + Cookie plays; F1–F10 tested |
+| **3 — Party on native** (built while the owner reviews the Phase 2 scorecard; uses test streams until repos are on) | Room stream key + private-channel URL handoff; guest re-resolve + ±2.5 s check; buffering debounce, scheduled transitions, ready barrier; lobby, attributed toasts, Resync, pass-the-remote; party UI in the §6.2.1 layer; migration `0010` (+ SQL tests) | S5 drift p95 ≤ 0.5 s over 10 min across emulator + simulator + phone; guest stall / host stall / 30 s barrier scenarios pass; F11/F12 tested |
+| **4 — Polish** | PiP / background audio / lock-screen via expo-video; final animation pass; physical-device gate | Owner sign-off on screenshots; physical two-phone gate (§11 R1) |
 
-Order rationale: Phase 1 restores Play + Watch Party within the existing component (smallest change, immediately
-useful); Phase 2 delivers the Hindi requirement; Phase 3 moves the party onto the lane that gives full control.
+Order rationale (revision 2): the owner chose native first. Phase 1 builds and perfects the player people will see on
+every title, on test streams, so it doesn't wait on sources; Phase 2 brings real titles onto it (and Hindi) once the
+owner picks repos; Phase 3 runs alongside the owner's scorecard review, so that decision isn't on the critical path.
 
 ## 10. Testing
 
@@ -423,11 +478,13 @@ useful); Phase 2 delivers the Hindi requirement; Phase 3 moves the party onto th
   for 20 s and records lane, source, language heard (track or label), TTFF, and outcome.
 - **Unit (jest-expo):** `rankCandidates`, language normalisation (`hin→hi`, label parsing, zero-width stripping),
   duration check, candidate key stability, stream-model conversion, PluginHost contract rules (timeouts, `< 100 ms`
-  empty = failure, last-known-good), embed-API message handling (origin checks), `PartySyncEngine` with a fake clock
+  empty = failure, last-known-good), synthesised `seeked`/`buffering` from expo-video events, `PartySyncEngine` with a fake clock
   (dead-band, nudges, capability-off path, buffering debounce, scheduled start, barrier timeout).
 - **SQL:** migration `0010` tests in `supabase/tests/` (existing harness).
-- **Device:** emulator + simulator via metro-mcp; party runs use both at once. Every visual change is checked by
-  screenshot before it is called done.
+- **Device:** Android emulator, iOS simulator (built with `xcodebuild` + `simctl`; no Simulator.app on this Mac) and the
+  physical Android phone; party runs use all three at once. Every visual change is checked by screenshot before it is
+  called done.
+- **Test streams (Phase 1):** §6.2.2 — the player's gate doesn't depend on any plugin repo.
 
 ## 11. Risks
 
@@ -437,14 +494,16 @@ useful); Phase 2 delivers the Hindi requirement; Phase 3 moves the party onto th
 | R2 | The operator's chosen plugin repos break or get taken down | Many repos, pinned versions, last-known-good, health feed, embed lanes as floor |
 | R3 | VidFast and its template siblings are one operator | Treat as one failure domain in health; native lane is the real answer |
 | R4 | iOS header behaviour differs in-app from the macOS spike | Phase 2 gate re-runs T1 in the app on the iOS simulator; fallback = loopback HLS rewrite proxy (kunai pattern), only if the gate fails |
-| R5 | expo-video SDK 53 gaps (read-only `videoTrack`, no `seeked`, no sidecar subs) | Workarounds in §6.2; SDK 54 upgrade later removes the seek patch |
+| R5 | expo-video gaps that remain on SDK 57 (read-only `videoTrack`, no `seeked` event, no sidecar subtitles) | Workarounds in §6.2 (variant reload + seek, synthesised `seeked`, `SubtitleOverlay`) |
+| R9 | Native-first means real titles keep the WebView fallback until the owner enables repos | Phase 3 proceeds in parallel; the scorecard makes the decision quick; plain embeds stay as the floor |
 | R6 | A repo the operator adds serves MKV / AC-3 | `platforms` false on both → ranked out; libVLC/mpv lane becomes a separate spec |
 | R7 | Supabase Free auto-pause kills the party backend after idle weeks | F1/F11 behaviour; operator decision on keep-alive or Pro plan |
 | R8 | Store removal / takedown pressure | Off-store channel already in place; no title artwork in any store listing |
 
 ## 12. Open items (decide in the phase plans, not now)
 
-- The extra 8 benchmark titles (Phase 0).
+- The extra 8 benchmark titles (Phase 2 plan; Phase 0 shipped without them).
+- The exact public test streams (Phase 1 plan).
 - Which plugin repos the operator enables for Phase 2 testing (operator's choice; `github-scraper-landscape`,
   `indexes-beyond-fmhy` and `fmhy-github-index` list candidates as information).
 - Whether `0008`/`0009` already carry enough of the room stream key to skip `0010` (Phase 3 plan verifies).
