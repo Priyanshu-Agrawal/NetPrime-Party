@@ -10,6 +10,15 @@
  */
 
 import type { Provider } from "./schemas";
+import {
+  LKG_KEY,
+  parseLkg,
+  resolveProviders,
+  writeLkgIfChanged,
+  type LiveOutcome,
+  type LkgRecord,
+  type ProvidersResult,
+} from "./configResolve";
 
 /**
  * Environment bindings. Names are read root-first (`EXPO_PUBLIC_*`, which is
@@ -44,6 +53,9 @@ export type Bindings = {
    *  through this — same-zone workers.dev HTTP subrequests are blocked. See
    *  wrangler.toml [[services]]. Absent in local dev → falls back to a plain fetch. */
   TMDB_PROXY?: { fetch: (req: Request) => Promise<Response> };
+  /** Durable last-known-good provider list (Workers KV). Optional: without it an
+   *  outage degrades to an empty, non-killswitch list. See configResolve.ts. */
+  CONFIG_LKG?: KVNamespace;
 };
 
 /**
@@ -129,75 +141,72 @@ function reorderByHealth(providers: Provider[], health: HealthRow[]): Provider[]
   ];
 }
 
-/**
- * Fetch all providers ordered by priority, with a 60s edge cache.
- *
- * @param env  Worker bindings (Supabase creds).
- * @param ctx  Execution context, used to persist the cache write without
- *             blocking the response (`ctx.waitUntil`).
- * @returns    The provider list, or `[]` if creds are missing / Supabase errors
- *             (callers degrade gracefully rather than 500).
- */
-export async function getProviders(
-  env: Bindings,
-  ctx: Waitable,
-): Promise<Provider[]> {
-  const cache = caches.default;
-  let response = await cache.match(PROVIDERS_CACHE_KEY);
-
-  if (!response) {
-    const { url, key } = resolveCredentials(env);
-    if (!url || !key) {
-      console.error("Missing Supabase environment variables.");
-      return [];
-    }
-
-    // Only enabled providers leave the edge. Clearing/disabling rows in Supabase
-    // makes /config genuinely empty over the wire — the app has no baked-in
-    // fallback, so it goes "dumb" (nothing observable) during store review.
-    // Explicit columns: /config stays lean — the heavy `bridge_script` body is
-    // NEVER sent here (served separately via /scripts); only its version tag.
-    const cols =
-      "id,name,enabled,priority,url_movie,url_tv,allowed_domain,hijack,script_version";
-    const endpoint = `${url}/rest/v1/providers?select=${cols}&enabled=eq.true&order=priority.asc`;
-    let res: Response;
-    try {
-      res = await fetch(endpoint, {
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        // Never let a hung Supabase call hang the worker.
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch (err) {
-      console.error("Supabase request failed or timed out:", err);
-      return [];
-    }
-
-    if (!res.ok) {
-      console.error(`Supabase responded ${res.status} for providers.`);
-      return [];
-    }
-
-    // Health-aware ordering: demote chronically-failing providers below healthy
-    // ones (best-effort — no health data ⇒ plain priority order). Cached with the
-    // list so the extra Supabase read happens at most once per 60s.
-    const rawProviders = (await res.json()) as Provider[];
-    const ordered = reorderByHealth(rawProviders, await fetchHealth(env));
-    response = new Response(JSON.stringify(ordered), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "s-maxage=60",
-      },
+/** One Supabase read of the enabled providers, health-ordered. Never throws. */
+async function fetchLiveProviders(env: Bindings): Promise<LiveOutcome> {
+  const { url, key } = resolveCredentials(env);
+  if (!url || !key) return { ok: false, reason: "missing-credentials" };
+  // Only enabled providers leave the edge. Clearing/disabling rows in Supabase makes
+  // /config genuinely empty over the wire — now flagged `killswitch:true` — so the
+  // app goes "dumb" during store review. The heavy `bridge_script` body is NEVER
+  // sent here (served separately via /scripts); only its version tag.
+  const cols = "id,name,enabled,priority,url_movie,url_tv,allowed_domain,hijack,script_version";
+  const endpoint = `${url}/rest/v1/providers?select=${cols}&enabled=eq.true&order=priority.asc`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(5000), // never let a hung Supabase call hang the worker
     });
+    if (!res.ok) return { ok: false, reason: `supabase-${res.status}` };
+    const raw = (await res.json()) as Provider[];
+    // Health-aware ordering: demote chronically-failing providers below healthy
+    // ones (best-effort — no health data ⇒ plain priority order).
+    return { ok: true, providers: reorderByHealth(raw, await fetchHealth(env)) };
+  } catch (err) {
+    console.error("Supabase request failed or timed out:", err);
+    return { ok: false, reason: "network" };
+  }
+}
 
+/**
+ * The provider list for /config, with outage awareness.
+ * Live answers are edge-cached 60 s (shared with /scrape) and mirrored to KV as
+ * last-known-good; when Supabase doesn't answer we serve that copy, marked stale.
+ */
+export async function getProvidersResult(env: Bindings, ctx: Waitable): Promise<ProvidersResult> {
+  const cache = caches.default;
+  const hit = await cache.match(PROVIDERS_CACHE_KEY);
+  if (hit) return resolveProviders({ ok: true, providers: (await hit.json()) as Provider[] }, null);
+
+  const live = await fetchLiveProviders(env);
+  if (live.ok) {
+    const response = new Response(JSON.stringify(live.providers), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "s-maxage=60" },
+    });
     // Persist to the edge cache without delaying the response to the client.
-    ctx.waitUntil(cache.put(PROVIDERS_CACHE_KEY, response.clone()));
+    ctx.waitUntil(cache.put(PROVIDERS_CACHE_KEY, response));
+    if (env.CONFIG_LKG) {
+      ctx.waitUntil(
+        writeLkgIfChanged(env.CONFIG_LKG, live.providers, new Date()).catch((e) =>
+          console.error("LKG write failed:", e),
+        ),
+      );
+    }
+    return resolveProviders(live, null);
   }
 
-  return response.json();
+  let lkg: LkgRecord | null = null;
+  try {
+    lkg = env.CONFIG_LKG ? parseLkg(await env.CONFIG_LKG.get(LKG_KEY)) : null;
+  } catch (e) {
+    console.error("LKG read failed:", e);
+  }
+  console.error(`Serving ${lkg ? "last-known-good" : "no"} providers: ${live.reason}`);
+  return resolveProviders(live, lkg);
+}
+
+/** Back-compat for /scrape: just the list (now also survives outages via LKG). */
+export async function getProviders(env: Bindings, ctx: Waitable): Promise<Provider[]> {
+  return (await getProvidersResult(env, ctx)).providers;
 }
 
 /**

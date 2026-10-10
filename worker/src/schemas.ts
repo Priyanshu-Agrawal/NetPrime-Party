@@ -135,6 +135,10 @@ export const AppConfigSchema = z
      *  client's "Popular in your region" rail; client defaults it when absent. */
     region: z.string().nullable().optional().openapi({ example: "IN" }),
     providers: z.array(ProviderSchema),
+    /** True when Supabase didn't answer and this is the last-known-good list. */
+    stale: z.boolean().optional().openapi({ example: false }),
+    /** True only when the operator deliberately emptied the list (store-review killswitch). */
+    killswitch: z.boolean().optional().openapi({ example: false }),
     /** Optional server-driven Home feed. Omitted → client renders its fallback. */
     homeFeed: FeedManifestSchema.optional(),
   })

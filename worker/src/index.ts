@@ -24,7 +24,14 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from "hono/cors";
 
 import type { Bindings } from "./supabase";
-import { getProviders, getScripts, hashIp, insertReport, purgeProviders } from "./supabase";
+import {
+  getProviders,
+  getProvidersResult,
+  getScripts,
+  hashIp,
+  insertReport,
+  purgeProviders,
+} from "./supabase";
 import { getFranchiseCollections } from "./franchises";
 import {
   AppConfigSchema,
@@ -119,7 +126,7 @@ const configRoute = createRoute({
 });
 
 app.openapi(configRoute, async (c) => {
-  const providers = await getProviders(c.env, c.executionCtx);
+  const { providers, stale, killswitch } = await getProvidersResult(c.env, c.executionCtx);
   // Cloudflare-detected client country (ISO 3166-1), for the client's "Popular in
   // your region" rail. Same accessor as /report. Null when cf is absent (local
   // `wrangler dev`) — the client then falls back to its own default region.
@@ -128,7 +135,7 @@ app.openapi(configRoute, async (c) => {
   // and the client falls back to its baked-in Home layout when absent. To
   // server-drive Home, populate `homeFeed: FeedManifest` (see schemas.ts) here.
   return c.json(
-    { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, region, providers },
+    { appVersion: APP_VERSION, maintenanceMode: MAINTENANCE_MODE, region, providers, stale, killswitch },
     200,
   );
 });
