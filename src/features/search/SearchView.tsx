@@ -276,7 +276,8 @@ const SearchView: React.FC = () => {
               : `${item.media_type || "media"}:${item.id}`
           }
           numColumns={COLS}
-          estimatedItemSize={183}
+          // A new query replaces the results; don't keep the old scroll anchor.
+          maintainVisibleContentPosition={{ disabled: true }}
           getItemType={(item) => ("isSkeleton" in item ? "skeleton" : "poster")}
           contentContainerStyle={contentContainerStyle}
           ListHeaderComponent={ListHeaderComponent}

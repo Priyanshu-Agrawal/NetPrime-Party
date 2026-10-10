@@ -54,13 +54,13 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { scheduleOnRN } from "react-native-worklets";
 
 /** Routes that already ARE the party, or that play video. */
 const HIDE_ON = new Set(["Party", "Player"]);
@@ -437,7 +437,7 @@ function TraySheet({
       Gesture.Pan()
         .onEnd((e) => {
           "worklet";
-          if (e.translationY > 60) runOnJS(onClose)();
+          if (e.translationY > 60) scheduleOnRN(onClose);
         })
         .runOnJS(false),
     [onClose],

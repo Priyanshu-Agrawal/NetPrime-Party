@@ -57,7 +57,7 @@ index 0000000..4319cf9
 +  }
 +}
 diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
-index 51338df..0ac2f25 100644
+index 438ab6a..a761e2b 100644
 --- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
 +++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
 @@ -60,7 +60,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
