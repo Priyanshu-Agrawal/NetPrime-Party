@@ -452,6 +452,12 @@ export const PlayerScreen: React.FC = () => {
   }, [armResume]);
 
   const onEvent = (e: PlayerEvent) => {
+    if (__DEV__) {
+      // Device-test visibility into the bound <video> (read over CDP).
+      const g = globalThis as unknown as { __lastEvents?: unknown[] };
+      (g.__lastEvents ??= []).push({ e: e.event, t: e.currentTime, rs: e.readyState, p: e.paused, at: Date.now() });
+      if (g.__lastEvents.length > 40) g.__lastEvents.shift();
+    }
     if (e.event === "caps") {
       if (e.caps) setBridgeCaps(e.caps);
       return;
