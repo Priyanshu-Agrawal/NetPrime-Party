@@ -272,6 +272,11 @@ export default function Party() {
     media ? { type: media.type, id: media.tmdbId } : skipToken,
   );
   const posterUrl = img(mediaDetails?.poster_path, "w342") ?? undefined;
+  // What's playing, shown with the controls. The snapshot carries the host's title; the
+  // details query covers a room whose media arrived without one.
+  const nowPlaying: string | undefined = media?.title || mediaDetails?.title || mediaDetails?.name || undefined;
+  const nowPlayingEpisode =
+    media?.type === "tv" && media.season && media.episode ? `S${media.season} · E${media.episode}` : undefined;
   const roomCode = snap?.code || room;
   const hostPresent = !!snap?.lease.hostId;
   const hostId = snap?.lease.hostId;
@@ -705,6 +710,9 @@ export default function Party() {
                     setShowPlayerSettings(true);
                   }}
                   fullscreen={fullscreen}
+                  title={nowPlaying}
+                  subtitle={nowPlayingEpisode}
+                  embedded={!isImmersive}
                   topBar={
                     isImmersive ? (
                       <View
@@ -720,6 +728,18 @@ export default function Party() {
                         <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
                           <Ionicons name="chevron-back" size={22} color={colors.text} />
                         </GlassButton>
+                        <View style={styles.nowPlaying} pointerEvents="none">
+                          {nowPlaying ? (
+                            <Text style={styles.nowPlayingTitle} numberOfLines={1}>
+                              {nowPlaying}
+                            </Text>
+                          ) : null}
+                          {nowPlayingEpisode ? (
+                            <Text style={styles.nowPlayingEpisode} numberOfLines={1}>
+                              {nowPlayingEpisode}
+                            </Text>
+                          ) : null}
+                        </View>
                         <GlassButton style={styles.codePill} onPress={share} blur={false}>
                           <Text style={styles.codeLabel}>ROOM · </Text>
                           <Text style={styles.code}>{roomCode || "—"}</Text>
@@ -1326,6 +1346,10 @@ const styles = StyleSheet.create({
   // --- Immersive / responsive party layout (glow/elevation stripped from anything
   //     that sits over the video — blur/elevation there re-captures every frame). ---
   topRightActions: { flexDirection: "row", alignItems: "center", gap: ms(8) },
+  // Same type as the solo player's header title, left-aligned beside the back button.
+  nowPlaying: { flex: 1, minWidth: 0 },
+  nowPlayingTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(16) },
+  nowPlayingEpisode: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(11), marginTop: ms(1) },
   chatToggleBtn: {
     flexDirection: "row",
     alignItems: "center",

@@ -80,6 +80,9 @@ export interface PlayerControlsProps {
   subtitle?: string;
   /** Whether the player is fullscreen/immersive (gates the default overlay header). */
   fullscreen?: boolean;
+  /** The player sits below the screen's own header (party, portrait) instead of full-bleed
+   *  behind the status bar, so the overlay header hugs the video's top edge. */
+  embedded?: boolean;
   /** Custom top-bar node for the overlay (the party fills this). */
   topBar?: React.ReactNode;
   /** Extra overlay children (badges, reaction pills) that fade with the controls. */
@@ -116,6 +119,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       title,
       subtitle,
       fullscreen,
+      embedded,
       topBar,
       overlayChildren,
       onVisibilityChange,
@@ -123,6 +127,9 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     ref,
   ) => {
     const insets = useSafeAreaInsets();
+    // Full-bleed players clear the status bar themselves; fullscreen hides it, and an
+    // embedded player already sits below the screen's header.
+    const headerTop = fullscreen || embedded ? ms(10) : Math.max(insets.top, ms(10));
     const [paused, setPaused] = useState(true);
     // Progress is stepwise (one setState per tick), NOT a 60 fps animation. A JS-driven
     // width/left glide restarts every tick and congests the UI thread the WebView video
@@ -299,7 +306,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               (solo, portrait + fullscreen). Shares the auto-hide fade + scrim. */}
           {topBar ? (
             <View
-              style={[styles.topBarCustom, { top: fullscreen ? ms(10) : Math.max(insets.top, ms(10)) }]}
+              style={[styles.topBarCustom, { top: headerTop }]}
               pointerEvents="box-none"
             >
               {topBar}
@@ -310,7 +317,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             // top inset ITSELF — same as topBarCustom above. Landscape hides the status bar
             // → flat ms(10). Matches the detail-screen header offset.
             <View
-              style={[styles.topRow, { top: fullscreen ? ms(10) : Math.max(insets.top, ms(10)) }]}
+              style={[styles.topRow, { top: headerTop }]}
               pointerEvents="box-none"
             >
               {onBack ? (
