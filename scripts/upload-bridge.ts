@@ -13,9 +13,10 @@
  *   npx tsx scripts/upload-bridge.ts videasy --dry-run   # compile+validate only
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { GENERIC_BRIDGE } from "../src/scripts/generic-bridge";
 import { LEGACY_VIDEASY_BRIDGE, LEGACY_VIDEASY_ID } from "../src/scripts/legacy-videasy";
 
 /**
@@ -26,8 +27,12 @@ import { LEGACY_VIDEASY_BRIDGE, LEGACY_VIDEASY_ID } from "../src/scripts/legacy-
  * split stays in the repo as the future refactor target — when a provider is
  * ported, its entry becomes `UNIVERSAL_CORE + "\\n" + <delta>`.
  */
+/** Providers served the generic bridge (Phase 1A, spec §6.2.4); videasy keeps its legacy one. */
+const GENERIC_PROVIDERS = ["vidfast", "vidlink", "vidnest", "vidcore", "vidphantom", "mycineby", "vixsrc", "111movies"];
+
 const SCRIPTS: Record<string, string> = {
   [LEGACY_VIDEASY_ID]: LEGACY_VIDEASY_BRIDGE,
+  ...Object.fromEntries(GENERIC_PROVIDERS.map((id) => [id, GENERIC_BRIDGE])),
 };
 
 const ROOT = resolve(__dirname, "..");
@@ -80,10 +85,39 @@ async function upload(id: string, url: string, key: string): Promise<void> {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
-  const target = args.find((a) => !a.startsWith("-"));
-  if (!target) fail("Usage: upload-bridge.ts <providerId|all> [--dry-run]");
+  const sqlAt = args.indexOf("--emit-sql");
+  const sqlFile = sqlAt >= 0 ? args[sqlAt + 1] : undefined;
+  const sqlValueAt = sqlAt >= 0 ? sqlAt + 1 : -1;
+  const target = args.find((a, i) => !a.startsWith("-") && i !== sqlValueAt);
+  if (!target) fail("Usage: upload-bridge.ts <providerId|generic|all> [--dry-run] [--emit-sql <file>]");
 
-  const ids = target === "all" ? Object.keys(SCRIPTS) : [target];
+  const ids = target === "all" ? Object.keys(SCRIPTS) : target === "generic" ? GENERIC_PROVIDERS : [target];
+
+  // --emit-sql: write the update as SQL (for the Supabase MCP / SQL editor) instead of
+  // calling the REST API — no service-role key on this machine. Rows sharing a script
+  // are written in one statement that carries the body once.
+  if (sqlFile) {
+    const byScript = new Map<string, { version: string; ids: string[] }>();
+    for (const id of ids) {
+      const { script, version } = buildAndValidate(id);
+      const hash = version.slice(version.indexOf("@") + 1);
+      const entry = byScript.get(script) ?? { version: hash, ids: [] };
+      entry.ids.push(id);
+      byScript.set(script, entry);
+    }
+    let sql = "";
+    for (const [script, { version, ids: rowIds }] of byScript) {
+      if (script.includes("$bridge$")) fail("script contains the SQL dollar-quote tag");
+      const list = rowIds.map((id) => `'${id}'`).join(", ");
+      sql +=
+        `WITH s AS (SELECT $bridge$${script}$bridge$::text AS body)\n` +
+        `UPDATE public.providers p SET bridge_script = s.body, script_version = p.id || '@${version}'\n` +
+        `FROM s WHERE p.id IN (${list});\n`;
+    }
+    writeFileSync(sqlFile, sql);
+    console.log(`✔ wrote ${byScript.size} statement(s) for ${ids.length} provider(s) → ${sqlFile}`);
+    return;
+  }
 
   if (dryRun) {
     for (const id of ids) {

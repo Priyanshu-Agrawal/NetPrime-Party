@@ -80,6 +80,16 @@ describe("generic bridge", () => {
     expect(css()).toBe("");
   });
 
+  it("leaves the page alone without a config (older app builds turn chrome-off on after bind)", () => {
+    (window as any).__vlCfg = undefined;
+    posted = [];
+    delete (window as any).__vlBridge;
+    new Function(GENERIC_BRIDGE)();
+    expect(document.getElementById("__vlChromeStyle")?.textContent ?? "").toBe("");
+    (window as any).__vlChromeOff(true);
+    expect(document.getElementById("__vlChromeStyle")?.textContent).toContain("iframe{visibility:visible");
+  });
+
   it("lists subtitle tracks and switches between them", () => {
     const tracks = [
       { kind: "subtitles", label: "English", language: "en", mode: "disabled" },

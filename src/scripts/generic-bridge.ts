@@ -14,7 +14,7 @@
 export const GENERIC_BRIDGE_ID = "generic";
 
 export interface BridgeConfig {
-  /** Paint only the <video> from document-start (default true). */
+  /** Paint only the <video> from document-start (default false: older app builds send no config and turn it on after bind). */
   chromeOff?: boolean;
   /** Click the provider's start control at 3 s and 8 s if no <video> exists (default true). */
   autoStart?: boolean;
@@ -55,7 +55,7 @@ export const GENERIC_BRIDGE: string = `
 
   var CHROME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}video{visibility:visible!important}';
   var FRAME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}iframe{visibility:visible!important}';
-  var chromeOn = CFG.chromeOff !== false;
+  var chromeOn = CFG.chromeOff === true;
   function styleEl(){
     var el = document.getElementById('__vlChromeStyle');
     if (!el){ el = document.createElement('style'); el.id = '__vlChromeStyle'; (document.head || document.documentElement).appendChild(el); }
