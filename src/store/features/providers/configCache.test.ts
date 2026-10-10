@@ -40,6 +40,12 @@ describe("loadCachedConfig", () => {
   });
   it("rejects malformed JSON (a half-written cache)", () =>
     expect(loadCachedConfig(fakeStorage({ [CONFIG_CACHE_KEY]: '{"providers":[' }))).toBeNull());
+  it("rejects a providers list holding non-objects (would crash the reducer on every launch)", () =>
+    expect(
+      loadCachedConfig(
+        fakeStorage({ [CONFIG_CACHE_KEY]: JSON.stringify({ maintenanceMode: false, providers: [null] }) }),
+      ),
+    ).toBeNull());
   it("rejects a value without a providers array (an older or foreign shape)", () =>
     expect(
       loadCachedConfig(fakeStorage({ [CONFIG_CACHE_KEY]: JSON.stringify({ maintenanceMode: false }) })),
@@ -52,6 +58,12 @@ describe("saveCachedConfig", () => {
     saveCachedConfig(cfg({ providers: [] }), s);
     saveCachedConfig(cfg({ stale: true }), s);
     expect(s.map.size).toBe(0);
+  });
+  it("persists a killswitch first learned during an outage (stale), so old providers can't come back", () => {
+    const s = fakeStorage();
+    saveCachedConfig(cfg(), s);
+    saveCachedConfig(cfg({ providers: [], killswitch: true, stale: true }), s);
+    expect(loadCachedConfig(s)?.providers).toEqual([]);
   });
   it("persists a killswitch so the app stays empty offline too", () => {
     const s = fakeStorage();

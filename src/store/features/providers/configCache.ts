@@ -22,15 +22,26 @@ export function loadCachedConfig(storage: Pick<UniversalStorage, "getString">): 
   if (!raw) return null;
   try {
     const v = JSON.parse(raw) as Partial<AppConfig> | null;
-    return v && Array.isArray(v.providers) && typeof v.maintenanceMode === "boolean" ? (v as AppConfig) : null;
+    const ok =
+      !!v &&
+      typeof v.maintenanceMode === "boolean" &&
+      Array.isArray(v.providers) &&
+      // A non-object entry would throw inside the reducer on every launch.
+      v.providers.every((p) => !!p && typeof p === "object");
+    return ok ? (v as AppConfig) : null;
   } catch {
     return null;
   }
 }
 
-/** Persist only fresh, accepted answers — never an outage or a stale copy. */
+/**
+ * Persist accepted answers. A stale (worker last-known-good) answer is skipped —
+ * EXCEPT a killswitch: a device that first learns of a kill during an outage must
+ * still forget its old providers, or they'd come back on every cold start.
+ */
 export function saveCachedConfig(cfg: AppConfig, storage: Pick<UniversalStorage, "set">): void {
-  if (cfg.stale || !shouldAcceptConfig(cfg)) return;
+  if (!shouldAcceptConfig(cfg)) return;
+  if (cfg.stale && cfg.killswitch !== true) return;
   try {
     storage.set(CONFIG_CACHE_KEY, JSON.stringify(cfg));
   } catch {
