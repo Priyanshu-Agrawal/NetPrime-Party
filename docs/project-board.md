@@ -286,3 +286,32 @@ timer — a genuine supply-chain exposure, which is why pinning is mandatory. Le
 unchanged by any of this. And provider liveness is volatile: `videasy`'s upstream went fully dark for
 ~30 minutes mid-research (DNS+TCP fine, no HTTP in 20 s) and recovered — a live demonstration of why
 one provider is not an architecture.
+
+---
+
+## `[/]` Playback, languages & watch party — Phase 0: Foundations (2026-10-10)
+**Spec:** [`superpowers/specs/2026-10-10-playback-languages-party-design.md`](superpowers/specs/2026-10-10-playback-languages-party-design.md) ·
+**Plan:** [`superpowers/plans/2026-10-10-phase0-foundations.md`](superpowers/plans/2026-10-10-phase0-foundations.md)
+
+**Why:** on 2026-10-10 the Supabase Free project had auto-paused after a month idle, and the worker turned that
+into `providers: []` — byte-identical to the operator's store-review killswitch — so every app went dark.
+
+**Done:**
+* `[x]` Worker separates "Supabase answered with an empty list" (explicit `killswitch: true`) from "Supabase didn't
+  answer" (`stale: true`, last-known-good from KV). Unit-tested (vitest, 14 tests). **KV binding + deploy pending
+  the owner's Cloudflare login** (the shell's API token has no access to this account; the saved OAuth login
+  expired 2026-08-28).
+* `[x]` App keeps its own last good `/config` in MMKV, boots from it, and only believes an empty list when it is an
+  explicit killswitch. Remote lane flags (`embedApiLane`, `nativeLane`, `pluginHost`) land in the store, all off.
+* `[x]` One neutral `PlayerHandle` v2 (`components/player/types.ts`) with capabilities, tracks and a landed-position
+  seek; the web twin's duplicated types removed.
+* `[x]` Test harnesses: `npm test` (jest-expo, 26 tests) and `cd worker && npm test` (vitest, 14 tests).
+
+**Gate (Android emulator, 2026-10-10):**
+* Live: 14 providers, `source: live`, `stale: false`, flags all off; the device copy holds 14 providers.
+* Simulated outage (local worker with `SUPABASE_URL` unreachable): worker answers `stale: true, killswitch: false`;
+  the cold-launched app still shows **14 providers** from its device copy (`source: cache`). Before this change it
+  showed none.
+* Cold start against the real worker: `/config` took **7.6 s** to land — the device copy now covers that window.
+* Note: metro-mcp attaches to whichever app connected first (GoTrade on the iOS simulator here); Bearoom's runtime
+  was read over Metro's CDP proxy instead (`/json/list` → `Runtime.evaluate`).
