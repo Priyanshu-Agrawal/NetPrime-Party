@@ -22,7 +22,7 @@ import {
   type PlayerEvent,
   type QualityLevel,
 } from "@/components/player/HijackPlayer";
-import { PlayerControls, type PlayerControlsHandle } from "@/components/player/PlayerControls";
+import { CONTROL_BAR_CLEARANCE, PlayerControls, type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
 import { settingsRows, type BridgeCaps } from "@/components/player/capabilities";
 import type { SubtitleTrack } from "@/components/player/types";
@@ -802,7 +802,7 @@ export default function Party() {
                         <>
                           {!landscapeChatOpen && reactionsOn && canParticipate ? (
                             <ReanimatedAnimated.View
-                              style={[styles.landscapeQuickReactions, { right: Math.max(insets.right, ms(16)), bottom: ms(66) }]}
+                              style={[styles.landscapeQuickReactions, { right: Math.max(insets.right, ms(16)), bottom: CONTROL_BAR_CLEARANCE }]}
                               pointerEvents="box-none"
                             >
                               {QUICK_REACTIONS.map((e) => (

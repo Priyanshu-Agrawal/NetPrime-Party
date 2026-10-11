@@ -94,6 +94,8 @@ export interface PlayerControlsProps {
 }
 
 export const AUTO_HIDE_MS = 3000;
+/** How far above the bottom edge an overlay must sit to clear the two-row control bar. */
+export const CONTROL_BAR_CLEARANCE = ms(100);
 export const SPINNER_DELAY_MS = 300;
 const UNLOCK_PILL_MS = 2500;
 
