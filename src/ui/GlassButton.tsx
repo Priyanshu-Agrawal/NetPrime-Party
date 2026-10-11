@@ -15,11 +15,13 @@ interface Props {
   hitSlop?: number;
   /** Glass (default) or a solid warm tint. */
   blur?: boolean;
+  /** "none" inside a Modal: never blur the screen behind (another window on Android). */
+  backdrop?: "auto" | "none";
   /** Screen-reader label — required for icon-only buttons that render no text. */
   accessibilityLabel?: string;
 }
 
-export function GlassButton({ onPress, children, style, disabled, hitSlop = 6, blur = true, accessibilityLabel }: Props) {
+export function GlassButton({ onPress, children, style, disabled, hitSlop = 6, blur = true, backdrop = "auto", accessibilityLabel }: Props) {
   return (
     <BouncyPressable
       onPress={onPress}
@@ -30,7 +32,7 @@ export function GlassButton({ onPress, children, style, disabled, hitSlop = 6, b
       style={[styles.btn, style]}
     >
       {blur ? (
-        <Glass material="control" radius={radius.pill} interactive />
+        <Glass material="control" radius={radius.pill} backdrop={backdrop} interactive />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.solid]} />
       )}

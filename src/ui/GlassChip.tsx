@@ -4,7 +4,7 @@
  */
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, View, type ViewStyle } from "react-native";
 import { colors, font, ms, radius, spacing } from "@/theme/bearoom";
 import { Glass } from "./glass";
 import { Text } from "./Text";
@@ -14,6 +14,8 @@ interface Props {
   icon?: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   blur?: boolean;
+  /** "none" inside a Modal: never blur the screen behind (another window on Android). */
+  backdrop?: "auto" | "none";
   size?: "sm" | "md";
   style?: ViewStyle;
 }
@@ -23,6 +25,7 @@ export function GlassChip({
   icon,
   iconColor = colors.honey,
   blur = false,
+  backdrop = "auto",
   size = "md",
   style,
 }: Props) {
@@ -36,7 +39,7 @@ export function GlassChip({
 
   return (
     <View style={shell}>
-      {blur ? <Glass material="control" radius={radius.pill} /> : null}
+      {blur ? <Glass material="control" radius={radius.pill} backdrop={backdrop} /> : null}
       <View style={styles.row}>
         {icon ? (
           <Ionicons name={icon} size={sm ? ms(9) : ms(12)} color={iconColor} />

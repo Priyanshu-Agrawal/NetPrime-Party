@@ -151,6 +151,14 @@ describe("Glass on iOS", () => {
     jest.useRealTimers();
   });
 
+  it("lets interactive Liquid Glass receive touches (its press effect) and keeps the rest out of the way", () => {
+    const r = render(<><Glass material="control" interactive /><Glass material="control" /></>);
+    const [interactive, plain] = all(r, "liquid").filter((n) => typeof n.type === "string"); // native views only
+    expect(interactive.props.pointerEvents).toBe("auto");
+    expect(plain.props.pointerEvents).toBe("none");
+    act(() => r.unmount());
+  });
+
   it("uses the system blur for sheets", () => {
     const r = render(<Glass material="sheet" />);
     expect(has(r, "system-blur")).toBe(true);

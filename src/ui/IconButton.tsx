@@ -12,9 +12,11 @@ interface Props {
   style?: ViewStyle;
   /** Screen-reader label — icon-only buttons announce nothing without it. */
   accessibilityLabel?: string;
+  /** "none" inside a Modal: never blur the screen behind (another window on Android). */
+  backdrop?: "auto" | "none";
 }
 
-export function IconButton({ onPress, children, size = layout.iconButton, style, accessibilityLabel }: Props) {
+export function IconButton({ onPress, children, size = layout.iconButton, style, accessibilityLabel, backdrop = "auto" }: Props) {
   const d = ms(size);
   return (
     <BouncyPressable
@@ -24,7 +26,7 @@ export function IconButton({ onPress, children, size = layout.iconButton, style,
       accessibilityLabel={accessibilityLabel}
       style={[styles.btn, { width: d, height: d }, style]}
     >
-      <Glass material="control" radius={radius.pill} interactive />
+      <Glass material="control" radius={radius.pill} backdrop={backdrop} interactive />
       {children}
     </BouncyPressable>
   );

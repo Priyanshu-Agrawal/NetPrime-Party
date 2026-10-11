@@ -26,6 +26,10 @@ describe("GlassCard", () => {
     const [g] = glassOf(<GlassCard material="control" visible={false} />);
     expect(g.props).toMatchObject({ material: "control", visible: false });
   });
+  it("passes backdrop through (a card inside a Modal must not blur the screen in another window)", () => {
+    const [g] = glassOf(<GlassCard backdrop="none" />);
+    expect(g.props.backdrop).toBe("none");
+  });
   it("draws no glass when blur is off", () => {
     expect(glassOf(<GlassCard blur={false} />)).toHaveLength(0);
   });

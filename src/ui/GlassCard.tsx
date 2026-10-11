@@ -13,6 +13,8 @@ interface Props extends ViewProps {
   material?: GlassMaterial;
   /** False while the card is faded out (player controls). */
   visible?: boolean;
+  /** "none" inside a Modal: never blur the screen behind (another window on Android). */
+  backdrop?: "auto" | "none";
   rounded?: number;
   bordered?: boolean;
   /** Inner padding; true = 16, or a number. */
@@ -23,6 +25,7 @@ export function GlassCard({
   blur = true,
   material = "bar",
   visible = true,
+  backdrop = "auto",
   rounded = radius.xl,
   bordered = true,
   padded = false,
@@ -40,7 +43,7 @@ export function GlassCard({
       ]}
       {...rest}
     >
-      {blur ? <Glass material={material} visible={visible} radius={rounded} /> : null}
+      {blur ? <Glass material={material} visible={visible} backdrop={backdrop} radius={rounded} /> : null}
       <View style={{ padding: pad }}>{children}</View>
     </View>
   );

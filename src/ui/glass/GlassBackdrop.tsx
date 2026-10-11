@@ -1,5 +1,5 @@
-import { useScreenFocused } from "@/hooks/useScreenFocused";
 import { NativeGlassBackdrop } from "@/modules/bearoom-glass";
+import { NavigationContext } from "@react-navigation/native";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { StyleProp, View, ViewStyle } from "react-native";
 import { createBackdropRegistry, nextBackdropId, screenBackdrops, type BackdropRegistry } from "./registry";
@@ -12,7 +12,7 @@ export const GlassInsideContext = createContext<readonly number[]>([]);
 /** A private backdrop slot for its subtree, so glass inside never blurs the screen (the players use one with no
  *  backdrop: a WebView must never be blurred — see modules/bearoom-glass). */
 export function GlassLayer({ children }: { children: ReactNode }) {
-  const slot = useMemo(() => createBackdropRegistry(), []);
+  const [slot] = useState(createBackdropRegistry);
   return <GlassLayerContext.Provider value={slot}>{children}</GlassLayerContext.Provider>;
 }
 
@@ -25,16 +25,29 @@ export function GlassBackdrop({ style, children }: { style?: StyleProp<ViewStyle
   const [id] = useState(nextBackdropId);
   const entry = useMemo(() => ({ id, ref }), [id]);
   const layer = useContext(GlassLayerContext);
-  const focused = useScreenFocused();
+  const navigation = useContext(NavigationContext);
   const outer = useContext(GlassInsideContext);
   const inside = useMemo(() => [...outer, id], [outer, id]);
 
   useEffect(() => {
-    const registry = layer ?? (focused ? screenBackdrops : null);
-    if (!registry) return;
-    registry.add(entry);
-    return () => registry.remove(entry.id);
-  }, [layer, focused, entry]);
+    const registry = layer ?? screenBackdrops;
+    const add = () => registry.add(entry);
+    const remove = () => registry.remove(entry.id);
+    if (layer || !navigation) {
+      add();
+      return remove;
+    }
+    // Straight from the navigation events, not React state: a blurred screen can be frozen (freezeOnBlur) and
+    // never commit a state update, which would leave its backdrop current behind the next screen.
+    if (navigation.isFocused()) add();
+    const offFocus = navigation.addListener("focus", add);
+    const offBlur = navigation.addListener("blur", remove);
+    return () => {
+      offFocus();
+      offBlur();
+      remove();
+    };
+  }, [layer, navigation, entry]);
 
   return (
     <GlassInsideContext.Provider value={inside}>

@@ -63,7 +63,7 @@ export function Glass({ material = "control", backdrop = "auto", visible = true,
   if (engine === "liquid") {
     return (
       <GlassView
-        pointerEvents="none"
+        pointerEvents={interactive ? "auto" : "none"}
         style={shape}
         glassEffectStyle={{ style: liquidOn ? "regular" : "none", animate: true, animationDuration: 0.2 }}
         tintColor={m.liquidTint}
