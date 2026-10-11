@@ -1,5 +1,5 @@
 import { StyleSheet, type ViewStyle } from "react-native";
-import { colors, glass, radius } from "../bearoom";
+import { colors, radius } from "../bearoom";
 
 export const surfaces = {
   screen: { flex: 1, backgroundColor: colors.bg } satisfies ViewStyle,
@@ -16,4 +16,3 @@ export const surfaces = {
   player: { flex: 1, backgroundColor: colors.playerBg } satisfies ViewStyle,
 } as const;
 
-export { glass };

@@ -1,18 +1,18 @@
 /**
- * GlassCard — a frosted-glass surface (BlurView + warm tint + hairline border).
- * The building block for control bars, sheets, CTA cards, and grouped rows.
- *
- * Perf note: real blur is not free on Android. Use blur={false} for repeated
- * surfaces (e.g. poster cards inside rails) to fall back to a cheap solid tint.
+ * GlassCard — a glass surface (Glass + hairline border) for bars, sheets, CTA cards and grouped rows.
+ * blur={false} draws a plain warm tint instead (repeated cards inside lists).
  */
-import { Frost } from "./Frost";
+import { colors, radius } from "@/theme/bearoom";
 import React from "react";
-import { Platform, StyleSheet, View, type ViewProps } from "react-native";
-import { colors, glass, radius } from "@/theme/bearoom";
+import { StyleSheet, View, type ViewProps } from "react-native";
+import { Glass, type GlassMaterial } from "./glass";
 
 interface Props extends ViewProps {
   blur?: boolean;
-  intensity?: number;
+  /** Glass material; floating bars by default. */
+  material?: GlassMaterial;
+  /** False while the card is faded out (player controls). */
+  visible?: boolean;
   rounded?: number;
   bordered?: boolean;
   /** Inner padding; true = 16, or a number. */
@@ -21,7 +21,8 @@ interface Props extends ViewProps {
 
 export function GlassCard({
   blur = true,
-  intensity = glass.intensity,
+  material = "bar",
+  visible = true,
   rounded = radius.xl,
   bordered = true,
   padded = false,
@@ -33,22 +34,13 @@ export function GlassCard({
   return (
     <View
       style={[
-        {
-          borderRadius: rounded,
-          overflow: "hidden",
-          backgroundColor: blur ? "transparent" : colors.surfaceStrong,
-        },
+        { borderRadius: rounded, overflow: "hidden", backgroundColor: blur ? "transparent" : colors.surfaceStrong },
         bordered && { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
         style,
       ]}
       {...rest}
     >
-      {blur && (
-        <>
-          <Frost intensity={intensity} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface }]} />
-        </>
-      )}
+      {blur ? <Glass material={material} visible={visible} radius={rounded} /> : null}
       <View style={{ padding: pad }}>{children}</View>
     </View>
   );

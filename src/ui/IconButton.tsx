@@ -1,28 +1,20 @@
 import { colors, ms, radius } from "@/theme/bearoom";
 import { layout } from "@/theme/styles/layout";
-import { Frost } from "./Frost";
 import React from "react";
-import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 import { BouncyPressable } from "./BouncyPressable";
+import { Glass } from "./glass";
 
 interface Props {
   onPress?: () => void;
   children: React.ReactNode;
-  intensity?: number;
   size?: number;
   style?: ViewStyle;
   /** Screen-reader label — icon-only buttons announce nothing without it. */
   accessibilityLabel?: string;
 }
 
-export function IconButton({
-  onPress,
-  children,
-  intensity = 55,
-  size = layout.iconButton,
-  style,
-  accessibilityLabel,
-}: Props) {
+export function IconButton({ onPress, children, size = layout.iconButton, style, accessibilityLabel }: Props) {
   const d = ms(size);
   return (
     <BouncyPressable
@@ -30,14 +22,9 @@ export function IconButton({
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={[
-        styles.btn,
-        { width: d, height: d },
-        style,
-      ]}
+      style={[styles.btn, { width: d, height: d }, style]}
     >
-      <Frost intensity={intensity} style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, styles.tint]} />
+      <Glass material="control" radius={radius.pill} interactive />
       {children}
     </BouncyPressable>
   );
@@ -55,7 +42,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tint: { backgroundColor: colors.overlay },
 });
 
 export default IconButton;

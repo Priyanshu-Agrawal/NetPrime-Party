@@ -1,12 +1,12 @@
 /**
  * GlassChip — compact frosted pill for metadata on hero slides and poster cards.
- * blur={true} for hero (few instances); blur={false} for poster grids (perf).
+ * blur={true} draws Glass (hero); blur={false} a solid chip (poster grids).
  */
 import { Ionicons } from "@expo/vector-icons";
-import { Frost } from "./Frost";
 import React from "react";
 import { Platform, StyleSheet, View, type ViewStyle } from "react-native";
-import { colors, font, glass, ms, radius, spacing } from "@/theme/bearoom";
+import { colors, font, ms, radius, spacing } from "@/theme/bearoom";
+import { Glass } from "./glass";
 import { Text } from "./Text";
 
 interface Props {
@@ -36,13 +36,7 @@ export function GlassChip({
 
   return (
     <View style={shell}>
-      {blur ? (
-        <>
-          <Frost intensity={glass.intensity} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, styles.blurScrim]} />
-          <View style={[StyleSheet.absoluteFill, styles.blurTint]} />
-        </>
-      ) : null}
+      {blur ? <Glass material="control" radius={radius.pill} /> : null}
       <View style={styles.row}>
         {icon ? (
           <Ionicons name={icon} size={sm ? ms(9) : ms(12)} color={iconColor} />
@@ -75,12 +69,6 @@ const styles = StyleSheet.create({
   },
   solid: {
     backgroundColor: colors.glassChipBg,
-  },
-  blurScrim: {
-    backgroundColor: colors.glassChipBg,
-  },
-  blurTint: {
-    backgroundColor: colors.glassChipTint,
   },
   row: {
     flexDirection: "row",

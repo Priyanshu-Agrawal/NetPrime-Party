@@ -66,7 +66,7 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, ms(12)) }]}>
-      <GlassCard rounded={radius.pill} intensity={40} bordered padded={ms(6)} style={styles.bar}>
+      <GlassCard rounded={radius.pill} bordered padded={ms(6)} style={styles.bar}>
         <View style={styles.row}>
           {head.map((t) => (
             <Tab key={t.route.key} route={t.route} focused={t.focused} />

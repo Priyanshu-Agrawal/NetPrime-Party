@@ -1,26 +1,25 @@
 /**
- * GlassButton — frosted-glass Pressable for controls over the app background.
+ * GlassButton — glass Pressable for round buttons and pills. blur={false} = solid warm tint.
  */
 import { colors, radius } from "@/theme/bearoom";
-import { Frost } from "./Frost";
 import React from "react";
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { BouncyPressable } from "./BouncyPressable";
+import { Glass } from "./glass";
 
 interface Props {
   onPress?: () => void;
   children: React.ReactNode;
-  intensity?: number;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
   hitSlop?: number;
-  /** Real frosted blur (default). false = solid tint — use over/near video: the blur re-samples every frame and stutters playback. */
+  /** Glass (default) or a solid warm tint. */
   blur?: boolean;
   /** Screen-reader label — required for icon-only buttons that render no text. */
   accessibilityLabel?: string;
 }
 
-export function GlassButton({ onPress, children, intensity = 42, style, disabled, hitSlop = 6, blur = true, accessibilityLabel }: Props) {
+export function GlassButton({ onPress, children, style, disabled, hitSlop = 6, blur = true, accessibilityLabel }: Props) {
   return (
     <BouncyPressable
       onPress={onPress}
@@ -30,8 +29,11 @@ export function GlassButton({ onPress, children, intensity = 42, style, disabled
       accessibilityLabel={accessibilityLabel}
       style={[styles.btn, style]}
     >
-      {blur ? <Frost intensity={intensity} style={StyleSheet.absoluteFill} /> : null}
-      <View style={[StyleSheet.absoluteFill, blur ? styles.tint : styles.solid]} />
+      {blur ? (
+        <Glass material="control" radius={radius.pill} interactive />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.solid]} />
+      )}
       {children}
     </BouncyPressable>
   );
@@ -46,7 +48,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tint: { backgroundColor: colors.overlay },
   solid: { backgroundColor: colors.surfaceStrong },
 });
 

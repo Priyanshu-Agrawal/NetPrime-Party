@@ -188,8 +188,6 @@ export const glow = {
   },
 } satisfies Record<string, ViewStyle>;
 
-/** Default BlurView params for frosted glass surfaces. */
-export const glass = { intensity: 24, tint: "dark" } as const;
 /**
  * Glass materials (spec 2026-10-11 D6). blur: Android blur radius in dp · saturation: lift on the blurred
  * backdrop · tint: drawn over real blur · solid: crafted glass (no blur) · iosIntensity: expo-blur intensity ·
@@ -213,7 +211,6 @@ export const theme = {
   font,
   type,
   glow,
-  glass,
   chat,
   interaction,
   layout: layoutTokens,
