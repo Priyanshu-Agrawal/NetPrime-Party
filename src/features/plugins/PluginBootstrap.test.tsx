@@ -46,10 +46,18 @@ describe("PluginBootstrap", () => {
     expect(mockSync).not.toHaveBeenCalled();
   });
 
-  it("mounts the sandbox and installs /config's repos (the cached list offline) when the flag is on", () => {
+  it("with the flag on, installs /config's repos (the cached list offline) but mounts the sandbox only while something holds it", () => {
     mockFlags = { ...mockFlags, pluginHost: true };
-    expect(sandboxes(render())).toHaveLength(1);
+    const r = render();
     expect(mockSync).toHaveBeenCalledWith(mockRepos);
+    expect(sandboxes(r)).toHaveLength(0);
+    let release = () => {};
+    act(() => {
+      release = holdSandbox();
+    });
+    expect(sandboxes(r)).toHaveLength(1);
+    act(() => release());
+    expect(sandboxes(r)).toHaveLength(0);
   });
 
   it("a dev screen can hold the sandbox open with the flag off, without installing anything", () => {
@@ -64,7 +72,9 @@ describe("PluginBootstrap", () => {
   it("never mounts in a binary without BearoomFetch", () => {
     mockAvailable = false;
     mockFlags = { ...mockFlags, pluginHost: true };
+    const release = holdSandbox();
     expect(sandboxes(render())).toHaveLength(0);
     expect(mockSync).not.toHaveBeenCalled();
+    release();
   });
 });

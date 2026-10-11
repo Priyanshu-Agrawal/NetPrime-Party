@@ -8,7 +8,7 @@ import type { PluginRepoRow } from "@/src/types/worker.types";
 import { CookieJar } from "./cookieJar";
 import { Limiter } from "./limiter";
 import { PluginHost } from "./PluginHost";
-import { pluginFetch, toPluginFetchRequest, type PluginFetchDeps } from "./pluginFetch";
+import { pluginFetch, toPluginFetchRequest, type PluginFetchDeps, type PluginFetchRequest } from "./pluginFetch";
 import { collectGarbage, installRepo, loadPlugins, type LoadedPlugin, type RepoStatus } from "./registry";
 import type { RunEnv } from "./sandbox/protocol";
 import { SandboxBridge } from "./sandboxBridge";
@@ -41,6 +41,11 @@ export const sandboxBridge = new SandboxBridge({
   // Dev builds only, and never with a URL in it: stream URLs and tokens must not reach any log.
   onLog: __DEV__ ? (key, level, msg) => console.log(`[plugin ${key}] ${level}: ${msg.replace(URLISH, "<url>")}`) : undefined,
 });
+
+/** The host's own fetch (the stream probe): the same per-hop guard and limits, and no plugin's cookies. */
+export function hostFetch(req: PluginFetchRequest) {
+  return pluginFetch(new CookieJar(), req, fetchDeps);
+}
 
 const registryJar = new CookieJar();
 async function download(url: string) {

@@ -1650,6 +1650,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 import type { HostResult } from "@/services/plugins/PluginHost";
 import type { PluginStream } from "@/services/plugins/streams";
 import type { PlaybackCandidate } from "./candidate";
+import type { ProbeContext } from "./probe";
 import { PROBE_TOP, probeByBackend, resolvePlayback, sourceIdOf } from "./resolver";
 
 const stream = (plugin: string, url: string, name = "Hindi"): PluginStream => ({
@@ -1673,7 +1674,7 @@ function deps(host: HostResult, verdicts: Record<string, Partial<PlaybackCandida
     warm,
     d: {
       getStreams: jest.fn(async () => host),
-      probe: jest.fn(async (c: PlaybackCandidate) => {
+      probe: jest.fn(async (c: PlaybackCandidate, _ctx: ProbeContext) => {
         probed.push(c.url);
         return { ...c, verdict: "ok" as const, ...verdicts[c.url] };
       }),

@@ -31,3 +31,16 @@ function subscribe(fn: () => void): () => void {
 export function useSandboxDemand(): number {
   return useSyncExternalStore(subscribe, sandboxDemand);
 }
+
+let warmRelease: (() => void) | null = null;
+let warmTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Keep the sandbox mounted for `ms` after the latest call: resolves come in bursts, and mounting costs ~0.5 s. */
+export function warmSandbox(ms = 120_000): void {
+  warmRelease ??= holdSandbox();
+  clearTimeout(warmTimer);
+  warmTimer = setTimeout(() => {
+    warmRelease?.();
+    warmRelease = null;
+  }, ms);
+}

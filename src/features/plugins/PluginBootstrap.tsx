@@ -7,9 +7,10 @@ import React, { useEffect } from "react";
 import { Platform } from "react-native";
 
 /**
- * Headless (spec §5.4): while /config's `pluginHost` flag is on, keeps the plugin sandbox mounted and the installed
- * repos in step with /config.pluginRepos — the device's cached copy when offline, so nothing downloads until a
- * download can work. A dev screen can hold the sandbox open with the flag off (no installs then).
+ * Headless (spec §5.4): while /config's `pluginHost` flag is on, keeps the installed repos in step with
+ * /config.pluginRepos — the device's cached copy when offline, so nothing downloads until a download can work. The
+ * sandbox mounts only while something holds it (a resolve keeps it 2 minutes; the Plugin Lab while it is open): its
+ * WebView renderer costs ≈118 MB.
  */
 export default function PluginBootstrap() {
   const { pluginHost } = useFeatureFlags();
@@ -21,5 +22,5 @@ export default function PluginBootstrap() {
     if (supported && pluginHost) void syncRepos(repos);
   }, [supported, pluginHost, repos]);
 
-  return supported && (pluginHost || demand > 0) ? <PluginSandbox bridge={sandboxBridge} /> : null;
+  return supported && demand > 0 ? <PluginSandbox bridge={sandboxBridge} /> : null;
 }
