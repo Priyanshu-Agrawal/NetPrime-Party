@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.bearoomfetch'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.bearoomfetch"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // React Native ships OkHttp in every app; compile against the version it declares
+  // (node_modules/react-native/gradle/libs.versions.toml — bump with RN).
+  compileOnly "com.squareup.okhttp3:okhttp:4.9.2"
+}

@@ -1,4 +1,6 @@
 PODS:
+  - BearoomFetch (1.0.0):
+    - ExpoModulesCore
   - BearoomPlayer (1.0.0):
     - ExpoModulesCore
   - EXConstants (57.0.21):
@@ -2549,6 +2551,7 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - BearoomFetch (from `../modules/bearoom-fetch/ios`)
   - BearoomPlayer (from `../modules/bearoom-player/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXJSONUtils (from `../node_modules/expo-json-utils/ios`)
@@ -2674,6 +2677,8 @@ SPEC REPOS:
     - MMKVCore
 
 EXTERNAL SOURCES:
+  BearoomFetch:
+    :path: "../modules/bearoom-fetch/ios"
   BearoomPlayer:
     :path: "../modules/bearoom-player/ios"
   EXConstants:
@@ -2913,6 +2918,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  BearoomFetch: ff8a31a0663e4b6de9c73740fcef61b4458443e1
   BearoomPlayer: 6cee02f31c38fb8a9a989d1e98d69cf9de1a8f17
   EXConstants: b4e9051547ee9b8337155565fbdbe66036865120
   EXJSONUtils: a49e3ef80dff762108e5690c7b2f360675dcf7f6
