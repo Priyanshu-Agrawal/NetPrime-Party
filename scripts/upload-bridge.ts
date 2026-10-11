@@ -7,7 +7,7 @@
  * `script_version` to the providers row via the service-role key, then purges
  * the worker's edge cache so the new script serves immediately.
  *
- * Run (service-role key never committed — pass it at call time):
+ * Run (service-role key never committed — from the env, or the git-ignored .env.local):
  *   SUPABASE_SERVICE_ROLE_KEY=sb_secret_… npx tsx scripts/upload-bridge.ts videasy
  *   SUPABASE_SERVICE_ROLE_KEY=…            npx tsx scripts/upload-bridge.ts all
  *   npx tsx scripts/upload-bridge.ts videasy --dry-run   # compile+validate only
@@ -132,9 +132,9 @@ async function main(): Promise<void> {
   }
 
   const url = process.env.SUPABASE_URL || envFromDotLocal("EXPO_PUBLIC_SUPABASE_URL");
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || envFromDotLocal("SUPABASE_SERVICE_ROLE_KEY");
   if (!url) fail("Missing Supabase URL (SUPABASE_URL env or EXPO_PUBLIC_SUPABASE_URL in .env.local).");
-  if (!key) fail("Missing SUPABASE_SERVICE_ROLE_KEY (service-role — bypasses RLS). Pass it at call time.");
+  if (!key) fail("Missing SUPABASE_SERVICE_ROLE_KEY (service-role — bypasses RLS): env or the git-ignored .env.local.");
 
   for (const id of ids) await upload(id, url, key);
 
