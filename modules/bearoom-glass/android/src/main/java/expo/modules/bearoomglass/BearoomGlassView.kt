@@ -13,6 +13,7 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.view.animation.AnimationUtils
 import androidx.annotation.RequiresApi
+import java.lang.ref.WeakReference
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.views.ExpoView
 import kotlin.math.ceil
@@ -30,7 +31,10 @@ private const val REFRESH_INTERVAL_MS = 14L
  */
 class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val blur: Blur? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Blur() else null
-  private var backdrop: BearoomGlassBackdropView? = null
+  // Weak: a backdrop whose screen is gone must not be kept alive by a glass that outlives it.
+  private var backdropRef: WeakReference<BearoomGlassBackdropView>? = null
+  private val backdrop: BearoomGlassBackdropView?
+    get() = backdropRef?.get()
   private var blurRadiusDp = 20f
   private var lastRefreshMs = 0L
   private var saturation = 1f
@@ -40,6 +44,8 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   private val theirs = IntArray(2)
   private var drawnDx = Int.MIN_VALUE
   private var drawnDy = Int.MIN_VALUE
+  private var askedDx = Int.MIN_VALUE
+  private var askedDy = Int.MIN_VALUE
 
   // Runs only for frames the window draws anyway (scrolling, video, animations) — it never schedules one.
   // - Scrolling and transitions move this view (or the backdrop) without redrawing it: re-check the offset
@@ -48,10 +54,16 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   //   changes: mark them for re-render in this frame.
   private val frameWatcher = ViewTreeObserver.OnPreDrawListener {
     val b = backdrop
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && canBlur(b)) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && isShown && canBlur(b)) {
       measureOffset(b)
       if (own[0] != drawnDx || own[1] != drawnDy) {
-        invalidate()
+        // Ask once per new offset: invalidating here schedules a frame, so a glass that never gets drawn
+        // must not ask again on every frame.
+        if (own[0] != askedDx || own[1] != askedDy) {
+          askedDx = own[0]
+          askedDy = own[1]
+          invalidate()
+        }
       } else {
         val now = AnimationUtils.currentAnimationTimeMillis()
         if (now - lastRefreshMs >= REFRESH_INTERVAL_MS) {
@@ -68,8 +80,9 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   }
 
   fun setBackdropTag(tag: Int?) {
-    backdrop = tag?.let { appContext.findView<BearoomGlassBackdropView>(it) }
+    backdropRef = tag?.let { appContext.findView<BearoomGlassBackdropView>(it) }?.let { WeakReference(it) }
     drawnDx = Int.MIN_VALUE
+    askedDx = Int.MIN_VALUE
     invalidate()
   }
 
@@ -106,6 +119,10 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
 
   override fun onDetachedFromWindow() {
     viewTreeObserver.removeOnPreDrawListener(frameWatcher)
+    // Free the GPU-side recording; it is re-recorded on the next draw if the view comes back.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) blur?.discard()
+    drawnDx = Int.MIN_VALUE
+    askedDx = Int.MIN_VALUE
     super.onDetachedFromWindow()
   }
 
@@ -115,23 +132,28 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
     super.onDraw(canvas)
     val b = backdrop
     val source = b?.renderNode
+    // Always opaque underneath: over a blurred copy, the backdrop records content but not the background behind
+    // it (text and gaps would stay see-through); and when the copy can't be drawn (backdrop gone, another
+    // window) the glass still reads as a solid bar instead of showing sharp content through a thin tint.
+    if (baseColor != Color.TRANSPARENT) canvas.drawColor(baseColor)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && source != null &&
       canvas.isHardwareAccelerated && canBlur(b)
     ) {
       measureOffset(b)
       drawnDx = own[0]
       drawnDy = own[1]
-      // The backdrop records content, not the background behind it: without an opaque base, text and gaps in
-      // the blurred copy stay see-through and the sharp originals show through the glass.
-      if (baseColor != Color.TRANSPARENT) canvas.drawColor(baseColor)
       val radiusPx = blurRadiusDp * resources.displayMetrics.density
       blur.draw(canvas, source, width, height, drawnDx, drawnDy, radiusPx, saturation)
     }
     if (overlayColor != Color.TRANSPARENT) canvas.drawColor(overlayColor)
   }
 
-  /** Attached, sized, and not inside the backdrop (drawing that would make the render tree contain itself). */
-  private fun canBlur(b: View): Boolean = b.isAttachedToWindow && width > 0 && height > 0 && !isInside(b)
+  /**
+   * Attached to this same window (a RenderNode from another window, e.g. a Modal's, must not be drawn here),
+   * sized, and not inside the backdrop (drawing that would make the render tree contain itself).
+   */
+  private fun canBlur(b: View): Boolean =
+    b.isAttachedToWindow && b.rootView === rootView && width > 0 && height > 0 && !isInside(b)
 
   /** Leaves this view's offset from the backdrop in own[0], own[1]. */
   private fun measureOffset(b: View) {
@@ -158,6 +180,10 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
 
     fun markDirty() {
       effectDirty = true
+    }
+
+    fun discard() {
+      node.discardDisplayList()
     }
 
     /** Re-render the cached blur layer this frame (a changed property; the pivot has no visible effect). */

@@ -23,6 +23,12 @@ class BearoomGlassBackdropView(context: Context, appContext: AppContext) : ExpoV
   val renderNode: RenderNode?
     get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) recorder?.node else null
 
+  override fun onDetachedFromWindow() {
+    // Free the recording; it is re-recorded on the next draw if the view comes back.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) recorder?.node?.discardDisplayList()
+    super.onDetachedFromWindow()
+  }
+
   // React Native positions the children; LinearLayout (ExpoView's base) must not re-arrange them.
   override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {}
 
