@@ -109,13 +109,24 @@ export const GENERIC_BRIDGE: string = `
   function markApplying(){ applying = Date.now() + 500; }
   function isApplying(){ return Date.now() < applying; }
   function isSubTrack(t){ return !t.kind || t.kind === 'subtitles' || t.kind === 'captions'; }
+  // A track can show text if the browser loads it itself (a <track> file) or it holds cues. Tracks
+  // a player made but fills itself (VidFast draws its own subtitles) would show nothing when picked.
+  // Remembered once seen: browsers report no cues for a track after it's switched off.
+  var showable = [];
+  function canShow(t, v){
+    if (showable.indexOf(t) !== -1) return true;
+    var ok = !!(t.cues && t.cues.length);
+    try { var els = v.getElementsByTagName('track'); for (var j = 0; j < els.length && !ok; j++) if (els[j].track === t) ok = true; } catch(e){}
+    if (ok) showable.push(t);
+    return ok;
+  }
   function subsOf(v){
     var out = [];
     try {
       var tt = v.textTracks || [];
       for (var i = 0; i < tt.length; i++){
         var t = tt[i];
-        if (!isSubTrack(t)) continue;
+        if (!isSubTrack(t) || !canShow(t, v)) continue;
         out.push({ id: String(i), label: t.label || t.language || ('Track ' + (i + 1)), language: t.language || '', selected: t.mode === 'showing' });
       }
     } catch(e){}

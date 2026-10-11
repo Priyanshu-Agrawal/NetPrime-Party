@@ -103,10 +103,11 @@ describe("generic bridge", () => {
   });
 
   it("lists subtitle tracks and switches between them", () => {
+    const cues = [{}];
     const tracks = [
-      { kind: "subtitles", label: "English", language: "en", mode: "disabled" },
-      { kind: "metadata", label: "id3", language: "", mode: "hidden" },
-      { kind: "subtitles", label: "Hindi", language: "hi", mode: "disabled" },
+      { kind: "subtitles", label: "English", language: "en", mode: "hidden", cues },
+      { kind: "metadata", label: "id3", language: "", mode: "hidden", cues },
+      { kind: "subtitles", label: "Hindi", language: "hi", mode: "hidden", cues },
     ];
     load();
     addVideo(8349, tracks);
@@ -117,6 +118,20 @@ describe("generic bridge", () => {
     expect(tracks.map((t) => t.mode)).toEqual(["disabled", "hidden", "showing"]);
     (window as any).__vlCmd({ action: "setSub", id: null });
     expect(tracks.map((t) => t.mode)).toEqual(["disabled", "hidden", "disabled"]);
+  });
+
+  it("lists only subtitle tracks that can show text (a <track> file, or cues already loaded)", () => {
+    // VidFast: player-made tracks with no cues — it draws subtitles itself, so picking one shows nothing.
+    const empty = { kind: "subtitles", label: "English", language: "en", mode: "disabled", cues: null };
+    const loaded = { kind: "subtitles", label: "Hindi", language: "hi", mode: "hidden", cues: [{}] };
+    const sidecar = { kind: "subtitles", label: "French", language: "fr", mode: "disabled", cues: null };
+    load();
+    const v = addVideo(8349, [empty, loaded, sidecar]);
+    const el = document.createElement("track");
+    Object.defineProperty(el, "track", { value: sidecar });
+    v.appendChild(el);
+    jest.advanceTimersByTime(700);
+    expect(events("subs")[0].subs.map((s: Msg) => s.label)).toEqual(["Hindi", "French"]);
   });
 
   it("blocks popups", () => {
