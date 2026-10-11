@@ -48,6 +48,7 @@ export type RootStackParamList = {
   TrendingShows: undefined;
   HomePrefs: undefined;
   TestStreams: undefined;
+  PluginLab: undefined;
 };
 
 declare global {

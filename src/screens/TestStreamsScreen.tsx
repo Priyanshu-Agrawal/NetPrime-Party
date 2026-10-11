@@ -1,7 +1,7 @@
 /** Dev-only list of public test streams that open in the native player (spec §6.2.2). */
 import { streamsFor } from "@/src/features/dev/testStreams";
 import { useTestStreamsEnabled } from "@/src/features/dev/testStreamsGate";
-import { openNativePlayer } from "@/src/navigation/actions";
+import { openNativePlayer, openPluginLab } from "@/src/navigation/actions";
 import { IconButton } from "@/src/ui";
 import { colors, font, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -26,6 +26,16 @@ export default function TestStreamsScreen() {
           <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
         </IconButton>
         <Text style={styles.title}>Test streams</Text>
+        {enabled ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open plugin lab"
+            style={({ pressed }) => [styles.labButton, pressed && pressedStyle]}
+            onPress={openPluginLab}
+          >
+            <Text style={styles.labText}>Plugin lab</Text>
+          </Pressable>
+        ) : null}
       </View>
       {enabled ? (
         <FlatList
@@ -55,6 +65,14 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: "row", alignItems: "center", gap: ms(12), paddingHorizontal: spacing.lg },
   title: { color: colors.text, fontFamily: font.headline, fontSize: ms(20) },
+  labButton: {
+    marginLeft: "auto",
+    paddingHorizontal: spacing.md,
+    paddingVertical: ms(7),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+  },
+  labText: { color: colors.text, fontFamily: font.bodySemi, fontSize: ms(13) },
   row: {
     padding: spacing.md,
     borderRadius: radius.lg,

@@ -44,6 +44,10 @@ export function openTestStreams() {
   navigate("TestStreams");
 }
 
+export function openPluginLab() {
+  navigate("PluginLab");
+}
+
 export function openSeeAll(title: string, path: string, kind: "movie" | "tv") {
   navigate("PlayerStack", { screen: "RailSeeAll", params: { title, path, kind } });
 }

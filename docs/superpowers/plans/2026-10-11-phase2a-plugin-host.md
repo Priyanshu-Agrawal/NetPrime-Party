@@ -4821,7 +4821,9 @@ describe("plugin self-test cases", () => {
 
 describe("runSelfTest", () => {
   it("runs every case in order, each as its own plugin, and reports as it goes", async () => {
-    const run = jest.fn(async () => Promise.reject(Object.assign(new Error("nope"), { code: "plugin" })));
+    const run = jest.fn(async (_key: string, _source: string, _timeoutMs: number): Promise<unknown> =>
+      Promise.reject(Object.assign(new Error("nope"), { code: "plugin" })),
+    );
     const seen: string[] = [];
     const out = await runSelfTest(run, (r) => seen.push(r.name));
     expect(out).toHaveLength(SELF_TEST.length);
