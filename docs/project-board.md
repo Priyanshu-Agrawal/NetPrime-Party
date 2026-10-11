@@ -491,6 +491,9 @@ Spec `docs/superpowers/specs/2026-10-11-glass-design.md` · plan `docs/superpowe
   scaled draw renders it black → controls over video are crafted glass on Android, Liquid Glass on iOS. Live
   video glass returns with Phase 1B's native player (`TextureView`).
 - Not verified this round: iOS 27 simulator (busy with parallel work) — Liquid Glass look and fades to check next.
+- Follow-ups done the same day: all review minors (opaque fallback, frame-loop guard, same-window check,
+  backdrop prop, backdrops registered from navigation events, touchable interactive Liquid Glass, recordings
+  freed on detach) and the movie/TV details error state (back + Try again, checked in airplane mode).
 - Separate finding (not glass): party playback measured 10–52 % janky frames (~33 fps drawn, p99 15–20 ms) while
   no blur runs over the video; Home scroll has 50–67 ms frames inside main-thread animation callbacks. Both
   queued as their own perf items.
