@@ -94,3 +94,18 @@ describe("PartySyncEngine — WebView rooms (no capabilities) are unchanged", ()
     expect(p.setRate).toHaveBeenCalled();
   });
 });
+
+describe("PartySyncEngine — drift stats (the S5 gate's readout)", () => {
+  it("reports p50/p95 of the absolute offset from the room over recent ticks", () => {
+    const e = new PartySyncEngine(client(false), player(NATIVE));
+    e.setAnchor(anchor());
+    expect(e.driftStats()).toEqual({ n: 0, p50: 0, p95: 0 });
+    const offsets = [0.1, -0.2, 0.05, 0.3, -0.1, 0.0, 0.4, -0.05, 0.2, 0.15];
+    for (const o of offsets) e.onPlayerEvent(ev("tick", 100 + o));
+    const s = e.driftStats();
+    expect(s.n).toBe(10);
+    expect(s.p50).toBeCloseTo(0.1, 5);
+    expect(s.p95).toBeCloseTo(0.4, 5);
+  });
+});
+

@@ -73,6 +73,8 @@ export interface PartyActions {
   kick: (userId: string) => Promise<void>;
   grabControl: () => Promise<void>;
   jumpToLive: () => void;
+  /** How far this player sat from the room recently (dev readout for the drift gate). */
+  driftStats: () => { n: number; p50: number; p95: number };
   resync: () => void;
   // queue
   queueAdd: (items: QueueItemInput[], position?: "end" | "next") => Promise<void>;
@@ -147,6 +149,7 @@ const IDLE: PartySessionValue = {
   kick: NOOP_ASYNC,
   grabControl: NOOP_ASYNC,
   jumpToLive: () => {},
+  driftStats: () => ({ n: 0, p50: 0, p95: 0 }),
   resync: () => {},
   queueAdd: NOOP_ASYNC,
   queueRemove: NOOP_ASYNC,
@@ -396,6 +399,7 @@ function PartySessionInner({
       kick: (uid) => client.kick(uid),
       grabControl: () => client.grabControl(),
       jumpToLive: () => engine.jumpToLive(),
+      driftStats: () => engine.driftStats(),
       resync: () => engine.resync(),
       queueAdd: (items, position) => client.queueAdd(items, position),
       queueRemove: (ids) => client.queueRemove(ids),

@@ -73,6 +73,8 @@ export class PartySyncEngine {
   private rate = 1;
   private lastHardSeek = 0;
   private stallTimer: ReturnType<typeof setTimeout> | null = null;
+  /** |offset from the room| per tick while following a playing room (the S5 readout); last 600 ticks. */
+  private recentDrift: number[] = [];
   private stalled = false;
   /** The room was paused because of the host's stall (so recovery resumes it — and only then). */
   private pausedForStall = false;
@@ -170,6 +172,13 @@ export class PartySyncEngine {
     } else if (!this.detached && this.anchor?.status === "playing") this.player.seek(this.expectedSec() + CATCH_UP_LEAD_S);
   }
 
+  /** p50/p95 of how far this player sat from the room over recent ticks (seconds; nearest rank). */
+  driftStats(): { n: number; p50: number; p95: number } {
+    const s = [...this.recentDrift].sort((a, b) => a - b);
+    const at = (p: number) => (s.length ? s[Math.max(0, Math.ceil(p * s.length) - 1)] : 0);
+    return { n: s.length, p50: at(0.5), p95: at(0.95) };
+  }
+
   // --- helpers --------------------------------------------------------------
   private expectedSec(): number {
     if (!this.anchor) return 0;
@@ -242,6 +251,8 @@ export class PartySyncEngine {
     const base = this.anchor.rate || 1;
     const exp = this.expectedSec();
     const rawDrift = e.currentTime - exp;
+    this.recentDrift.push(Math.abs(rawDrift));
+    if (this.recentDrift.length > 600) this.recentDrift.shift();
     if (__DEV__) {
       // Party-gate instrumentation (read over CDP): every raw drift sample, in seconds.
       const g = globalThis as unknown as { __partyDrift?: { t: number; d: number }[] };

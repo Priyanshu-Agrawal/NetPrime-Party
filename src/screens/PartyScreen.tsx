@@ -76,6 +76,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassLayer } from "@/src/ui/glass";
 import { NativeRoomPlayer, type StreamIdentity } from "@/src/features/party/NativeRoomPlayer";
+import { DriftReadout } from "@/src/features/party/DriftReadout";
 import { pendingHostStream } from "@/src/features/party/pendingHostStream";
 import { relocateSame } from "@/src/features/party/roomStream";
 import { currentItem, nativeSeed, roomLane } from "@/src/features/party/roomLane";
@@ -896,6 +897,11 @@ export default function Party() {
                     }
                   />
                 ) : null}
+                {nativeItem ? (
+                  <View pointerEvents="none" style={styles.driftReadout}>
+                    <DriftReadout stats={party.driftStats} />
+                  </View>
+                ) : null}
               </GlassLayer>
             </>
           ) : !snap ? (
@@ -1428,6 +1434,8 @@ function FloatingEmoji({ reaction, offset }: { reaction: FloatingReaction; offse
 }
 
 const styles = StyleSheet.create({
+  // Test builds: the drift readout sits at the top of the player, clear of the controls.
+  driftReadout: { position: "absolute", top: ms(2), left: ms(56), right: ms(56) },
   container: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
 
