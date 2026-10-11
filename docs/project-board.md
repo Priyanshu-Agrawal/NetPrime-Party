@@ -418,7 +418,7 @@ we already have.
   guest vs host end to end p50 0.13 s · **p95 0.34 s** · max 0.60 s (gate ≤ 1 s); no provider UI on either.
 * Dead providers skipped silently (vixsrc TV, vidlink, mycineby, 111movies); F4 (`id=99999999`) ends on the branded
   error card with Retry · Try another source.
-* `[ ]` Phone leg (Nothing Phone 1 disconnected) · `[ ]` publish the bridge + provider data (owner's go-ahead).
+* `[ ]` Phone leg (Nothing Phone 1 disconnected) · `[x]` **published 2026-10-11 06:21** — bridge `37f02567` on vidfast, vidnest, vixsrc, vidlink (priorities 1–4), videasy disabled; verified live with the dev switch off (Fight Club → VidFast, our controls, picture).
 
 **Publish plan (after the owner says yes):** scripts for vidfast, vidnest, vixsrc, vidlink only; priority vidfast 1,
 vidnest 2, vixsrc 3, vidlink 4, then plain embeds; no script for mycineby, 111movies (dead), vidcore, vidphantom
