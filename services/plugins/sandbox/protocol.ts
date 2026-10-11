@@ -8,10 +8,12 @@ export type HostFrame =
   | { t: "run"; id: string; key: string; args: unknown[]; env: RunEnv }
   | { t: "fetchResult"; id: string; reqId: number; ok: true; res: FetchResultPayload }
   | { t: "fetchResult"; id: string; reqId: number; ok: false; error: string; code: string }
-  | { t: "kill"; id: string };
+  | { t: "kill"; id: string }
+  | { t: "ping"; n: number };
 export type DocFrame =
   | { t: "ready"; protocol: number; csp: boolean }
   | { t: "fetch"; id: string; reqId: number; req: unknown }
   | { t: "done"; id: string; ok: true; result: unknown; ms: number }
   | { t: "done"; id: string; ok: false; error: string; ms: number }
-  | { t: "log"; id: string; level: "log" | "warn" | "error"; msg: string };
+  | { t: "log"; id: string; level: "log" | "warn" | "error"; msg: string }
+  | { t: "pong"; n: number };

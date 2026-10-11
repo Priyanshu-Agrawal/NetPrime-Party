@@ -1,5 +1,5 @@
 import type { HostFrame } from "./sandbox/protocol";
-import { frameScript, READY_TIMEOUT_MS, RESTART_AFTER_TIMEOUTS, SandboxBridge } from "./sandboxBridge";
+import { frameScript, PING_TIMEOUT_MS, READY_TIMEOUT_MS, SandboxBridge } from "./sandboxBridge";
 
 const ENV = { tmdbApiKey: "k", settings: {}, debug: false };
 const PLUGIN = { key: "r/p@abc", source: "module.exports = { getStreams: () => [] };" };
@@ -119,33 +119,38 @@ describe("SandboxBridge", () => {
     expect(() => done(id, { ok: true, result: 1 })).not.toThrow();
   });
 
-  it(`restarts the page after ${RESTART_AFTER_TIMEOUTS} timeouts in a row; an answer in between resets the count`, async () => {
+  it("after killing a call it pings the page; a page that answers keeps every other call alive", async () => {
     const { bridge, inject, restart, ready, done } = setup();
     ready();
-    const a = bridge.run(PLUGIN, [], ENV, 1000).catch(() => null);
-    const b = bridge.run(PLUGIN, [], ENV, 1000).catch(() => null);
+    const slow = bridge.run(PLUGIN, [], ENV, 1000).catch((e) => e);
+    const healthy = bridge.run(PLUGIN, [], ENV, 60_000);
     await jest.advanceTimersByTimeAsync(1000);
-    await Promise.all([a, b]);
-    const c = bridge.run(PLUGIN, [], ENV, 5000);
-    await jest.advanceTimersByTimeAsync(0);
-    done(runIds(inject)[2], { ok: true, result: 1 });
-    await c;
-    const d = bridge.run(PLUGIN, [], ENV, 1000).catch(() => null);
-    await jest.advanceTimersByTimeAsync(1000);
-    await d;
+    expect(await slow).toMatchObject({ code: "timeout" });
+    const ping = framesOf(inject).find((f) => f.t === "ping");
+    expect(ping).toBeDefined();
+    bridge.onMessage(JSON.stringify({ t: "pong", n: (ping as { n: number }).n }));
+    await jest.advanceTimersByTimeAsync(PING_TIMEOUT_MS * 2);
     expect(restart).not.toHaveBeenCalled();
-    const e = bridge.run(PLUGIN, [], ENV, 1000).catch(() => null);
-    const f = bridge.run(PLUGIN, [], ENV, 1000).catch(() => null);
+    done(runIds(inject)[1], { ok: true, result: "still here" });
+    await expect(healthy).resolves.toBe("still here");
+  });
+
+  it("a page that doesn't answer the ping is replaced", async () => {
+    const { bridge, restart, ready } = setup();
+    ready();
+    const slow = bridge.run(PLUGIN, [], ENV, 1000).catch(() => null);
     await jest.advanceTimersByTimeAsync(1000);
-    await Promise.all([e, f]);
+    await slow;
+    await jest.advanceTimersByTimeAsync(PING_TIMEOUT_MS);
     expect(restart).toHaveBeenCalledTimes(1);
   });
 
-  it("fails calls when the page never becomes ready", async () => {
-    const { bridge } = setup();
+  it("fails calls when the page never becomes ready, and replaces the page", async () => {
+    const { bridge, restart } = setup();
     const settled = bridge.run(PLUGIN, [], ENV, 1000).catch((e) => e);
     await jest.advanceTimersByTimeAsync(READY_TIMEOUT_MS);
     expect(await settled).toMatchObject({ code: "not-ready" });
+    expect(restart).toHaveBeenCalledTimes(1);
   });
 
   it("a crashed page fails running calls and asks for a restart", async () => {

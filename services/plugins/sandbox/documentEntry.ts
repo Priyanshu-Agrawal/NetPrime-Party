@@ -76,6 +76,7 @@ page.__bearoom = (raw: string) => {
   else if (m.t === "kill") finish(m.id);
   else if (m.t === "fetchResult") workers.get(m.id)?.postMessage(m);
   else if (m.t === "run") start(m.id, m.key, m.args, m.env);
+  else if (m.t === "ping") send({ t: "pong", n: m.n });
 };
 
 /** CSP self-check: a worker's real fetch of a data: URL must be refused. If it isn't, the host refuses to run plugins. */

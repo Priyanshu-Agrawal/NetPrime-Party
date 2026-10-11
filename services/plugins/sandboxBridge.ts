@@ -34,7 +34,8 @@ export interface BridgeDeps {
 }
 
 export const READY_TIMEOUT_MS = 15_000;
-export const RESTART_AFTER_TIMEOUTS = 3;
+/** After a kill the page must answer a ping this fast, or it is replaced (a stuck page, not a slow plugin). */
+export const PING_TIMEOUT_MS = 2_000;
 
 /** A frame as a script for WebView.injectJavaScript (U+2028/2029 escaped so the literal always parses). */
 export function frameScript(frame: HostFrame): string {
@@ -64,7 +65,8 @@ export class SandboxBridge {
   private calls = new Map<string, Call>();
   private waiters = new Set<Waiter>();
   private seq = 0;
-  private timeoutsInARow = 0;
+  private pingSeq = 0;
+  private pingTimer: ReturnType<typeof setTimeout> | null = null;
   private restart: () => void = () => {};
   private listeners = new Set<() => void>();
   private snapshot: SandboxState = { attached: false, ready: false, csp: false, generation: 0, running: 0 };
@@ -86,6 +88,7 @@ export class SandboxBridge {
 
   /** A freshly mounted page; it announces `ready` when its CSP check is done. */
   attach(inject: (js: string) => void): void {
+    this.clearPing();
     this.inject = inject;
     this.ready = false;
     this.csp = false;
@@ -96,6 +99,7 @@ export class SandboxBridge {
   }
 
   detach(): void {
+    this.clearPing();
     this.inject = null;
     this.ready = false;
     this.loaded.clear();
@@ -129,6 +133,10 @@ export class SandboxBridge {
       this.emit();
       return;
     }
+    if (m.t === "pong") {
+      if (m.n === this.pingSeq) this.clearPing();
+      return;
+    }
     const call = this.calls.get(m.id);
     if (!call) return;
     if (m.t === "fetch") {
@@ -143,7 +151,6 @@ export class SandboxBridge {
     } else if (m.t === "done") {
       this.calls.delete(m.id);
       clearTimeout(call.timer);
-      this.timeoutsInARow = 0;
       if (m.ok) call.resolve(m.result);
       else call.reject(new SandboxError("plugin", m.error));
       this.emit();
@@ -175,6 +182,8 @@ export class SandboxBridge {
         timer: setTimeout(() => {
           this.waiters.delete(waiter);
           reject(new SandboxError("not-ready", "The sandbox did not start"));
+          // A page that never announced itself is stuck: replace it (once, for every waiter that gives up).
+          if (!this.ready && this.inject) this.crashed();
         }, READY_TIMEOUT_MS),
       };
       this.waiters.add(waiter);
@@ -188,10 +197,23 @@ export class SandboxBridge {
     this.send({ t: "kill", id });
     call.reject(new SandboxError("timeout", "The plugin took too long"));
     this.emit();
-    if (++this.timeoutsInARow >= RESTART_AFTER_TIMEOUTS) {
-      this.timeoutsInARow = 0;
+    this.checkAlive();
+  }
+
+  /** A killed worker can't hang the page, but a page can still get stuck: ask it, and replace it if it is silent. */
+  private checkAlive(): void {
+    if (this.pingTimer) return;
+    const n = ++this.pingSeq;
+    this.pingTimer = setTimeout(() => {
+      this.pingTimer = null;
       this.crashed();
-    }
+    }, PING_TIMEOUT_MS);
+    this.send({ t: "ping", n });
+  }
+
+  private clearPing(): void {
+    if (this.pingTimer) clearTimeout(this.pingTimer);
+    this.pingTimer = null;
   }
 
   private failCalls(code: SandboxErrorCode, message: string): void {
