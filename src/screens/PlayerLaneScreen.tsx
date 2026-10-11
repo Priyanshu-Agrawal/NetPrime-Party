@@ -15,11 +15,10 @@ import { PlayerScreen } from "./PlayerScreen";
 
 type Params = PlayerStackParamList["Player"];
 
-function Lanes({ params, nativeFirst }: { params: Params; nativeFirst: boolean }) {
+function NativeLane({ params, onUseWeb }: { params: Params; onUseWeb: () => void }) {
   const navigation = useNavigation();
-  const [lane, setLane] = useState<"native" | "web">(nativeFirst ? "native" : "web");
+  // TTFF baseline: this episode's Play (or its Next).
   const [startedAt] = useState(() => Date.now());
-  if (lane === "web") return <PlayerScreen />;
   const toNumber = (v: unknown) => (v == null || v === "" ? undefined : Number(v));
   return (
     <TitlePlayer
@@ -30,11 +29,22 @@ function Lanes({ params, nativeFirst }: { params: Params; nativeFirst: boolean }
       title={params.title}
       posterUrl={img(typeof params.poster_path === "string" ? params.poster_path : null, "w342") ?? undefined}
       startedAt={startedAt}
-      onUseWeb={() => setLane("web")}
+      onUseWeb={onUseWeb}
       onClose={exitMediaBack}
       onEpisode={(season, ep) => (navigation as { setParams(p: Partial<Params>): void }).setParams({ season: String(season), ep: String(ep) })}
     />
   );
+}
+
+/**
+ * One title's lane. The web player stays mounted across episodes (it handles its own `setParams` and keeps the
+ * viewer's provider, fullscreen and speed); the native lane resolves each episode afresh. A title handed to the web
+ * player stays there for its next episodes.
+ */
+function Lanes({ params, nativeFirst }: { params: Params; nativeFirst: boolean }) {
+  const [lane, setLane] = useState<"native" | "web">(nativeFirst ? "native" : "web");
+  if (lane === "web") return <PlayerScreen />;
+  return <NativeLane key={`${params.season ?? ""}:${params.ep ?? ""}`} params={params} onUseWeb={() => setLane("web")} />;
 }
 
 export function PlayerLaneScreen() {
@@ -42,7 +52,7 @@ export function PlayerLaneScreen() {
   const params = route.params ?? ({} as Params);
   const { pluginHost, nativeLane } = useFeatureFlags();
   const nativeFirst = pluginHost && nativeLane && Platform.OS !== "web" && nativeFetchAvailable && !!params.id;
-  return <Lanes key={`${params.id}:${params.season ?? ""}:${params.ep ?? ""}`} params={params} nativeFirst={nativeFirst} />;
+  return <Lanes key={String(params.id ?? "")} params={params} nativeFirst={nativeFirst} />;
 }
 
 export default PlayerLaneScreen;

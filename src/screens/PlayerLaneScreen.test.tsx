@@ -23,14 +23,27 @@ jest.mock("@/src/features/player/TitlePlayer", () => {
   return {
     TitlePlayer: (p: any) => {
       mockTitleProps = p;
+      jest.requireActual("react").useEffect(() => {
+        mockNativeMounts++;
+      }, []);
       return <Text>native</Text>;
     },
   };
 });
+let mockWebMounts = 0;
 jest.mock("./PlayerScreen", () => {
+  const R = jest.requireActual("react");
   const { Text } = jest.requireActual("react-native");
-  return { PlayerScreen: () => <Text>web</Text> };
+  return {
+    PlayerScreen: () => {
+      R.useEffect(() => {
+        mockWebMounts++;
+      }, []);
+      return <Text>web</Text>;
+    },
+  };
 });
+let mockNativeMounts = 0;
 
 const texts = (r: ReactTestRenderer) =>
   r.root.findAll((n) => typeof n.type === "string" && typeof n.props.children === "string").map((n) => n.props.children as string);
@@ -47,6 +60,8 @@ beforeEach(() => {
   mockFlags = { embedApiLane: false, nativeLane: true, pluginHost: true };
   mockAvailable = true;
   mockTitleProps = null;
+  mockWebMounts = 0;
+  mockNativeMounts = 0;
 });
 
 describe("PlayerLaneScreen", () => {
@@ -78,5 +93,34 @@ describe("PlayerLaneScreen", () => {
     expect(mockTitleProps).toMatchObject({ type: "tv", season: 1, episode: 3 });
     act(() => mockTitleProps.onEpisode(1, 4));
     expect(mockSetParams).toHaveBeenCalledWith({ season: "1", ep: "4" });
+  });
+
+  it("a new episode resolves again in the native lane", () => {
+    mockParams = { id: "1396", type: "tv", season: "1", ep: "3", title: "Breaking Bad" };
+    const r = render();
+    mockParams = { ...mockParams, ep: "4" };
+    act(() => r.update(<PlayerLaneScreen />));
+    expect(mockNativeMounts).toBe(2);
+    expect(mockTitleProps).toMatchObject({ season: 1, episode: 4 });
+  });
+
+  it("the web player stays mounted across episodes (it keeps the provider, fullscreen and speed)", () => {
+    mockFlags = { ...mockFlags, nativeLane: false };
+    mockParams = { id: "1396", type: "tv", season: "1", ep: "3", title: "Breaking Bad" };
+    const r = render();
+    mockParams = { ...mockParams, ep: "4" };
+    act(() => r.update(<PlayerLaneScreen />));
+    expect(texts(r)).toEqual(["web"]);
+    expect(mockWebMounts).toBe(1);
+  });
+
+  it("once the title is on the web lane, its next episode stays there", () => {
+    mockParams = { id: "1396", type: "tv", season: "1", ep: "3", title: "Breaking Bad" };
+    const r = render();
+    act(() => mockTitleProps.onUseWeb());
+    mockParams = { ...mockParams, ep: "4" };
+    act(() => r.update(<PlayerLaneScreen />));
+    expect(texts(r)).toEqual(["web"]);
+    expect(mockWebMounts).toBe(1);
   });
 });
