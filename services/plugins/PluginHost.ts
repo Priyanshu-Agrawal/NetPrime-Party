@@ -62,6 +62,8 @@ function reasonOf(e: unknown): FailureReason {
 
 export class PluginHost {
   private cache = new Map<string, { at: number; streams: PluginStream[] }>();
+  /** Runs still going, by title|plugin: a second request joins one instead of running the plugin again. */
+  private inflight = new Map<string, Promise<PluginStream[] | PluginFailure>>();
 
   constructor(private readonly deps: HostDeps) {}
 
@@ -112,7 +114,19 @@ export class PluginHost {
         if (hit && this.deps.now() - hit.at < BUDGET.cacheMs) {
           add(p, hit.streams);
           settle();
-        } else queue.push(p);
+          continue;
+        }
+        // Joined runs report health to the caller that started them only (once per run).
+        const shared = this.inflight.get(`${title}|${p.key}`);
+        if (shared) {
+          void shared.then((out) => {
+            if (Array.isArray(out)) add(p, out);
+            else failures.push(out);
+            settle();
+          });
+          continue;
+        }
+        queue.push(p);
       }
       let inFlight = 0;
       const pump = () => {
@@ -133,6 +147,7 @@ export class PluginHost {
 
   clearCache(): void {
     this.cache.clear();
+    this.inflight.clear(); // a fresh resolve (F6: new tokens) must not join an older run
   }
 
   private async runOne(
@@ -143,22 +158,36 @@ export class PluginHost {
     add: (p: LoadedPlugin, list: PluginStream[]) => void,
     onSettled?: (pluginKey: string, failure?: PluginFailure) => void,
   ): Promise<void> {
+    const key = `${title}|${p.key}`;
+    const outcome = this.attempt(p, req, title);
+    this.inflight.set(key, outcome);
+    try {
+      const out = await outcome;
+      if (Array.isArray(out)) {
+        add(p, out);
+        onSettled?.(p.key);
+      } else {
+        failures.push(out);
+        onSettled?.(out.pluginKey, out);
+      }
+    } finally {
+      if (this.inflight.get(key) === outcome) this.inflight.delete(key);
+    }
+  }
+
+  /** One plugin run: its streams (cached), or why it failed. Never rejects. */
+  private async attempt(p: LoadedPlugin, req: ResolveRequest, title: string): Promise<PluginStream[] | PluginFailure> {
     const started = this.deps.now();
-    const fail = (f: PluginFailure) => {
-      failures.push(f);
-      onSettled?.(f.pluginKey, f);
-    };
     try {
       const raw = await this.deps.run(p, req, BUDGET.perPluginMs);
       const ms = this.deps.now() - started;
       const list = this.deps.normalise(p, raw);
-      if (list === null) return fail({ pluginKey: p.key, reason: "bad-shape", ms });
-      if (list.length === 0 && ms < BUDGET.emptyFastMs) return fail({ pluginKey: p.key, reason: "empty-fast", ms });
+      if (list === null) return { pluginKey: p.key, reason: "bad-shape", ms };
+      if (list.length === 0 && ms < BUDGET.emptyFastMs) return { pluginKey: p.key, reason: "empty-fast", ms };
       this.cache.set(`${title}|${p.key}`, { at: this.deps.now(), streams: list });
-      add(p, list);
-      onSettled?.(p.key);
+      return list;
     } catch (e) {
-      fail({ pluginKey: p.key, reason: reasonOf(e), detail: String((e as Error)?.message ?? e).slice(0, 200), ms: this.deps.now() - started });
+      return { pluginKey: p.key, reason: reasonOf(e), detail: String((e as Error)?.message ?? e).slice(0, 200), ms: this.deps.now() - started };
     }
   }
 }

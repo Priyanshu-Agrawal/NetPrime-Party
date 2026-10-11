@@ -130,6 +130,46 @@ describe("PluginHost.getStreams", () => {
     expect(r.complete).toBe(true);
   });
 
+  it("a second call for the same title joins a plugin already running instead of running it twice", async () => {
+    const { host, run, answer } = harness([plugin("a")]);
+    const settledA: string[] = [];
+    const settledB: string[] = [];
+    const first = host.getStreams(REQ, { onSettled: (k) => settledA.push(k) });
+    await jest.advanceTimersByTimeAsync(0);
+    const second = host.getStreams(REQ, { onSettled: (k) => settledB.push(k) });
+    await answer("a", ["u1"]);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect((await first).streams.map((s) => s.url)).toEqual(["u1"]);
+    expect((await second).streams.map((s) => s.url)).toEqual(["u1"]);
+    expect(settledA).toEqual(["r/a@1"]);
+    expect(settledB).toEqual([]);
+  });
+
+  it("a joined run that fails is a failure for both callers, reported once", async () => {
+    const { host, run, pending } = harness([plugin("a")]);
+    const settled: string[] = [];
+    const first = host.getStreams(REQ, { onSettled: (k) => settled.push(k) });
+    await jest.advanceTimersByTimeAsync(0);
+    const second = host.getStreams(REQ, { onSettled: (k) => settled.push(k) });
+    await jest.advanceTimersByTimeAsync(200);
+    pending.get("r/a@1")!.reject(new Error("boom"));
+    await jest.advanceTimersByTimeAsync(0);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect((await first).failures).toHaveLength(1);
+    expect((await second).failures).toHaveLength(1);
+    expect(settled).toEqual(["r/a@1"]);
+  });
+
+  it("after clearCache a new request runs the plugin afresh instead of joining the older run", async () => {
+    const { host, run } = harness([plugin("a")]);
+    void host.getStreams(REQ);
+    await jest.advanceTimersByTimeAsync(0);
+    host.clearCache();
+    void host.getStreams(REQ);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
   it("caches per title for 15 minutes", async () => {
     const { host, run, answer } = harness([plugin("a")]);
     const out = host.getStreams(REQ);
