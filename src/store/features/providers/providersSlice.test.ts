@@ -76,4 +76,17 @@ describe("providers slice", () => {
     const s = reduceConfig(initial(), cfg({ flags: { embedApiLane: true, nativeLane: false, pluginHost: false } }));
     expect(s.flags.embedApiLane).toBe(true);
   });
+
+  const repo = { id: "open-movies", manifestUrl: "https://h.test/manifest.json", version: 1, files: [], enabled: true, down: false, allowPlugins: null };
+
+  it("keeps /config's plugin repos, from the device cache too", () => {
+    expect(reducer(initial(), hydrateFromCache(cfg({ pluginRepos: [repo] }))).pluginRepos).toEqual([repo]);
+    expect(reduceConfig(initial(), cfg({ pluginRepos: [repo] })).pluginRepos).toEqual([repo]);
+    expect(reduceConfig(initial(), cfg()).pluginRepos).toEqual([]); // an old worker without the field
+  });
+
+  it("an outage answer keeps the plugin repos it had", () => {
+    const live = reduceConfig(initial(), cfg({ pluginRepos: [repo] }));
+    expect(reduceConfig(live, cfg({ providers: [] })).pluginRepos).toEqual([repo]);
+  });
 });

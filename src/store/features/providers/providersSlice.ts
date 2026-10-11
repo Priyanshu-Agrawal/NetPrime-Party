@@ -1,7 +1,7 @@
 import { type Provider } from "@/components/player/providerRegistry";
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { workerApi } from "@/src/store/services/workerApi";
-import { DEFAULT_FLAGS, type AppConfig, type FeatureFlags } from "@/src/types/worker.types";
+import { DEFAULT_FLAGS, type AppConfig, type FeatureFlags, type PluginRepoRow } from "@/src/types/worker.types";
 import { shouldAcceptConfig } from "./configCache";
 import { remoteToProviders } from "./mappers";
 
@@ -27,6 +27,8 @@ interface ProvidersState {
     stale: boolean;
     /** Remote lane switches (/config.flags). Default all off. */
     flags: FeatureFlags;
+    /** Operator-listed plugin repos from /config (or the device's cached copy). */
+    pluginRepos: PluginRepoRow[];
     /** Where the current data came from. The device cache never overwrites "live". */
     source: "none" | "cache" | "live";
 }
@@ -37,6 +39,7 @@ const initialState: ProvidersState = {
     region: null,
     stale: false,
     flags: DEFAULT_FLAGS,
+    pluginRepos: [],
     source: "none",
 };
 
@@ -45,6 +48,7 @@ function applyConfig(state: ProvidersState, cfg: AppConfig): void {
     state.maintenanceMode = cfg.maintenanceMode;
     state.region = cfg.region ?? null;
     state.flags = cfg.flags ?? DEFAULT_FLAGS;
+    state.pluginRepos = cfg.pluginRepos ?? [];
 }
 
 /**
@@ -63,6 +67,7 @@ export function reduceConfig(state: ProvidersState, payload: AppConfig): Provide
         maintenanceMode: payload.maintenanceMode,
         region: payload.region ?? null,
         flags: payload.flags ?? DEFAULT_FLAGS,
+        pluginRepos: payload.pluginRepos ?? [],
         source: "live",
         stale: payload.stale === true,
     };

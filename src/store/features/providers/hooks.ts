@@ -1,6 +1,6 @@
 import { useAppSelector } from "@/src/store/hooks";
 import type { Provider } from "@/components/player/providerRegistry";
-import type { FeatureFlags } from "@/src/types/worker.types";
+import type { FeatureFlags, PluginRepoRow } from "@/src/types/worker.types";
 
 /** The live provider list (Supabase-backed, bootstrap until /config loads). */
 export function useProviders(): Provider[] {
@@ -31,4 +31,9 @@ export function useFeatureFlags(): FeatureFlags {
 /** True while the app is running on a cached /config (worker or Supabase outage). */
 export function useConfigStale(): boolean {
     return useAppSelector((s) => s.providers.stale);
+}
+
+/** Plugin repos to install (empty until the operator lists one). */
+export function usePluginRepos(): PluginRepoRow[] {
+    return useAppSelector((s) => s.providers.pluginRepos);
 }

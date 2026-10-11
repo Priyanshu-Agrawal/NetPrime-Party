@@ -23,6 +23,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Provider as ReduxProvider } from "react-redux";
 import { store } from "@/src/store";
 import ConfigBootstrap from "@/src/store/ConfigBootstrap";
+import PluginBootstrap from "@/src/features/plugins/PluginBootstrap";
 import { DarkTheme, NavigationContainer } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
@@ -115,6 +116,7 @@ export default function App() {
             <BottomSheetModalProvider>
             <MovieContextProvider>
               <ConfigBootstrap />
+              <PluginBootstrap />
               <NavigationContainer ref={navigationRef} linking={linking} theme={navTheme} onStateChange={handleNavStateChange}>
                 <StatusBar style={colorScheme === "light" ? "dark" : "light"} />
                 {/* The watch-party session lives ABOVE the navigator so leaving

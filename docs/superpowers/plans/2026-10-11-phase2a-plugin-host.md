@@ -4213,7 +4213,7 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import PluginBootstrap from "./PluginBootstrap";
 
-const mockSync = jest.fn(async () => []);
+const mockSync = jest.fn(async (..._repos: unknown[]) => []);
 jest.mock("@/services/plugins", () => ({ sandboxBridge: { tag: "bridge" }, syncRepos: (...a: unknown[]) => mockSync(...a) }));
 jest.mock("@/components/plugins/PluginSandbox", () => {
   const { View } = jest.requireActual("react-native");
@@ -4230,13 +4230,19 @@ jest.mock("@/modules/bearoom-fetch", () => ({
 }));
 
 const sandboxes = (r: ReactTestRenderer) => r.root.findAll((n) => typeof n.type === "string" && n.props.testID === "plugin-sandbox");
+const mounted: ReactTestRenderer[] = [];
 function render() {
   let r!: ReactTestRenderer;
   act(() => {
     r = create(<PluginBootstrap />);
   });
+  mounted.push(r);
   return r;
 }
+
+afterEach(() => {
+  act(() => mounted.splice(0).forEach((r) => r.unmount()));
+});
 
 beforeEach(() => {
   mockSync.mockClear();
