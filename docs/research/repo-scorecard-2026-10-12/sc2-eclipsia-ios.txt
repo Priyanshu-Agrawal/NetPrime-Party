@@ -1,0 +1,29 @@
+eclipsia smoke · ios: 4/4 titles playable · labelled Hindi on 3 · 6 wrong streams · first stream p50 0.6 s · 23.0 MB + 0.5 MB install · done · obfuscated 10/43
+Jawan: 36 streams · 16 probed · 9 ok · 1 unverified · 0 Hindi · 4 wrong · 0.8 s
+Oppenheimer: 36 streams · 16 probed · 10 ok · 4 unverified · 1 Hindi · 2 wrong · 0.9 s
+Breaking Bad S1E1: 33 streams · 16 probed · 12 ok · 4 unverified · 1 Hindi · 0 wrong · 0.6 s
+Mirzapur S1E1: 16 streams · 14 probed · 12 ok · 1 unverified · 2 Hindi · 0 wrong · 0.6 s
+waelum: streams on 4/4 titles · 23 streams · 8 probed · 8 ok · 0 unverified · 1 Hindi · 0 wrong
+karnis: streams on 4/4 titles · 5 streams · 5 probed · 5 ok · 0 unverified · 1 Hindi · 0 wrong
+zevran: streams on 4/4 titles · 12 streams · 6 probed · 5 ok · 0 unverified · 0 Hindi · 0 wrong
+mavonyx: streams on 4/4 titles · 11 streams · 6 probed · 4 ok · 1 unverified · 2 Hindi · 1 wrong
+rynara: streams on 3/4 titles · 6 streams · 4 probed · 4 ok · 0 unverified · 0 Hindi · 0 wrong
+soryn: streams on 3/4 titles · 6 streams · 4 probed · 4 ok · 0 unverified · 0 Hindi · 0 wrong
+haylox: streams on 2/4 titles · 4 streams · 3 probed · 3 ok · 0 unverified · 0 Hindi · 0 wrong
+phraxis: streams on 2/4 titles · 4 streams · 2 probed · 2 ok · 0 unverified · 0 Hindi · 0 wrong
+wrenok: streams on 2/4 titles · 2 streams · 2 probed · 2 ok · 0 unverified · 0 Hindi · 0 wrong
+brellor: streams on 2/4 titles · 9 streams · 4 probed · 1 ok · 0 unverified · 0 Hindi · 3 wrong · empty-fast×2
+evyrith: streams on 3/4 titles · 5 streams · 4 probed · 1 ok · 3 unverified · 0 Hindi · 0 wrong
+quinox: streams on 2/4 titles · 4 streams · 2 probed · 1 ok · 1 unverified · 0 Hindi · 0 wrong · timeout×1
+noctyx: streams on 3/4 titles · 3 streams · 3 probed · 1 ok · 1 unverified · 0 Hindi · 1 wrong
+sylphera: streams on 1/4 titles · 2 streams · 1 probed · 1 ok · 0 unverified · 0 Hindi · 0 wrong
+vitrix: streams on 2/4 titles · 2 streams · 2 probed · 1 ok · 1 unverified · 0 Hindi · 0 wrong
+novus: streams on 4/4 titles · 6 streams · 0 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+xylos: streams on 1/4 titles · 6 streams · 1 probed · 0 ok · 0 unverified · 0 Hindi · 1 wrong
+kryxalia: streams on 2/4 titles · 4 streams · 2 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+fastrion: streams on 2/4 titles · 3 streams · 2 probed · 0 ok · 2 unverified · 0 Hindi · 0 wrong
+qyrvaen: streams on 2/4 titles · 3 streams · 0 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+fyron: streams on 1/4 titles · 1 streams · 1 probed · 0 ok · 1 unverified · 0 Hindi · 0 wrong
+answered with nothing: fendrix, gravix, jhaeros, jyniq, kethrax, lyrin, nyxora, onyxia, praxiel, qorva, vyranel, xandril, zyrvael
+only failed: durnel (timeout×4), fjoral (error×4), hexion (error×4), lenyr (error×4), pynvix (error×4), solunix (error×4), svartok (error×4), tyvrel (error×4), vornix (error×4)
+obfuscated: fendrix, haylox, jhaeros, kryxalia, novus, phraxis, solunix, svartok, vyranel, waelum

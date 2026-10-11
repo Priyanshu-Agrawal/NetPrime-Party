@@ -1,0 +1,22 @@
+aio smoke · android: 4/4 titles playable · labelled Hindi on 4 · 2 wrong streams · first stream p50 2.0 s · 14.9 MB + 3.3 MB install · done · obfuscated 53/66
+Jawan: 39 streams · 16 probed · 7 ok · 2 unverified · 5 Hindi · 2 wrong · 2.5 s
+Oppenheimer: 43 streams · 16 probed · 7 ok · 3 unverified · 2 Hindi · 0 wrong · 2.1 s
+Breaking Bad S1E1: 19 streams · 15 probed · 8 ok · 1 unverified · 1 Hindi · 0 wrong · 1.7 s
+Mirzapur S1E1: 14 streams · 11 probed · 7 ok · 3 unverified · 5 Hindi · 0 wrong · 2.0 s
+playimdb: streams on 4/4 titles · 12 streams · 10 probed · 9 ok · 0 unverified · 4 Hindi · 0 wrong
+moviebox: streams on 4/4 titles · 19 streams · 8 probed · 7 ok · 1 unverified · 6 Hindi · 0 wrong
+castle: streams on 4/4 titles · 8 streams · 6 probed · 6 ok · 0 unverified · 1 Hindi · 0 wrong
+vidrock: streams on 4/4 titles · 6 streams · 6 probed · 3 ok · 3 unverified · 2 Hindi · 0 wrong
+movix: streams on 2/4 titles · 2 streams · 2 probed · 2 ok · 0 unverified · 0 Hindi · 0 wrong
+purstream: streams on 2/4 titles · 12 streams · 3 probed · 1 ok · 0 unverified · 0 Hindi · 2 wrong
+topcartoons: streams on 1/4 titles · 1 streams · 1 probed · 1 ok · 0 unverified · 0 Hindi · 0 wrong
+4khdhub: streams on 2/4 titles · 19 streams · 9 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+desiflix: streams on 4/4 titles · 12 streams · 0 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+dahmermovies: streams on 2/4 titles · 7 streams · 5 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+dahmermovies-tv: streams on 2/4 titles · 7 streams · 0 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+movieblast: streams on 3/4 titles · 6 streams · 5 probed · 0 ok · 5 unverified · 0 Hindi · 0 wrong
+einthusan: streams on 1/4 titles · 3 streams · 2 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+reanime: streams on 1/4 titles · 1 streams · 1 probed · 0 ok · 0 unverified · 0 Hindi · 0 wrong
+answered with nothing: 1shows, allanime, allmovieland, allwish, anidb, anikototv, anime-sama, animedekho, animekai, animepahe, animesalt, animetsu, animeworld, animezey, anizone, Cineby, cinefreak, cinemacity, dooflix, goated, hdghartv, hdhub4u, hianime, hindmoviez, kisskh, kurage, mapple, moonflix, movies4u, moviesdrive, movieshunt, moviesmod, nakios, netmirror, onlykdrama, peachify, persianstremio, torrentio, uhdmovies, vegamovies, videasy, vidfast, vidlink, vidlove, vidsrc, vixsrc, xpass, zinkmovies
+only failed: ctgmovies (timeout×4), fibwatch (error×4), gramcinema (empty-fast×4), showbox (empty-fast×4)
+obfuscated: allanime, 4khdhub, 1shows, allwish, animekai, anikototv, anidb, animetsu, animeworld, anime-sama, allmovieland, animezey, desiflix, castle, Cineby, cinefreak, moonflix, cinemacity, ctgmovies, dahmermovies, dahmermovies-tv, dooflix, einthusan, goated, gramcinema, hdghartv, hianime, hindmoviez, kurage, movieblast, movieshunt, movies4u, movix, nakios, persianstremio, peachify, playimdb, purstream, showbox, topcartoons, torrentio, vidrock, vegamovies, vidlink, videasy, vidsrc, vixsrc, vidfast, vidlove, xpass, zinkmovies, onlykdrama, kisskh
