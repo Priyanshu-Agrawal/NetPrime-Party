@@ -15,7 +15,8 @@ android {
 }
 
 dependencies {
-  // expo-video's player class and the ExoPlayer it wraps; both ship in the app already.
-  compileOnly project(':expo-video')
-  compileOnly "androidx.media3:media3-exoplayer:${androidxMedia3Version}"
+  // expo-video's player class and the ExoPlayer it wraps; both ship in the app already. expo-video is a prebuilt
+  // artifact here, and media3 is the version its pom declares (bump both with the SDK).
+  compileOnly "host.exp.exponent:expo.modules.video:57.0.5"
+  compileOnly "androidx.media3:media3-exoplayer:1.9.0"
 }

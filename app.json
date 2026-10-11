@@ -78,7 +78,8 @@
             "enableSceneSupport": true
           }
         }
-      ]
+      ],
+      "expo-video"
     ],
     "extra": {
       "eas": {
