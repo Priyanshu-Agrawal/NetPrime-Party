@@ -154,6 +154,47 @@ describe("generic bridge", () => {
     expect(v.play).toHaveBeenCalledTimes(4);
   });
 
+  it("ignores the pause a video fires when the provider removes it (element swap mid-play)", () => {
+    load();
+    const v = addVideo(8349);
+    jest.advanceTimersByTime(700);
+    v.remove(); // browsers run the pause steps on removal, before our next scan
+    v.dispatchEvent(new Event("pause"));
+    expect(events("pause")).toHaveLength(0);
+  });
+
+  it("clicks the provider's start again when the bound video already ended (a pre-roll ad)", () => {
+    load({ startSelectors: ["#start"] });
+    const ad = addVideo(30);
+    jest.advanceTimersByTime(700);
+    Object.defineProperty(ad, "ended", { value: true, configurable: true });
+    const btn = document.createElement("button");
+    btn.id = "start";
+    const onClick = jest.fn();
+    btn.addEventListener("click", onClick);
+    document.body.appendChild(btn);
+    (window as any).__vlCmd({ action: "play" });
+    expect(onClick).toHaveBeenCalled();
+  });
+
+  it("never hands its messages to the page's JSON.stringify (the page could read the nonce)", () => {
+    load();
+    const seen: unknown[] = [];
+    const real = JSON.stringify;
+    JSON.stringify = ((v: unknown, ...rest: unknown[]) => {
+      seen.push(v);
+      return (real as (...a: unknown[]) => string)(v, ...rest);
+    }) as typeof JSON.stringify;
+    try {
+      addVideo(8349);
+      jest.advanceTimersByTime(700);
+    } finally {
+      JSON.stringify = real;
+    }
+    expect(events("ready")).toHaveLength(1);
+    expect(seen.some((v) => !!v && typeof v === "object" && "__n" in (v as object))).toBe(false);
+  });
+
   it("answers quality and audio reads with empty lists (no provider menus driven)", () => {
     load();
     addVideo(8349);

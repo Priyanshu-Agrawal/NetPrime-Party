@@ -28,7 +28,9 @@ export const GENERIC_BRIDGE: string = `
   var CFG = window.__vlCfg || {};
   var __vlN; try { __vlN = window.__vlMsgNonce; delete window.__vlMsgNonce; } catch(e){}
   var __rnpost; try { __rnpost = window.ReactNativeWebView.postMessage.bind(window.ReactNativeWebView); } catch(e){}
-  function post(o){ try { if (__vlN !== undefined) o.__n = __vlN; (__rnpost || window.ReactNativeWebView.postMessage)(JSON.stringify(o)); } catch(e){} }
+  // Captured now, before page scripts run: a page that swapped JSON.stringify would see the nonce.
+  var __json = JSON.stringify;
+  function post(o){ try { if (__vlN !== undefined) o.__n = __vlN; (__rnpost || window.ReactNativeWebView.postMessage)(__json(o)); } catch(e){} }
   function snap(v, o){
     o.currentTime = (v && v.currentTime) || 0;
     o.duration = (v && isFinite(v.duration) && v.duration) || 0;
@@ -138,7 +140,8 @@ export const GENERIC_BRIDGE: string = `
       v.__vlBound = true;
       ['play','pause','seeking','seeked','ended','waiting','playing','canplay'].forEach(function(ev){
         v.addEventListener(ev, function(){
-          if (v !== vid) return;
+          // A removed element fires pause before the next scan swaps it out — not the user's.
+          if (v !== vid || v.isConnected === false) return;
           if (ev === 'pause' && document.hidden && wasPlaying){ keepAlive(); return; }
           if (isApplying()) return;
           if (ev === 'play' || ev === 'playing') wasPlaying = true;
@@ -199,14 +202,15 @@ export const GENERIC_BRIDGE: string = `
     return false;
   }
   if (CFG.autoStart !== false){
-    [3000, 8000].forEach(function(ms){ setTimeout(function(){ if (!vid) clickStart(); }, ms); });
+    [3000, 8000].forEach(function(ms){ setTimeout(function(){ if (!vid || vid.ended) clickStart(); }, ms); });
   }
 
   window.__vlCmd = function(cmd){
     try {
       if (cmd.action === 'play'){
         wasPlaying = true; wantPlay = true;
-        if (!vid){ clickStart(); return; }
+        // An ended video is a finished pre-roll ad still in the page: the film needs its start.
+        if (!vid || vid.ended){ clickStart(); return; }
         markApplying();
         var p = vid.play(); if (p && p.catch) p.catch(function(){});
         return;
