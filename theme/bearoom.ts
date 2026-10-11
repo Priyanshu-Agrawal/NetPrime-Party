@@ -196,7 +196,7 @@ export const glow = {
 export const glassMaterials = {
   control: { blur: 20, saturation: 1.25, tint: "rgba(16,13,10,0.30)", solid: "rgba(16,13,10,0.58)", iosIntensity: 40, liquidTint: "rgba(16,13,10,0.22)" },
   bar: { blur: 24, saturation: 1.25, tint: "rgba(16,13,10,0.42)", solid: "rgba(16,13,10,0.80)", iosIntensity: 50, liquidTint: "rgba(16,13,10,0.30)" },
-  chrome: { blur: 24, saturation: 1.2, tint: "rgba(16,13,10,0.45)", solid: "rgba(16,13,10,0.86)", iosIntensity: 45, liquidTint: "rgba(16,13,10,0.30)" },
+  chrome: { blur: 24, saturation: 1.2, tint: "rgba(16,13,10,0.45)", solid: "rgba(16,13,10,0.94)", iosIntensity: 45, liquidTint: "rgba(16,13,10,0.30)" },
   sheet: { blur: 28, saturation: 1.1, tint: "rgba(16,13,10,0.70)", solid: "rgba(16,13,10,0.94)", iosIntensity: 60, liquidTint: "rgba(16,13,10,0.50)" },
 } as const;
 /** Top-edge highlight every non-liquid glass gets. */
