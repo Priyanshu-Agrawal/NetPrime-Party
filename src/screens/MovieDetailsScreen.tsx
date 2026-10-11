@@ -57,6 +57,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DetailsError } from "@/src/ui/DetailsError";
 
 const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.3);
@@ -66,7 +67,7 @@ const MovieDetailsScreen: React.FC = () => {
   const { id } = route.params;
   const insets = useSafeAreaInsets();
   // RTK Query: cached per movie id (append_to_response bundle).
-  const { data: d, isLoading: loading, error: qErr } = useDetailsQuery({ type: "movie", id: id! });
+  const { data: d, isLoading: loading, error: qErr, refetch } = useDetailsQuery({ type: "movie", id: id! });
   const error = qErr
     ? typeof qErr === "string"
       ? qErr
@@ -131,11 +132,7 @@ const MovieDetailsScreen: React.FC = () => {
     return <DetailsSkeleton />;
   }
   if (error || !d) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errText}>{error || "Not found"}</Text>
-      </View>
-    );
+    return <DetailsError what="this title" onBack={goBack} onRetry={refetch} />;
   }
 
   // A title can sit in lists/collections (e.g. "Upcoming", an announced sequel)
@@ -462,8 +459,6 @@ const MovieDetailsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   backdrop: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  errText: { color: colors.danger, fontFamily: font.body, fontSize: ms(15) },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 
   hero: { width: "100%", height: HERO_H, justifyContent: "flex-end" },
