@@ -30,6 +30,7 @@ public class BearoomFetchModule: Module {
     cfg.httpCookieAcceptPolicy = .never
     cfg.urlCache = nil
     cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
+    cfg.timeoutIntervalForResource = 30 // backstop; each request's own deadline is enforced below
     return URLSession(configuration: cfg, delegate: NoRedirects(), delegateQueue: nil)
   }()
 
@@ -50,7 +51,17 @@ public class BearoomFetchModule: Module {
       scheme == "http" || scheme == "https", let host = url.host, !host.isEmpty
     else { throw fail("ERR_BAD_REQUEST", "Not an http(s) URL") }
     do {
-      try PublicAddress.check(host: host)
+      // getaddrinfo blocks: run it on a utility queue, never on Swift's shared cooperative pool.
+      try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+        DispatchQueue.global(qos: .utility).async {
+          do {
+            try PublicAddress.check(host: host)
+            cont.resume()
+          } catch {
+            cont.resume(throwing: error)
+          }
+        }
+      }
     } catch PublicAddress.Failure.blocked {
       throw fail("ERR_BLOCKED_ADDRESS", "Blocked non-public address")
     } catch {
@@ -65,14 +76,29 @@ public class BearoomFetchModule: Module {
       request.httpBody = body.data(using: .utf8)
     }
 
-    let started = Date()
-    let bytes: URLSession.AsyncBytes
-    let response: URLResponse
-    do {
-      (bytes, response) = try await session.bytes(for: request)
-    } catch let e as URLError {
-      throw fail(e.code == .timedOut ? "ERR_TIMEOUT" : "ERR_NETWORK", e.localizedDescription)
+    // The whole exchange gets timeoutMs: a server that drips a byte at a time is cut off on time.
+    let work = Task { try await self.exchange(request, req) }
+    let deadline = Task {
+      do {
+        try await Task.sleep(nanoseconds: UInt64(max(req.timeoutMs, 1)) * 1_000_000)
+        work.cancel()
+      } catch {
+        // The exchange finished first and cancelled this timer.
+      }
     }
+    defer { deadline.cancel() }
+    do {
+      return try await work.value
+    } catch is CancellationError {
+      throw fail("ERR_TIMEOUT", "Timed out")
+    } catch let e as URLError {
+      throw fail(e.code == .timedOut || e.code == .cancelled ? "ERR_TIMEOUT" : "ERR_NETWORK", e.localizedDescription)
+    }
+  }
+
+  private func exchange(_ request: URLRequest, _ req: FetchRequest) async throws -> [String: Any] {
+    guard let url = request.url else { throw fail("ERR_BAD_REQUEST", "No URL") }
+    let (bytes, response) = try await session.bytes(for: request)
     guard let http = response as? HTTPURLResponse else { throw fail("ERR_NETWORK", "Not an HTTP response") }
 
     var data = Data()
@@ -81,13 +107,11 @@ public class BearoomFetchModule: Module {
       for try await byte in bytes {
         if data.count >= req.maxBytes { truncated = true; break }
         data.append(byte)
-        if data.count % 65536 == 0, Date().timeIntervalSince(started) * 1000 > Double(req.timeoutMs) {
-          bytes.task.cancel()
-          throw fail("ERR_TIMEOUT", "Timed out")
-        }
+        if data.count % 65536 == 0 { try Task.checkCancellation() }
       }
-    } catch let e as URLError {
-      throw fail(e.code == .timedOut ? "ERR_TIMEOUT" : "ERR_NETWORK", e.localizedDescription)
+    } catch {
+      bytes.task.cancel()
+      throw error
     }
     if truncated { bytes.task.cancel() }
 

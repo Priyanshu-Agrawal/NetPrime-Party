@@ -58,8 +58,15 @@ class BearoomFetchModule : Module() {
   private fun perform(req: FetchRequest): Map<String, Any?> {
     val url = req.url.toHttpUrlOrNull()
       ?: throw CodedException("ERR_BAD_REQUEST", "Not an http(s) URL", null)
-    if (isIpLiteral(url.host) && !isPublicAddress(InetAddress.getByName(url.host))) {
-      throw CodedException("ERR_BLOCKED_ADDRESS", "Blocked non-public address", null)
+    // OkHttp skips the resolver for any host made of digits and dots (or with a ':'), so check those here: a strict
+    // dotted quad or IPv6 literal must be public, and any other numeric form ("127.1", "2130706433") is refused.
+    if (looksNumeric(url.host)) {
+      val addr = if (IPV4.matches(url.host) || url.host.contains(':')) {
+        try { InetAddress.getByName(url.host) } catch (e: Exception) { null }
+      } else null
+      if (addr == null || !isPublicAddress(addr)) {
+        throw CodedException("ERR_BLOCKED_ADDRESS", "Blocked non-public address", null)
+      }
     }
     val method = req.method.uppercase()
     val contentType = req.headers.entries.firstOrNull { it.key.equals("content-type", ignoreCase = true) }?.value
@@ -140,9 +147,10 @@ class BearoomFetchModule : Module() {
     }
   }
 
-  private fun isIpLiteral(host: String) = host.contains(':') || IPV4.matches(host)
+  private fun looksNumeric(host: String) = host.contains(':') || NUMERIC.matches(host)
 
   private companion object {
     val IPV4 = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
+    val NUMERIC = Regex("^[\\d.]+$")
   }
 }
