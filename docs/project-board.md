@@ -756,3 +756,34 @@ Plan `docs/superpowers/plans/2026-10-12-phase2c-title-language.md` · branch `fe
   - Inline chips rather than a sheet.
   - Unlabelled streams don't silence the note, consistent with the player's own notice; the owner may want both changed.
 - **Phone setting:** "Check languages on mobile data" is back **off**. The owner's Wi-Fi is metered to Android, so on that network title pages won't check languages unless they turn it on.
+
+## `[x]` Phase 2D — repo scorecard (2026-10-12)
+
+Plan `docs/superpowers/plans/2026-10-12-phase2d-repo-scorecard.md` · branch `feat/phase2d-repo-scorecard`.
+Spec §9 row 2 (repo scorecard + repo selection).
+
+- **What it is:** Plugin Lab → **Scorecard** (dev builds only).
+  - It runs a pinned candidate repo in memory, through Bearoom's real sandbox and probe, over the benchmark titles. It never touches the user registry, `/config`, the app's plugin host, or source health.
+  - Every loaded plugin gets a row: streams / ok / unverified / labelled Hindi / wrong, answered with nothing, only failed, or never ran.
+  - Probes are shared round-robin across plugins. Data is counted at the native fetch layer.
+  - Smoke caps at 60 MB and Full at 400 MB, install included. Stop really stops, and so does leaving the Lab.
+- **Candidates:** pinned by `scripts/pin-plugin-repo.mjs` and disabled (`src/features/dev/scorecardData.ts`):
+  - Eclipsia (codeberg `4e486ed`, 43 plugins);
+  - All-in-One-Nuvio (github `3f09a6f`, 66 plugins).
+- **Benchmark:** the spec's 12 titles + Border 2, RRR, Demon Slayer: Infinity Castle, Friends S1E1 and four from the trending feed. Smoke = Jawan, Oppenheimer, Breaking Bad S1E1, Mirzapur S1E1.
+- **Smoke results (phone + iOS 27 sim, ≈ 110 MB total on the metered hotspot):**
+  - Both repos play 4/4 titles on both platforms.
+  - Eclipsia: Hindi (labelled) on 3, 5–6 wrong streams, 10/43 files obfuscated.
+  - AIO: Hindi on 3–4, 2 wrong streams, 53/66 files obfuscated.
+  - Report and recommendation: `docs/research/repo-scorecard-2026-10-12.md`.
+- **Recommendation (awaiting the owner's yes; nothing enabled):**
+  - Eclipsia with `allow_plugins = {karnis, zevran, mavonyx, rynara, soryn, evyrith}`;
+  - AIO `moviebox` for Android Hindi;
+  - the obfuscated strong ones (playimdb, castle, vidrock, waelum) are the owner's call.
+- **Final review (Opus) → with fixes; all fixed test-first:**
+  - C1: the production early return made per-plugin results arbitrary.
+  - C2: Stop and the budget didn't stop queued plugins.
+  - I1–I5: probe fairness, unverified streams, install data, counting at the native fetch layer, leaving the Lab.
+  - M1: namespaced candidate keys.
+  - The first, pre-review smoke run was discarded.
+- **Next, after the owner's yes:** enable the chosen allow-list, then build the benchmark runner (plays each title 20 s) and run the Phase 2 S1/S2/S3/S8 gate on enabled sources. Full 20-title scorecard runs need the owner's OK on data, or an unmetered network.
