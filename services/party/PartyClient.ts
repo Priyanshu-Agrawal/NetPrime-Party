@@ -24,6 +24,7 @@ import { ensurePartyAuth, supabase } from "@/services/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getInstallationId } from "./identity";
 import { sendBroadcast } from "./broadcast";
+import { StreamRelay } from "./streamRelay";
 import { genRoomCode } from "@/utils/roomCode";
 import { hostLooksGone } from "./election";
 import { LEASE_RENEW_INTERVAL_MS } from "./protocol";
@@ -74,6 +75,8 @@ export class PartyClient {
   private password?: string;
 
   private channel: RealtimeChannel | null = null;
+  /** Host → members stream handoff (ephemeral; never stored or logged). */
+  readonly streams = new StreamRelay();
   private snap: RoomSnapshot | null = null;
 
   private offset = 0;
@@ -211,6 +214,7 @@ export class PartyClient {
     } catch {
       /* best-effort */
     }
+    this.streams.detach();
     if (this.channel) await supabase.removeChannel(this.channel);
     this.channel = null;
   }
@@ -420,6 +424,7 @@ export class PartyClient {
     // (previously `this.channel` was only set after SUBSCRIBED resolved, leaking the
     // channel + its presence entry on a fast unmount / password-retry rebuild).
     this.channel = channel;
+    this.streams.attach(channel as unknown as Parameters<StreamRelay["attach"]>[0]);
     channel.on("broadcast", { event: "snap" }, ({ payload }) =>
       this.applySnapshot(payload as WireSnapshot),
     );
