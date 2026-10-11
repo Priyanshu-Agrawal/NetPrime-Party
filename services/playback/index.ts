@@ -7,7 +7,7 @@ import { universalStorage } from "@/services/storage/universalStorage";
 import { Platform } from "react-native";
 import { SourceHealth } from "./health";
 import { ProbeCache, probeCandidate, type ProbeFetch } from "./probe";
-import { resolvePlayback, type ResolveResult, type TitleRequest } from "./resolver";
+import { previewPlayback, resolvePlayback, type ResolveResult, type TitleRequest } from "./resolver";
 
 export const sourceHealth = new SourceHealth(universalStorage);
 
@@ -28,6 +28,17 @@ export function resolveTitle(req: TitleRequest, languages: string[]): Promise<Re
       probeCache.set(out, ctx);
       return out;
     },
+    health: sourceHealth,
+    platform: Platform.OS === "ios" ? "ios" : "android",
+    languages,
+    warm: () => warmSandbox(),
+  });
+}
+
+/** The title page's preview: languages without probing; its streams seed Play through the plugin host's cache. */
+export function previewTitle(req: TitleRequest, languages: string[]) {
+  return previewPlayback(req, {
+    getStreams: (r, opts) => pluginHost.getStreams(r, opts),
     health: sourceHealth,
     platform: Platform.OS === "ios" ? "ios" : "android",
     languages,

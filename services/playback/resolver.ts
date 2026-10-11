@@ -75,11 +75,10 @@ export async function probeByBackend(cands: PlaybackCandidate[], probe: (c: Play
   return cands.map((c) => done.get(c.key) ?? c);
 }
 
-export async function resolvePlayback(req: TitleRequest, deps: ResolveDeps): Promise<ResolveResult> {
-  deps.warm?.();
-  // Health is recorded as each plugin settles — a plugin still running when the host returns early is judged when
-  // it actually finishes, never counted healthy just for having started.
-  const host = await deps.getStreams(
+/** The plugin host's streams for a title. Health is recorded as each plugin settles — a plugin still running when the
+ * host returns early is judged when it actually finishes, never counted healthy just for having started. */
+function streamsFor(req: TitleRequest, deps: Pick<ResolveDeps, "getStreams" | "health">) {
+  return deps.getStreams(
     { tmdbId: req.tmdbId, type: req.type, season: req.season, episode: req.episode },
     {
       onSettled: (pluginKey, failure) => {
@@ -88,6 +87,22 @@ export async function resolvePlayback(req: TitleRequest, deps: ResolveDeps): Pro
       },
     },
   );
+}
+
+/**
+ * The title page's look-ahead (spec §6.1): what the plugins found, ranked, without probing — no request reaches a stream
+ * host. The plugin host caches the streams for 15 minutes, so Play right after reuses them.
+ */
+export async function previewPlayback(req: TitleRequest, deps: Omit<ResolveDeps, "probe">): Promise<{ ranked: PlaybackCandidate[]; complete: boolean }> {
+  deps.warm?.();
+  const host = await streamsFor(req, deps);
+  const all = toCandidates(host.streams, { originalLanguage: req.originalLanguage, titleName: req.titleName, originalTitle: req.originalTitle });
+  return { ranked: rankCandidates(all, { platform: deps.platform, languages: deps.languages, isDown: (id) => deps.health.isDown(id) }), complete: host.complete };
+}
+
+export async function resolvePlayback(req: TitleRequest, deps: ResolveDeps): Promise<ResolveResult> {
+  deps.warm?.();
+  const host = await streamsFor(req, deps);
 
   const all = toCandidates(host.streams, { originalLanguage: req.originalLanguage, titleName: req.titleName, originalTitle: req.originalTitle });
   const ctx = { platform: deps.platform, languages: deps.languages, isDown: (id: string) => deps.health.isDown(id) };

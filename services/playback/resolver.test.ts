@@ -2,7 +2,7 @@ import type { HostResult } from "@/services/plugins/PluginHost";
 import type { PluginStream } from "@/services/plugins/streams";
 import type { PlaybackCandidate } from "./candidate";
 import type { ProbeContext } from "./probe";
-import { PROBE_TOP, probeByBackend, resolvePlayback, sourceIdOf } from "./resolver";
+import { previewPlayback, PROBE_TOP, probeByBackend, resolvePlayback, sourceIdOf } from "./resolver";
 
 const stream = (plugin: string, url: string, name = "Hindi"): PluginStream => ({
   pluginKey: `r/${plugin}@abc`,
@@ -120,5 +120,29 @@ describe("probeByBackend", () => {
 
   it("sourceIdOf drops the version", () => {
     expect(sourceIdOf("open-movies/open-movies@1c8f6cac")).toBe("open-movies/open-movies");
+  });
+});
+
+describe("previewPlayback", () => {
+  it("ranks what the plugins found without probing, keeps the sandbox warm and records health as they settle", async () => {
+    const host: HostResult = {
+      streams: [stream("a", "https://x.example.net/e.m3u8", "English"), stream("a", "https://x.example.net/h.m3u8", "Hindi")],
+      failures: [],
+      ran: ["r/a@abc"],
+      complete: true,
+    };
+    const { d, probed, recorded, warm } = deps(host);
+    d.getStreams.mockImplementation(async (_req, opts) => {
+      opts?.onSettled?.("r/a@abc");
+      return host;
+    });
+    const { probe: _probe, ...noProbe } = d;
+    const out = await previewPlayback({ tmdbId: "1", type: "movie" }, noProbe);
+    expect(out.complete).toBe(true);
+    expect(out.ranked.map((c) => c.languages[0])).toEqual(["hi", "en"]);
+    expect(out.ranked.every((c) => c.verdict === "unverified")).toBe(true);
+    expect(probed).toEqual([]);
+    expect(warm).toHaveBeenCalled();
+    expect(recorded).toEqual([["r/a", true]]);
   });
 });
