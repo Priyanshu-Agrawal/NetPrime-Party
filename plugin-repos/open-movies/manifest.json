@@ -1,0 +1,18 @@
+{
+  "name": "Bearoom Open Movies",
+  "version": "1.0.0",
+  "description": "Blender Foundation open films (CC BY) from their publishers' public test streams. Bearoom's own fixture repo.",
+  "scrapers": [
+    {
+      "id": "open-movies",
+      "name": "Open Movies",
+      "description": "Big Buck Bunny, Tears of Steel, Sintel",
+      "version": "1.0.0",
+      "supportedTypes": ["movie"],
+      "filename": "providers/open-movies.js",
+      "enabled": true,
+      "contentLanguage": ["en"],
+      "formats": ["m3u8", "mpd", "mov"]
+    }
+  ]
+}

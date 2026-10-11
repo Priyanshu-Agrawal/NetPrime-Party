@@ -32,6 +32,14 @@ module.exports = defineConfig([
     },
   },
   {
+    // Plugin repos run in the sandbox worker (Nuvio contract): CommonJS plus the host's globals.
+    files: ['plugin-repos/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { module: 'writable', fetch: 'readonly', TMDB_API_KEY: 'readonly', console: 'readonly' },
+    },
+  },
+  {
     files: ['**/*.test.js'],
     languageOptions: {
       globals: { describe: 'readonly', it: 'readonly', expect: 'readonly', jest: 'readonly', beforeEach: 'readonly', afterEach: 'readonly' },
