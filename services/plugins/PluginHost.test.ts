@@ -74,6 +74,22 @@ describe("PluginHost.getStreams", () => {
     expect(again.streams.map((s) => s.url)).toEqual(["1", "2", "3", "4"]);
   });
 
+  it("tells the caller how each plugin settled, stragglers after an early return included", async () => {
+    const { host, answer, pending } = harness([plugin("a"), plugin("slow")]);
+    const settled: [string, string | undefined][] = [];
+    const out = host.getStreams(REQ, { onSettled: (key, failure) => settled.push([key, failure?.reason]) });
+    await answer("a", ["1", "2", "3"]);
+    await jest.advanceTimersByTimeAsync(BUDGET.earlyIdleMs);
+    await out;
+    expect(settled).toEqual([["r/a@1", undefined]]);
+    pending.get("r/slow@1")!.reject(Object.assign(new Error("slow"), { code: "timeout" }));
+    await jest.advanceTimersByTimeAsync(0);
+    expect(settled).toEqual([
+      ["r/a@1", undefined],
+      ["r/slow@1", "timeout"],
+    ]);
+  });
+
   it("stops at the 20 s overall budget with what it has", async () => {
     const { host, answer } = harness([plugin("a"), plugin("hung")]);
     const out = host.getStreams(REQ);

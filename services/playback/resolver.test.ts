@@ -24,7 +24,7 @@ function deps(host: HostResult, verdicts: Record<string, Partial<PlaybackCandida
     probed,
     warm,
     d: {
-      getStreams: jest.fn(async () => host),
+      getStreams: jest.fn(async (_req: unknown, _opts?: { onSettled?(pluginKey: string, failure?: { pluginKey: string; reason: string; ms: number }): void }) => host),
       probe: jest.fn(async (c: PlaybackCandidate, _ctx: ProbeContext) => {
         probed.push(c.url);
         return { ...c, verdict: "ok" as const, ...verdicts[c.url] };
@@ -64,22 +64,22 @@ describe("resolvePlayback", () => {
     expect(out.rejected.map((c) => c.rejectReason).sort()).toEqual(["duration", "platform"]);
   });
 
-  it("records health: real failures count against a source, an answer counts for it; empty-fast and sandbox trouble don't count", async () => {
-    const { d, recorded } = deps({
-      streams: [stream("a", "https://x.example.net/1.m3u8")],
-      failures: [
-        { pluginKey: "r/b@abc", reason: "timeout", ms: 15000 },
-        { pluginKey: "r/c@abc", reason: "empty-fast", ms: 3 },
-        { pluginKey: "r/d@abc", reason: "crashed", ms: 1 },
-      ],
-      ran: ["r/a@abc", "r/b@abc", "r/c@abc", "r/d@abc", "r/e@abc"],
-      complete: true,
+  it("records health as each plugin settles — stragglers too; empty-fast and sandbox trouble don't count", async () => {
+    let settle!: (pluginKey: string, failure?: { pluginKey: string; reason: string; ms: number }) => void;
+    const { d, recorded } = deps({ streams: [stream("a", "https://x.example.net/1.m3u8")], failures: [], ran: ["r/a@abc", "r/slow@abc"], complete: false });
+    d.getStreams.mockImplementation(async (_req: unknown, opts?: { onSettled?(pluginKey: string, failure?: { pluginKey: string; reason: string; ms: number }): void }) => {
+      settle = opts!.onSettled!;
+      settle("r/a@abc");
+      settle("r/c@abc", { pluginKey: "r/c@abc", reason: "empty-fast", ms: 3 });
+      settle("r/d@abc", { pluginKey: "r/d@abc", reason: "crashed", ms: 1 });
+      return { streams: [stream("a", "https://x.example.net/1.m3u8")], failures: [], ran: ["r/a@abc", "r/slow@abc"], complete: false };
     });
     await resolvePlayback({ tmdbId: "1", type: "movie" }, d);
-    expect(recorded.sort()).toEqual([
+    expect(recorded).toEqual([["r/a", true]]); // the straggler is not counted as healthy just because it was started
+    settle("r/slow@abc", { pluginKey: "r/slow@abc", reason: "timeout", ms: 15000 });
+    expect(recorded).toEqual([
       ["r/a", true],
-      ["r/b", false],
-      ["r/e", true],
+      ["r/slow", false],
     ]);
   });
 
@@ -87,7 +87,7 @@ describe("resolvePlayback", () => {
     const { d } = deps({ streams: [stream("a", "https://x.example.net/1.m3u8")], failures: [], ran: [], complete: true });
     await resolvePlayback({ tmdbId: "1", type: "tv", season: 1, episode: 2, runtimeMin: 47 }, d);
     expect(d.probe.mock.calls[0][1]).toEqual({ kind: "tv", runtimeMin: 47 });
-    expect(d.getStreams).toHaveBeenCalledWith({ tmdbId: "1", type: "tv", season: 1, episode: 2 });
+    expect(d.getStreams).toHaveBeenCalledWith({ tmdbId: "1", type: "tv", season: 1, episode: 2 }, { onSettled: expect.any(Function) });
   });
 });
 

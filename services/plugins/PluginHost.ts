@@ -65,7 +65,14 @@ export class PluginHost {
 
   constructor(private readonly deps: HostDeps) {}
 
-  getStreams(req: ResolveRequest, opts: { onStreams?(pluginKey: string, streams: PluginStream[]): void } = {}): Promise<HostResult> {
+  getStreams(
+    req: ResolveRequest,
+    opts: {
+      onStreams?(pluginKey: string, streams: PluginStream[]): void;
+      /** Once per plugin run, when it settles — also after the call returned early. No failure = it answered. */
+      onSettled?(pluginKey: string, failure?: PluginFailure): void;
+    } = {},
+  ): Promise<HostResult> {
     const title = titleKey(req);
     const plugins = this.deps.plugins().filter((p) => p.supportedTypes.includes(req.type));
     const streams: PluginStream[] = [];
@@ -113,7 +120,7 @@ export class PluginHost {
           const p = queue.shift()!;
           inFlight++;
           ran.push(p.key);
-          void this.runOne(p, req, title, failures, add).finally(() => {
+          void this.runOne(p, req, title, failures, add, opts.onSettled).finally(() => {
             inFlight--;
             settle();
             pump();
@@ -134,24 +141,24 @@ export class PluginHost {
     title: string,
     failures: PluginFailure[],
     add: (p: LoadedPlugin, list: PluginStream[]) => void,
+    onSettled?: (pluginKey: string, failure?: PluginFailure) => void,
   ): Promise<void> {
     const started = this.deps.now();
+    const fail = (f: PluginFailure) => {
+      failures.push(f);
+      onSettled?.(f.pluginKey, f);
+    };
     try {
       const raw = await this.deps.run(p, req, BUDGET.perPluginMs);
       const ms = this.deps.now() - started;
       const list = this.deps.normalise(p, raw);
-      if (list === null) {
-        failures.push({ pluginKey: p.key, reason: "bad-shape", ms });
-        return;
-      }
-      if (list.length === 0 && ms < BUDGET.emptyFastMs) {
-        failures.push({ pluginKey: p.key, reason: "empty-fast", ms });
-        return;
-      }
+      if (list === null) return fail({ pluginKey: p.key, reason: "bad-shape", ms });
+      if (list.length === 0 && ms < BUDGET.emptyFastMs) return fail({ pluginKey: p.key, reason: "empty-fast", ms });
       this.cache.set(`${title}|${p.key}`, { at: this.deps.now(), streams: list });
       add(p, list);
+      onSettled?.(p.key);
     } catch (e) {
-      failures.push({ pluginKey: p.key, reason: reasonOf(e), detail: String((e as Error)?.message ?? e).slice(0, 200), ms: this.deps.now() - started });
+      fail({ pluginKey: p.key, reason: reasonOf(e), detail: String((e as Error)?.message ?? e).slice(0, 200), ms: this.deps.now() - started });
     }
   }
 }

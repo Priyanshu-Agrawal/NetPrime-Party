@@ -24,7 +24,7 @@ export interface TitleRequest {
 }
 
 export interface ResolveDeps {
-  getStreams(req: ResolveRequest): Promise<HostResult>;
+  getStreams(req: ResolveRequest, opts?: { onSettled?(pluginKey: string, failure?: PluginFailure): void }): Promise<HostResult>;
   probe(c: PlaybackCandidate, ctx: ProbeContext): Promise<PlaybackCandidate>;
   health: Pick<SourceHealth, "isDown" | "record">;
   platform: "ios" | "android";
@@ -75,11 +75,17 @@ export async function probeByBackend(cands: PlaybackCandidate[], probe: (c: Play
 
 export async function resolvePlayback(req: TitleRequest, deps: ResolveDeps): Promise<ResolveResult> {
   deps.warm?.();
-  const host = await deps.getStreams({ tmdbId: req.tmdbId, type: req.type, season: req.season, episode: req.episode });
-
-  const failed = new Set(host.failures.map((f) => f.pluginKey));
-  for (const f of host.failures) if (countsAgainstSource(f.reason)) deps.health.record(sourceIdOf(f.pluginKey), false);
-  for (const key of host.ran) if (!failed.has(key)) deps.health.record(sourceIdOf(key), true);
+  // Health is recorded as each plugin settles — a plugin still running when the host returns early is judged when
+  // it actually finishes, never counted healthy just for having started.
+  const host = await deps.getStreams(
+    { tmdbId: req.tmdbId, type: req.type, season: req.season, episode: req.episode },
+    {
+      onSettled: (pluginKey, failure) => {
+        if (!failure) deps.health.record(sourceIdOf(pluginKey), true);
+        else if (countsAgainstSource(failure.reason)) deps.health.record(sourceIdOf(pluginKey), false);
+      },
+    },
+  );
 
   const all = toCandidates(host.streams, { originalLanguage: req.originalLanguage, titleName: req.titleName });
   const ctx = { platform: deps.platform, languages: deps.languages, isDown: (id: string) => deps.health.isDown(id) };

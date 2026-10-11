@@ -23,7 +23,7 @@ const probed = new Map<string, { at: number; c: PlaybackCandidate }>();
 
 export function resolveTitle(req: TitleRequest, languages: string[]): Promise<ResolveResult> {
   return resolvePlayback(req, {
-    getStreams: (r) => pluginHost.getStreams(r),
+    getStreams: (r, opts) => pluginHost.getStreams(r, opts),
     probe: async (c, ctx) => {
       const hit = probed.get(c.url);
       if (hit && Date.now() - hit.at < PROBE_CACHE_MS) return { ...hit.c, order: c.order };
