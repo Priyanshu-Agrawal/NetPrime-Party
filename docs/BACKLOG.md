@@ -92,6 +92,7 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 | `/report` lane · stage · ttffMs | PENDING (owner yes) | Apply `supabase/migrations/20261011150000_provider_reports_native_fields.sql`, THEN deploy the worker (it inserts the new columns). The live worker strips the fields until then. |
 | Dead stream fails slowly | NOTED (Phase 2) | A 404 master playlist shows the error card only after ExoPlayer's retries (~10–15 s); Phase 2's StreamProbe checks reachability before the player gets a URL. |
 | Home hero sized at launch orientation | OPEN | `HeroCarousel` reads `Dimensions` at module load: launching while the phone is sideways gives a full-screen hero in portrait. Use `useWindowDimensions`. |
+| Native player review minors (Phase 1B) | DEFERRED | From the final review: re-fetch a sidecar file that parsed to nothing; read the expo-video/media3 pins from the installed package; clamp `ttffMs` before the worker deploy; `manual_switch` report via `report()`; Next episode skips unaired episodes; quick chip opens the sheet at its row; "Original audio (this source)" for single-track streams; prefer a track's own name over "Unknown"; block taps during the loading card; lift in-stream subtitles too; party tick rate on an existing player. Ledger: `.superpowers/sdd/2026-10-11-phase1b-native-player/progress.md`. |
 
 ## H. Atmospheric background
 | Item | Status | Detail |
