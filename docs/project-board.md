@@ -466,3 +466,31 @@ median 8 ms, p99 12 ms, animation callbacks 176 → ~115 ms/s.
 **Notes:** solo playback was already smooth (0 dropped frames, p99 12–14 ms); the emulator's own stutter is the
 emulator (emulated GLES). Remaining always-on cost while video plays is the WebView's per-refresh tick (halves on
 60 Hz phones; a 60 Hz preferred refresh rate during playback is an option on 120 Hz phones).
+
+## `[x]` Glass that stays smooth (2026-10-11)
+
+Spec `docs/superpowers/specs/2026-10-11-glass-design.md` · plan `docs/superpowers/plans/2026-10-11-glass.md`.
+
+- One `<Glass>` (`src/ui/glass`) picks an engine per surface: **iOS** Liquid Glass (`expo-glass-effect`) for
+  buttons/bars, system blur (`expo-blur`) for headers/sheets; **Android 12+** live blur only on the floating bars
+  (tab bar, party bar) through our own module `modules/bearoom-glass` — a quarter-resolution, glass-sized
+  `RenderNode` + `RenderEffect` blur of an explicit `<GlassBackdrop>`; everything else crafted glass (tint, warm
+  lift, top highlight). `@sbaiahmed1/react-native-blur` removed.
+- Found on the way: the old library re-drew the **whole window in software for every blurred surface, every
+  frame** — Home scrolled at ~26 fps with 100 % janky frames (59 836 text redraws in 5 s).
+- Nothing Phone 1, release build, Home scroll A/B (alternating runs, same thermal state):
+
+  | | Janky frames | GPU p90 |
+  |---|---|---|
+  | Old library | 99–100 % (~26 fps) | — |
+  | No blur | 5.4–11.6 % | 6 ms |
+  | **Live blur on the bars (shipped)** | **5.4–12.4 %** | **6 ms** |
+  | Live blur on bars + header + buttons | 6.9–28.8 % | 6–7 ms |
+
+- Over the video: blurring the WebView makes Chromium draw the film again every frame (36–50 % janky) and a
+  scaled draw renders it black → controls over video are crafted glass on Android, Liquid Glass on iOS. Live
+  video glass returns with Phase 1B's native player (`TextureView`).
+- Not verified this round: iOS 27 simulator (busy with parallel work) — Liquid Glass look and fades to check next.
+- Separate finding (not glass): party playback measured 10–52 % janky frames (~33 fps drawn, p99 15–20 ms) while
+  no blur runs over the video; Home scroll has 50–67 ms frames inside main-thread animation callbacks. Both
+  queued as their own perf items.
