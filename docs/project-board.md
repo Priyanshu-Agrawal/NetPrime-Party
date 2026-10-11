@@ -696,6 +696,7 @@ Plan `docs/superpowers/plans/2026-10-11-phase2b2-native-lane.md` · branch `feat
 - **Found on the devices, fixed test-first:**
   - Tears of Steel's MOV was rejected as an "error page". x264 writes its settings as ASCII into the first frame, so the file read as 96 % text. An MP4/QuickTime header now wins over the text check.
   - The iPhone crashed when a sheet opened over a landscape player: an RN Modal allows only portrait, and iOS aborts the app. This existed before for the web player's settings too. The player's sheets now allow landscape.
+  - "Change source" did nothing on iPhone because the settings sheet stayed open and iOS won't present a second Modal. Settings now closes first; on iOS the source sheet opens once settings has finished closing. Checked on the simulator: HLS → MOV switch.
 - **Final review (Opus) → not ready; all fixed test-first** (integration tests with the real player view over a fake expo-video):
   - C1: a switch or failover before the new stream was ready restarted the film at 0.
   - C2: failover could loop forever when a plugin's keys change on every resolve. It is now capped at 2n+2 automatic attempts, and a hung re-resolve gives up at 8 s.
