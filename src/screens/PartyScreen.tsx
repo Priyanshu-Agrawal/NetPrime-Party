@@ -49,6 +49,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
+import { controlChips } from "@/components/player/chips";
 import { img } from "@/utils/tmdbDetails";
 import { exitMedia, exitMediaBack, openSearchTab } from "@/src/navigation/actions";
 import { useRoute } from "@react-navigation/native";
@@ -730,6 +731,7 @@ export default function Party() {
                     title={nowPlaying}
                     subtitle={nowPlayingEpisode}
                     embedded={!isImmersive}
+                    chips={controlChips(audios, qualities, subtitles)}
                     topBar={
                       isImmersive ? (
                         <View

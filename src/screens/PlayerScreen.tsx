@@ -44,6 +44,9 @@ import {
   type MoveOnReason,
 } from "@/components/player/providerPick";
 import { settingsRows, type BridgeCaps, type OS } from "@/components/player/capabilities";
+import { controlChips } from "@/components/player/chips";
+import { nextEpisode } from "@/components/player/nextEpisode";
+import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import type { SubtitleTrack } from "@/components/player/types";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
 import type { ReportArgs, ReportOutcome } from "@/src/types/worker.types";
@@ -346,6 +349,16 @@ export const PlayerScreen: React.FC = () => {
     }),
     [id, type, season, ep],
   );
+
+  // TV: the episode after this one, for the controls' Next-episode button.
+  const { data: showDetails } = useDetailsQuery(
+    { type: "tv", id: media.tmdbId },
+    { skip: media.type !== "tv" || !media.tmdbId },
+  );
+  const upNext =
+    media.type === "tv" && media.season && media.episode
+      ? nextEpisode(showDetails?.seasons, media.season, media.episode)
+      : null;
 
   // Phase 7 telemetry — fire-and-forget provider health report. `providerId` is
   // explicit so failure hooks can report the OLD provider (e.g. manual_switch).
@@ -775,6 +788,12 @@ export const PlayerScreen: React.FC = () => {
                       setShowSettings(true);
                     }}
                     onEpisodes={media.type === "tv" ? () => episodeSheetRef.current?.present() : undefined}
+                    chips={controlChips(audios, qualities, subtitles)}
+                    onNextEpisode={
+                      upNext
+                        ? () => navigation.setParams({ season: String(upNext.season), ep: String(upNext.ep) })
+                        : undefined
+                    }
                   />
                 ) : null}
               </>
