@@ -1,5 +1,5 @@
 import type { CookieJar } from "./cookieJar";
-import { cleanHeaders, hasHeader } from "./urlGuard";
+import { checkUrl, cleanHeaders, hasHeader } from "./urlGuard";
 
 /**
  * A plugin's raw answer → streams Bearoom can hand on (spec §5.3–5.4). Plugin output is untrusted: anything that is
@@ -30,7 +30,14 @@ export interface PluginStream {
 
 export const MAX_STREAMS_PER_PLUGIN = 200;
 const ZERO_WIDTH = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
-const HTTP = /^https?:\/\//i;
+const MAX_URL = 8192;
+
+/** A public http(s) URL in canonical form, or null: the video player fetches these, so the SSRF guard applies here too. */
+function publicUrl(v: unknown): string | null {
+  if (typeof v !== "string" || v.length > MAX_URL) return null;
+  const verdict = checkUrl(v.trim());
+  return verdict.ok ? verdict.url.toString() : null;
+}
 
 export function cleanText(v: unknown, max = 200): string {
   if (typeof v !== "string" && typeof v !== "number") return "";
@@ -43,8 +50,8 @@ function subtitlesOf(v: unknown): PluginStreamSubtitle[] {
   for (const t of v) {
     if (out.length >= 50) break;
     const sub = (t && typeof t === "object" ? t : {}) as Record<string, unknown>;
-    const url = typeof sub.url === "string" ? sub.url.trim() : "";
-    if (!HTTP.test(url)) continue;
+    const url = publicUrl(sub.url);
+    if (!url) continue;
     const language = cleanText(sub.lang ?? sub.language, 20) || undefined;
     out.push({ url, language, label: cleanText(sub.label ?? sub.name, 60) || language || "Subtitles" });
   }
@@ -58,8 +65,8 @@ export function normaliseStreams(plugin: { key: string; repoId: string; pluginId
     if (out.length >= MAX_STREAMS_PER_PLUGIN) break;
     if (!item || typeof item !== "object") continue;
     const s = item as Record<string, unknown>;
-    const url = typeof s.url === "string" ? s.url.trim() : "";
-    if (!HTTP.test(url) || url.length > 8192) continue; // magnets, torrents, relative and script URLs
+    const url = publicUrl(s.url);
+    if (!url) continue; // magnets, torrents, relative, script and private-network URLs
     const hints = s.behaviorHints as { proxyHeaders?: { request?: unknown } } | undefined;
     const headers = cleanHeaders(s.headers ?? hints?.proxyHeaders?.request);
     if (!hasHeader(headers, "cookie")) {

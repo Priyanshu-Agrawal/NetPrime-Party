@@ -105,6 +105,23 @@ describe("pluginFetch", () => {
     expect(seen[1].headers).toEqual({ Referer: "https://a.example.net/" });
   });
 
+  it("strips credentials on any change of origin — a downgrade to http or another port too", async () => {
+    const { seen, jar, deps } = setup({
+      "https://a.example.net/x": res({ status: 302, headers: { location: "http://a.example.net/y" } }),
+      "http://a.example.net/y": res({ status: 302, headers: { location: "http://a.example.net:8080/z" } }),
+      "http://a.example.net:8080/z": res(),
+    });
+    await pluginFetch(jar, { url: "https://a.example.net/x", headers: { Authorization: "Bearer t" } }, deps);
+    expect(seen[1].headers).toEqual({});
+    expect(seen[2].headers).toEqual({});
+  });
+
+  it("only reads go through the TMDB proxy; anything else is sent to TMDB itself", async () => {
+    const { seen, jar, deps } = setup({ "https://api.themoviedb.org/3/movie/550/rating": res({ status: 401 }) });
+    await pluginFetch(jar, { url: "https://api.themoviedb.org/3/movie/550/rating", method: "POST", body: "{}" }, deps);
+    expect(seen[0].url).toBe("https://api.themoviedb.org/3/movie/550/rating");
+  });
+
   it("stores response cookies and sends them back to that site; a plugin's own Cookie wins", async () => {
     const { seen, jar, deps } = setup({
       "https://a.example.net/login": res({ cookies: [{ name: "sid", value: "42", domain: "a.example.net", path: "/", hostOnly: true, secure: true, expiresAt: 0 }] }),

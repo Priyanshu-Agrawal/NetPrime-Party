@@ -60,8 +60,9 @@ const NATIVE_TO_PLUGIN: Record<NativeFetchError["code"], PluginFetchErrorCode> =
 };
 
 /** A direct TMDB API call goes to the proxy instead; the proxy holds the token, so `api_key` is dropped. */
-export function rewriteTmdb(url: URL, proxyBase: string): URL {
-  if (url.hostname !== TMDB_API_HOST) return url;
+export function rewriteTmdb(url: URL, proxyBase: string, method = "GET"): URL {
+  // Reads only: the proxy holds the app's token, and it must never write anything for a plugin.
+  if (url.hostname !== TMDB_API_HOST || (method !== "GET" && method !== "HEAD")) return url;
   const out = new URL(proxyBase.replace(/\/$/, "") + url.pathname.replace(/^\/3(?=\/|$)/, ""));
   url.searchParams.forEach((v, k) => {
     if (k !== "api_key") out.searchParams.append(k, v);
@@ -83,7 +84,7 @@ export async function pluginFetch(
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
     const verdict = checkUrl(current);
     if (!verdict.ok) throw new PluginFetchError("blocked", `Blocked URL (${verdict.reason})`);
-    const target = rewriteTmdb(verdict.url, deps.tmdbProxyBase).toString();
+    const target = rewriteTmdb(verdict.url, deps.tmdbProxyBase, method).toString();
     const send = { ...headers };
     if (!hasHeader(send, "cookie")) {
       const fromJar = jar.header(target);
@@ -124,7 +125,8 @@ export async function pluginFetch(
       body = undefined;
       headers = withoutHeader(headers, "content-type");
     }
-    if (new URL(next).hostname !== new URL(current).hostname) {
+    // Like fetch: credentials never follow a redirect to another origin (host, scheme or port).
+    if (new URL(next).origin !== new URL(current).origin) {
       headers = withoutHeader(withoutHeader(headers, "authorization"), "cookie");
     }
     current = next;
