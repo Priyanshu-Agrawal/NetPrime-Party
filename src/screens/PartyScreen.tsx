@@ -24,6 +24,8 @@ import {
 } from "@/components/player/HijackPlayer";
 import { PlayerControls, type PlayerControlsHandle } from "@/components/player/PlayerControls";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
+import { settingsRows, type BridgeCaps } from "@/components/player/capabilities";
+import type { SubtitleTrack } from "@/components/player/types";
 import { bearAlert } from "@/components/ui/BearAlert";
 import GlassButton from "@/components/ui/GlassButton";
 import { useMediaCloseGuard } from "@/hooks/useMediaCloseGuard";
@@ -211,6 +213,9 @@ export default function Party() {
   const [showPlayerSettings, setShowPlayerSettings] = useState(false);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [audios, setAudios] = useState<QualityLevel[]>([]);
+  // What the generic bridge reports about the bound <video> (undefined = legacy bridge).
+  const [bridgeCaps, setBridgeCaps] = useState<BridgeCaps | undefined>(undefined);
+  const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   const [landscapeChatOpen, setLandscapeChatOpen] = useState(false);
   const isImmersive = fullscreen || isLandscapeMobile;
@@ -349,6 +354,8 @@ export default function Party() {
   // so drop back to web controls until the new <video> binds.
   useEffect(() => {
     setPlayerBound(false);
+    setBridgeCaps(undefined);
+    setSubtitles([]);
   }, [providerId, media?.tmdbId, media?.season, media?.episode]);
 
   // Native fullscreen: rotate + expand our player. (HTML5 requestFullscreen needs a
@@ -446,6 +453,14 @@ export default function Party() {
   }, [chat.messages.length]);
 
   const onEvent = (e: PlayerEvent) => {
+    if (e.event === "caps") {
+      if (e.caps) setBridgeCaps(e.caps);
+      return;
+    }
+    if (e.event === "subs") {
+      setSubtitles(e.subs ?? []);
+      return;
+    }
     if (e.event === "quality") {
       setQualities(e.qualities ?? []);
       return;
@@ -1133,6 +1148,9 @@ export default function Party() {
         onSetQuality={(label) => playerRef.current?.setQuality(label)}
         audios={audios}
         onSetAudio={(label) => playerRef.current?.setAudio(label)}
+        {...settingsRows(bridgeCaps)}
+        subtitles={subtitles}
+        onSetSubtitle={(sid) => playerRef.current?.setSubtitle(sid)}
       />
 
       {/* Guest: password prompt for a protected room */}

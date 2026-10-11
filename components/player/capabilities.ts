@@ -63,3 +63,11 @@ export function hijackCapabilities(p: ProviderLike, os: OS, reported?: BridgeCap
     partySync: isPartyCapable(p),
   };
 }
+
+/**
+ * Which settings rows the bound video can back. No reported capabilities means the legacy
+ * bridge, which drives the provider's own Audio and Quality menus.
+ */
+export function settingsRows(caps: BridgeCaps | undefined): { showAudio: boolean; showQuality: boolean } {
+  return { showAudio: caps ? caps.audio : true, showQuality: caps ? caps.quality : true };
+}

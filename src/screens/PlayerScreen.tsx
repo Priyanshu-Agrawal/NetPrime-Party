@@ -43,7 +43,7 @@ import {
   pickInitialProvider as pickProvider,
   type MoveOnReason,
 } from "@/components/player/providerPick";
-import type { BridgeCaps, OS } from "@/components/player/capabilities";
+import { settingsRows, type BridgeCaps, type OS } from "@/components/player/capabilities";
 import type { SubtitleTrack } from "@/components/player/types";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
 import type { ReportArgs, ReportOutcome } from "@/src/types/worker.types";
@@ -874,8 +874,7 @@ export const PlayerScreen: React.FC = () => {
           setPreferredAudio(label);
           applyAudio(label);
         }}
-        showAudio={bridgeCaps ? bridgeCaps.audio : true}
-        showQuality={bridgeCaps ? bridgeCaps.quality : true}
+        {...settingsRows(bridgeCaps)}
         subtitles={subtitles}
         onSetSubtitle={(sid) => playerRef.current?.setSubtitle(sid)}
         showAutoplay={media.type === "tv"}

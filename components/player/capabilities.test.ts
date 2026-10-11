@@ -4,6 +4,7 @@ import {
   isHijackable,
   isPartyCapable,
   NO_CAPABILITIES,
+  settingsRows,
 } from "@/components/player/capabilities";
 import type { HijackCapability } from "@/components/player/hijackCapabilities";
 
@@ -83,5 +84,17 @@ describe("hijackCapabilities", () => {
     expect(hijackCapabilities(p({ supported: true, videoLocation: "cross-origin-iframe" }), "ios").partySync).toBe(
       false,
     );
+  });
+});
+
+describe("settingsRows", () => {
+  it("shows Audio and Quality for the legacy bridge, which reports no capabilities", () => {
+    expect(settingsRows(undefined)).toEqual({ showAudio: true, showQuality: true });
+  });
+  it("shows only the rows the bound video can switch", () => {
+    expect(settingsRows({ quality: false, audio: false, subtitles: true })).toEqual({
+      showAudio: false,
+      showQuality: false,
+    });
   });
 });
