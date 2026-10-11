@@ -17,7 +17,7 @@ export interface CandidateSubtitle {
 }
 
 export interface PlaybackCandidate {
-  /** Stable across re-resolves: source + label + quality + URL shape (tokens and numbers masked). */
+  /** Stable across re-resolves: source + label + quality + title + URL shape (tokens and numbers masked). */
   key: string;
   /** `${repoId}/${pluginId}` — health, telemetry and failure memory key on this, never on a hostname. */
   sourceId: string;
@@ -103,8 +103,10 @@ function fnv1a(s: string): string {
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
-export function candidateKey(sourceId: string, label: string, url: string, quality?: string): string {
-  return `${sourceId}:${fnv1a(`${norm(label)}|${norm(quality ?? "")}|${urlShape(url)}`)}`;
+/** The title's numbers are masked: sizes, seed counts and dates can change between resolves; the words name the file. */
+export function candidateKey(sourceId: string, label: string, url: string, quality?: string, title?: string): string {
+  const name = norm(title ?? "").replace(/\d+/g, "#");
+  return `${sourceId}:${fnv1a(`${norm(label)}|${norm(quality ?? "")}|${name}|${urlShape(url)}`)}`;
 }
 
 /** Which stream owns each URL: the lowest sourceId, so a URL two plugins share never changes hands between resolves. */
@@ -131,7 +133,7 @@ export function toCandidates(
     const sourceId = `${s.repoId}/${s.pluginId}`;
     const height = heightOf(s.quality) ?? heightOf(s.name) ?? heightOf(s.title);
     const qualityLabel = s.quality ?? (height ? `${height}p` : undefined);
-    const base = candidateKey(sourceId, s.name, s.url, qualityLabel);
+    const base = candidateKey(sourceId, s.name, s.url, qualityLabel, s.title);
     const n = seenKeys.get(base) ?? 0;
     seenKeys.set(base, n + 1);
     const container = containerOf(s.url);

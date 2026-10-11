@@ -111,6 +111,14 @@ describe("toCandidates", () => {
     expect(keys(toCandidates([hd, sd], {}))).toEqual(keys(toCandidates([sd, hd], {})));
   });
 
+  it("tells two files of one quality apart by their title, ignoring numbers that change", () => {
+    const web = stream({ quality: "1080p", title: "Jawan WEB 2.1GB seeds 34", url: "https://a.example.net/v/1/x.m3u8" });
+    const bluray = stream({ quality: "1080p", title: "Jawan BluRay 9.8GB seeds 12", url: "https://a.example.net/v/2/x.m3u8" });
+    const keys = (cs: ReturnType<typeof toCandidates>) => Object.fromEntries(cs.map((c) => [c.url, c.key]));
+    expect(keys(toCandidates([web, bluray], {}))).toEqual(keys(toCandidates([bluray, web], {})));
+    expect(toCandidates([web], {})[0].key).toBe(toCandidates([{ ...web, title: "Jawan WEB 2.1GB seeds 35" }], {})[0].key);
+  });
+
   it("gives a URL two plugins share to the same plugin every time", () => {
     const url = "https://a.example.net/1/x.m3u8";
     const p = stream({ url });
