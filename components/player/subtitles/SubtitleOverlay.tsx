@@ -40,22 +40,22 @@ export function loadCues(url: string, headers?: Record<string, string>, fetcher:
 
 /** Cues for the chosen sidecar track; [] while loading, after a failure, or with none chosen. */
 export function useSidecarCues(track?: { url: string; headers?: Record<string, string> }): Cue[] {
-  const [cues, setCues] = useState<Cue[]>([]);
+  // Results are tagged with their URL, so a new pick never shows the previous file's cues.
+  const [loaded, setLoaded] = useState<{ url: string; cues: Cue[] } | null>(null);
   const url = track?.url;
   const headers = track?.headers;
   useEffect(() => {
-    setCues([]);
     if (!url) return;
     let live = true;
     loadCues(url, headers).then(
-      (c) => live && setCues(c),
-      () => live && setCues([]),
+      (cues) => live && setLoaded({ url, cues }),
+      () => live && setLoaded({ url, cues: [] }),
     );
     return () => {
       live = false;
     };
   }, [url, headers]);
-  return cues;
+  return loaded && loaded.url === url ? loaded.cues : [];
 }
 
 interface Props {
