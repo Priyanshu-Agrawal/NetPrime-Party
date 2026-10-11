@@ -162,6 +162,28 @@ describe("NativePlayer", () => {
     expect(player.play).not.toHaveBeenCalled();
   });
 
+  it("settles when its parent keeps the emitted lists in state and passes no sidecar subtitles", () => {
+    let renders = 0;
+    function Parent() {
+      const [, setAudios] = React.useState<unknown>([]);
+      renders += 1;
+      if (renders > 50) throw new Error("render loop");
+      return (
+        <NativePlayer
+          source={{ uri: "https://example.test/master.m3u8" }}
+          onPlayerEvent={(e) => {
+            if (e.event === "audio") setAudios(e.audios ?? []);
+          }}
+        />
+      );
+    }
+    act(() => {
+      create(<Parent />);
+    });
+    act(() => FakeVideoPlayer.last!.emit("sourceLoad", LOAD));
+    expect(renders).toBeLessThan(10);
+  });
+
   it("forwards the first frame", () => {
     const { r, onFirstFrame } = setup();
     act(() => r.root.find((n) => n.props?.testID === "video-view").props.onFirstFrameRender());

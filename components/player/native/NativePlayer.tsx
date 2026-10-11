@@ -60,6 +60,8 @@ export interface NativePlayerProps {
   style?: StyleProp<ViewStyle>;
 }
 
+// A stable empty list: a fresh `[]` default would change identity every render and loop the track publishing.
+const NO_SIDECARS: SidecarSubtitle[] = [];
 const SIDECAR = "side:";
 const IN_STREAM = "in:";
 
@@ -75,7 +77,7 @@ interface Tracks {
 export const NativePlayer = forwardRef<PlayerHandle, NativePlayerProps>(function NativePlayer(props, ref) {
   const {
     source,
-    sidecarSubtitles = [],
+    sidecarSubtitles = NO_SIDECARS,
     autoPlay = true,
     tickInterval = 0.5,
     surfaceType = "surfaceView",
