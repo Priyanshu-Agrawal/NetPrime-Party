@@ -35,6 +35,20 @@ export interface FeatureFlags {
 
 export const DEFAULT_FLAGS: FeatureFlags = { embedApiLane: false, nativeLane: false, pluginHost: false };
 
+/** An operator-listed plugin repo from /config (worker/src/pluginRepos.ts). Every file is pinned by sha256. */
+export interface PluginRepoRow {
+    id: string;
+    manifestUrl: string;
+    version: number;
+    /** Paths relative to the manifest's folder; the manifest itself is one of them. */
+    files: { path: string; sha256: string }[];
+    enabled: boolean;
+    /** True = unload remotely (files stay on the device). */
+    down: boolean;
+    /** Only these plugin ids may run; null = every enabled plugin in the manifest. */
+    allowPlugins: string[] | null;
+}
+
 /** `GET /config` — app bootstrap config + provider registry. */
 export interface AppConfig {
     appVersion: string;
@@ -53,6 +67,8 @@ export interface AppConfig {
     /** True only when the operator deliberately emptied the list. Absent on old workers. */
     killswitch?: boolean;
     flags?: FeatureFlags;
+    /** Plugin repos to install (enabled rows only). Absent on old workers. */
+    pluginRepos?: PluginRepoRow[];
 }
 
 /** Per-provider resolution outcome from `GET /scrape`. */

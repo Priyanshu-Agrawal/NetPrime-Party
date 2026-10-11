@@ -4336,7 +4336,7 @@ import { pluginFetch, toPluginFetchRequest, type PluginFetchDeps } from "./plugi
 import { collectGarbage, installRepo, loadPlugins, type LoadedPlugin, type RepoStatus } from "./registry";
 import type { RunEnv } from "./sandbox/protocol";
 import { SandboxBridge } from "./sandboxBridge";
-import { mmkvPluginStore } from "./store";
+import { mmkvPluginStore } from "./mmkvStore";
 import { normaliseStreams } from "./streams";
 
 const store = mmkvPluginStore();
