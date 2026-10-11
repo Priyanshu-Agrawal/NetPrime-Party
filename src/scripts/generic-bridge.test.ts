@@ -162,6 +162,23 @@ describe("generic bridge", () => {
     expect(v.pause).toHaveBeenCalled();
   });
 
+  it("holds the speed it was asked for when the provider resets it (VidFast goes back to 1× after a seek)", () => {
+    load();
+    const v = addVideo(8349);
+    jest.advanceTimersByTime(700);
+    (window as any).__vlCmd({ action: "rate", rate: 1.1 });
+    v.playbackRate = 1; // the provider's own player puts it back
+    v.dispatchEvent(new Event("ratechange"));
+    expect(v.playbackRate).toBe(1.1);
+    v.playbackRate = 1; // …or does so without an event
+    jest.advanceTimersByTime(1000);
+    expect(v.playbackRate).toBe(1.1);
+    v.remove();
+    const swapped = addVideo(8349); // the provider swaps the element: the new one gets the speed too
+    jest.advanceTimersByTime(700);
+    expect(swapped.playbackRate).toBe(1.1);
+  });
+
   it("keeps a play asked for before the stream was ready, until a pause cancels it", () => {
     load();
     const v = addVideo(8349);

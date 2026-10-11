@@ -106,6 +106,13 @@ export const GENERIC_BRIDGE: string = `
   // stream after we bind, so the first play() can land too early (iOS drops it); retry
   // when the video says it can play.
   var vid = null, applying = 0, wasPlaying = false, wantPlay = false;
+  // The speed we were asked for (party drift correction, solo speed). Some providers put the
+  // video back to 1x on their own (VidFast after a seek), which froze party catch-up — hold it.
+  var wantRate = null;
+  function holdRate(v){
+    if (wantRate == null || !v) return;
+    try { if (Math.abs(v.playbackRate - wantRate) > 0.001) v.playbackRate = wantRate; } catch(e){}
+  }
   function markApplying(){ applying = Date.now() + 500; }
   function isApplying(){ return Date.now() < applying; }
   function isSubTrack(t){ return !t.kind || t.kind === 'subtitles' || t.kind === 'captions'; }
@@ -150,6 +157,7 @@ export const GENERIC_BRIDGE: string = `
     if (!v || v === vid) return;
     try { if (vid) vid.removeAttribute('data-vl-bound'); v.setAttribute('data-vl-bound', ''); } catch(e){}
     vid = v; wasPlaying = !v.paused;
+    holdRate(v);
     if (!v.__vlBound){
       v.__vlBound = true;
       ['play','pause','seeking','seeked','ended','waiting','playing','canplay'].forEach(function(ev){
@@ -164,6 +172,7 @@ export const GENERIC_BRIDGE: string = `
         });
       });
       try { v.addEventListener('loadedmetadata', function(){ if (v === vid) postCaps(); }); } catch(e){}
+      v.addEventListener('ratechange', function(){ if (v === vid) holdRate(v); });
       ['canplay', 'loadeddata'].forEach(function(ev){
         v.addEventListener(ev, function(){
           if (v !== vid || !wantPlay || !v.paused) return;
@@ -188,7 +197,7 @@ export const GENERIC_BRIDGE: string = `
     applyChrome();
   }
   setInterval(scan, 700);
-  setInterval(function(){ keepAlive(); if (vid) post(snap(vid, { event: 'tick' })); }, 1000);
+  setInterval(function(){ keepAlive(); if (vid){ holdRate(vid); post(snap(vid, { event: 'tick' })); } }, 1000);
   document.addEventListener('visibilitychange', function(){
     if (!document.hidden) return;
     keepAlive(); setTimeout(keepAlive, 50); setTimeout(keepAlive, 250); setTimeout(keepAlive, 1000);
@@ -232,10 +241,10 @@ export const GENERIC_BRIDGE: string = `
       if (cmd.action === 'readQuality'){ post(snap(vid, { event: 'quality', qualities: [] })); return; }
       if (cmd.action === 'readAudio'){ post(snap(vid, { event: 'audio', audios: [] })); return; }
       if (cmd.action === 'readSubs'){ postSubs(); return; }
+      if (cmd.action === 'rate'){ wantRate = cmd.rate; if (vid) vid.playbackRate = cmd.rate; return; }
       if (!vid) return;
       if (cmd.action === 'pause'){ wasPlaying = false; wantPlay = false; markApplying(); vid.pause(); }
       else if (cmd.action === 'seek'){ markApplying(); vid.currentTime = cmd.time; }
-      else if (cmd.action === 'rate'){ vid.playbackRate = cmd.rate; }
       else if (cmd.action === 'setSub'){
         var tt = vid.textTracks || [];
         for (var i = 0; i < tt.length; i++){
