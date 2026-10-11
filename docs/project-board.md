@@ -388,3 +388,45 @@ FlashList 2 · TypeScript 6 · webview 13.16.1 · CI on Node 22. Stepped 53 → 
 * **Before the next `v*` tag (CI ships a release APK):** release build on the Nothing Phone 1 — Home while a video
   plays keeps audio (the keep-alive was last proven on an emulator debug build), and VidFast plays 60 s with no false
   overlay.
+
+## `[~]` Phase 1A — our skin + party on existing providers (2026-10-11)
+**Spec:** [`superpowers/specs/2026-10-10-playback-languages-party-design.md`](superpowers/specs/2026-10-10-playback-languages-party-design.md)
+§6.2.4 + §9 row 1A · **Plan:** [`superpowers/plans/2026-10-11-phase1a-skin-existing-providers.md`](superpowers/plans/2026-10-11-phase1a-skin-existing-providers.md)
+· branch `phase1a/skin-existing-providers`
+
+**Why:** a title opened VidFast's own player ("Watch Party isn't supported on VidFast") since videasy died. Real titles
+reach the native player only once plugin repos are on, so this phase puts our controls and the party on the embeds
+we already have.
+
+**Done:**
+* `[x]` One generic bridge (`src/scripts/generic-bridge.ts`, OTA via `/scripts`): binds the page's best `<video>`
+  (main + same-origin frames, feature over ads, rebinds on swap), paints only the video, blocks popups, keeps a play
+  asked for before the stream is ready, reads subtitles from `textTracks`, auto-starts through start selectors.
+* `[x]` Per-platform bindability (`capabilities.ts`: cross-origin-frame providers are iOS-only, measured overrides
+  win) · party needs a provider bindable on both · solo bind-or-move-on (bind timeout, fatal error, stalled start)
+  across bindable providers (`providerPick.ts`) · videasy `nextEpisode` off in parties.
+* `[x]` Subtitles row in the settings sheet; Audio/Quality rows hide when the bridge can't switch them.
+* `[x]` Party shows what's playing with the controls (title + S·E; portrait and fullscreen) — owner request.
+* `[x]` Fixed a party bug found in the gate: a guest could take host from a live host right after joining
+  (`services/party/election.ts`, `b743bff`).
+* Dev switch `EXPO_PUBLIC_DEV_GENERIC_BRIDGE=1` serves the bundled bridge before it is published (dev builds only).
+
+**Gate (2026-10-11):**
+* Solo, our controls, no provider UI — Android emulator: Fight Club, GoT S1E1, Stranger Things S1E1 (VidFast);
+  iOS 27 simulator: Fight Club, GoT S1E1, Stranger Things S1E1 (VidFast, bind 3.2–3.6 s, playing 6.4–9.5 s).
+* Party, emulator host + iOS guest, VidFast Fight Club, 10.1 min with pause / play / +10 / −10 / scrubber seek:
+  guest vs host end to end p50 0.13 s · **p95 0.34 s** · max 0.60 s (gate ≤ 1 s); no provider UI on either.
+* Dead providers skipped silently (vixsrc TV, vidlink, mycineby, 111movies); F4 (`id=99999999`) ends on the branded
+  error card with Retry · Try another source.
+* `[ ]` Phone leg (Nothing Phone 1 disconnected) · `[ ]` publish the bridge + provider data (owner's go-ahead).
+
+**Publish plan (after the owner says yes):** scripts for vidfast, vidnest, vixsrc, vidlink only; priority vidfast 1,
+vidnest 2, vixsrc 3, vidlink 4, then plain embeds; no script for mycineby, 111movies (dead), vidcore, vidphantom
+(cross-origin on Android, slow on iOS); videasy disabled (403). Revert SQL is in the ledger.
+
+**Deferred (minor):**
+* F4 card has no Report button and blames one source when all failed; dev tries every provider (~2.5 min), the
+  published set (~1 min) — rework with the 1B error states.
+* Unhandled `party_set_playback: not host` rejection if the host role flips mid-press (silent in release).
+* Player controls have no accessibility labels.
+* Exiting fullscreen on the iOS simulator stays landscape (no tilt sensor) — confirm portrait returns on a phone.
