@@ -4,6 +4,9 @@
 // upsert that leaves the repo DISABLED. Pin commit-addressed URLs (a commit SHA in the path), never a branch.
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+
+const { safePath, upsertSql } = createRequire(import.meta.url)("./pin-plugin-repo-lib.js");
 
 const [manifestUrl, ...rest] = process.argv.slice(2);
 if (!manifestUrl?.startsWith("https://")) {
@@ -28,18 +31,14 @@ const files = [{ path: manifestUrl.slice(base.length), sha256: sha(manifestBytes
 for (const s of manifest.scrapers ?? []) {
   if (s.enabled === false) continue;
   const url = new URL(s.filename, base).toString();
-  if (!url.startsWith(base)) {
-    console.error(`skipping ${s.id}: ${s.filename} is outside the repo folder`);
+  const path = url.slice(base.length);
+  if (!url.startsWith(base) || !safePath(path)) {
+    console.error(`skipping ${s.id}: ${JSON.stringify(s.filename)} is outside the repo folder or not a plain path`);
     continue;
   }
-  files.push({ path: url.slice(base.length), sha256: sha(await get(url)) });
+  files.push({ path, sha256: sha(await get(url)) });
 }
 const id = opt("id", "repo");
 const version = Number(opt("version", "1"));
 console.log(JSON.stringify({ id, manifestUrl, version, files }, null, 2));
-console.log(
-  `\n-- Review, then run as the operator (the repo stays disabled until enabled on purpose):\n` +
-    `insert into public.plugin_repos (id, manifest_url, version, files, enabled)\n` +
-    `values ('${id}', '${manifestUrl}', ${version}, '${JSON.stringify(files)}'::jsonb, false)\n` +
-    `on conflict (id) do update set manifest_url = excluded.manifest_url, version = excluded.version, files = excluded.files, updated_at = now();`,
-);
+console.log(`\n-- Review, then run as the operator (the repo stays disabled until enabled on purpose):\n${upsertSql({ id, manifestUrl, version, files })}`);
