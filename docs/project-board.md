@@ -663,3 +663,53 @@ Spec §5.3, §5.5–5.7, §7 F5.
   - I8: candidate keys moved between re-resolves. Opaque path tokens are masked whole; quality and the title (numbers masked) are part of the key; a URL two plugins share always goes to the lowest source id.
   - Graded up: a namespaced `<mpd:MPD>` was rejected; everyday words (spa/por/chi/tha/tur) read as languages; a show-level TV runtime would have rejected long pilots (episodes skip the length check until per-episode runtime lands).
   - Other minors are deferred in BACKLOG.
+
+## `[x]` Phase 2B-2 — native lane for real titles (2026-10-12)
+
+Plan `docs/superpowers/plans/2026-10-11-phase2b2-native-lane.md` · branch `feat/phase2b-native-sources`. Spec §6.2, §6.2.1,
+§6.3, §7 F4/F6/F8/F14.
+
+- **What Play does now:** the Player route (`PlayerLaneScreen`) tries Bearoom's own player first when the `pluginHost`
+  and `nativeLane` flags are on. `TitlePlayer` resolves the title's streams and waits at most 8 s:
+  - a playable stream → our native player (loading card → first frame);
+  - nothing in time → today's web flow, unchanged.
+  - Inside the native lane:
+    - the Audio row offers sibling-language streams;
+    - Settings → Source lists every candidate plus "Web player · other sources";
+    - F6 failover: re-resolve the same stream once → next in the same language → another language with a notice → the F4 card;
+    - §6.3 notices ("Hindi isn't available for this title — playing original audio");
+    - `/report` rows on lane `native` (`providerId` = source id, no URLs).
+- **Gate — Nothing Phone 1 (release build):**
+
+  | Title | Result |
+  |---|---|
+  | Big Buck Bunny (via Search) | native · "Open Movies • HLS · English · 1080p" · Hindi notice · no provider page · `/report` `success` lane `native` ttff 6.2 s cold |
+  | Tears of Steel | Source lists HLS + MOV; the MOV switch kept the position; Subtitles lists 6 sidecar languages and English renders |
+  | Sintel | DASH plays natively (Android) |
+  | Fight Club | today's web flow (VidFast with our skin) within ~1 s |
+  | Re-gate after the review fixes | Two source switches in fullscreen kept fullscreen, 1.25× and English subtitles (re-selected on the next stream), and the position. Closing the player relocks portrait. 30 s of airplane mode paused on "No internet connection" on the same stream and resumed by itself. The back button shows while loading. |
+
+- **Gate — iOS 27 simulator:**
+  - Big Buck Bunny plays natively with the notice; ttff 3.5 s warm, 6.5 s cold.
+  - Sintel shows our loading card for ~2 s, then the web flow (DASH can't play on iPhone).
+  - Screenshots: `docs/qa/phase2b2/`.
+- **Found on the devices, fixed test-first:**
+  - Tears of Steel's MOV was rejected as an "error page". x264 writes its settings as ASCII into the first frame, so the file read as 96 % text. An MP4/QuickTime header now wins over the text check.
+  - The iPhone crashed when a sheet opened over a landscape player: an RN Modal allows only portrait, and iOS aborts the app. This existed before for the web player's settings too. The player's sheets now allow landscape.
+- **Final review (Opus) → not ready; all fixed test-first** (integration tests with the real player view over a fake expo-video):
+  - C1: a switch or failover before the new stream was ready restarted the film at 0.
+  - C2: failover could loop forever when a plugin's keys change on every resolve. It is now capped at 2n+2 automatic attempts, and a hung re-resolve gives up at 8 s.
+  - I1: the web player remounted on every episode, losing the provider, fullscreen and speed.
+  - I2: offline, a stream error burned every source. It now waits for the network (F8).
+  - I3 and M5: notices were hidden under the loading cover and sat over the back button.
+  - I4: the wanted language inside a multi-audio stream is now selected.
+  - I5: fullscreen, speed, subtitles and pause were lost on every switch. They now carry over, and the lane owns the orientation.
+  - I6: loading and error states had no way back.
+  - I7: the native lane never unlocked rotation, and closing it left the details page free to rotate.
+  - I8: "Subs: Hindi" was read as Hindi audio after the title was stripped.
+- **Rulings:**
+  - The native lane is solo; party stays on the web lane until Phase 3.
+  - The F4 "Report" action is deferred.
+  - A title handed to the web lane stays there for its next episodes.
+  - Settings carry across a per-stream remount instead of an in-place swap, because expo-video 57 builds a new native player for any new source.
+  - On iPhone, a back press in landscape closes without the "Stop watching?" confirm. BearAlert's Modal is portrait-only and off-limits to me; it needs the owner's OK for a one-line fix.
