@@ -51,10 +51,24 @@ describe("scorecardHost", () => {
     expect(plugins).toEqual([]);
   });
 
-  it("each scorecard run starts from a fresh store (nothing is kept between runs)", async () => {
+  it("a second run of the same pinned files reuses this session's install (no second download)", async () => {
+    const row = { ...ROW, id: "again" };
     download.mockClear();
-    await scorecardHost(ROW, { download, run: jest.fn(), jarFor: () => new CookieJar() });
-    await scorecardHost(ROW, { download, run: jest.fn(), jarFor: () => new CookieJar() });
-    expect(download).toHaveBeenCalledTimes(6);
+    await scorecardHost(row, { download, run: jest.fn(), jarFor: () => new CookieJar() });
+    await scorecardHost(row, { download, run: jest.fn(), jarFor: () => new CookieJar() });
+    expect(download).toHaveBeenCalledTimes(3);
+  });
+
+  it("candidate plugins get their own keys, so their sandbox entries and cookie jars never meet the app's", async () => {
+    const { plugins } = await scorecardHost(ROW, { download, run: jest.fn(), jarFor: () => new CookieJar() });
+    expect(plugins.every((p) => p.key.startsWith("scorecard:cand/"))).toBe(true);
+  });
+
+  it("once stopped (or over budget), no further plugin starts", async () => {
+    const run = jest.fn(async () => []);
+    const { host } = await scorecardHost(ROW, { download, run, jarFor: () => new CookieJar(), shouldStop: () => true });
+    const r = await host.getStreams({ tmdbId: "9", type: "movie" });
+    expect(run).not.toHaveBeenCalled();
+    expect(r.failures.map((f) => f.reason)).toEqual(["not-ready", "not-ready"]);
   });
 });

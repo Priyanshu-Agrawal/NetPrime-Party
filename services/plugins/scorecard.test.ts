@@ -21,10 +21,14 @@ const TITLES: BenchTitle[] = [
 function deps(byTitle: Record<string, HostResult>, verdicts: Record<string, Partial<PlaybackCandidate>> = {}, over: Partial<ScoreDeps> = {}): ScoreDeps {
   let t = 0;
   return {
-    getStreams: jest.fn(async (req: ResolveRequest, opts?: { onStreams?(k: string, l: PluginStream[]): void }) => {
+    pluginIds: [],
+    getStreams: jest.fn(async (req: ResolveRequest, opts?: Parameters<ScoreDeps["getStreams"]>[1]) => {
       const r = byTitle[req.tmdbId];
       t += 500;
       if (r.streams.length) opts?.onStreams?.(r.streams[0].pluginKey, r.streams);
+      for (const key of new Set(r.streams.map((x) => x.pluginKey))) opts?.onSettled?.(key);
+      for (const key of r.ran) opts?.onSettled?.(key);
+      for (const f of r.failures) opts?.onSettled?.(f.pluginKey, f);
       return r;
     }),
     probe: jest.fn(async (c: PlaybackCandidate) => ({ ...c, verdict: "ok" as const, ...verdicts[c.url] })),
@@ -37,6 +41,8 @@ function deps(byTitle: Record<string, HostResult>, verdicts: Record<string, Part
     ...over,
   };
 }
+/** `ran` here = plugins that answered with nothing (settled, no failure, no streams). */
+const answeredEmpty = (keys: string[], h: HostResult): HostResult => ({ ...h, ran: keys });
 const host = (streams: PluginStream[], failures: HostResult["failures"] = []): HostResult => ({ streams, failures, ran: [], complete: true });
 
 describe("scoreRepo", () => {
@@ -129,6 +135,52 @@ describe("scoreRepo", () => {
     const d = deps({ "1": host(many) }, {}, { probeLimit: 5 });
     await scoreRepo([TITLES[0]], d);
     expect(d.probe).toHaveBeenCalledTimes(5);
+  });
+});
+
+describe("scoreRepo accounts for every plugin and probes fairly", () => {
+  it("every loaded plugin gets a row: streams, answered empty, failed, or never ran", async () => {
+    const report = await scoreRepo(
+      [TITLES[0]],
+      deps(
+        { "1": answeredEmpty(["r/b@1"], host([stream("a", "https://x.example.net/1.m3u8")], [{ pluginKey: "r/c@1", reason: "timeout", ms: 15000 }])) },
+        {},
+        { pluginIds: ["a", "b", "c", "d"] },
+      ),
+    );
+    const row = (id: string) => report.plugins.find((p) => p.pluginId === id)!;
+    expect(row("a")).toMatchObject({ answered: 1, empty: 0, streams: 1 });
+    expect(row("b")).toMatchObject({ answered: 1, empty: 1, streams: 0 });
+    expect(row("c")).toMatchObject({ answered: 0, failures: { timeout: 1 } });
+    expect(row("d")).toMatchObject({ answered: 0, notRun: 1 });
+  });
+
+  it("every plugin gets a probe before any gets a second", async () => {
+    const d = deps(
+      {
+        "1": host([
+          stream("a", "https://a1.example.net/1.m3u8", "Hindi"),
+          stream("a", "https://a2.example.net/2.m3u8", "Hindi"),
+          stream("a", "https://a3.example.net/3.m3u8", "Hindi"),
+          stream("b", "https://b1.example.net/4.m3u8", "English"),
+        ]),
+      },
+      {},
+      { probeLimit: 2 },
+    );
+    const report = await scoreRepo([TITLES[0]], d);
+    expect((d.probe as jest.Mock).mock.calls.map(([c]) => c.sourceId).sort()).toEqual(["r/a", "r/b"]);
+    expect(report.plugins.find((p) => p.pluginId === "a")).toMatchObject({ streams: 3, probed: 1 });
+    expect(report.titles[0]).toMatchObject({ streams: 4, probed: 2 });
+  });
+
+  it("an unverified stream (no time to check, moov at the end) is counted apart from playable", async () => {
+    const report = await scoreRepo(
+      [TITLES[0]],
+      deps({ "1": host([stream("a", "https://x.example.net/f.mp4")]) }, { "https://x.example.net/f.mp4": { verdict: "unverified" } }),
+    );
+    expect(report.titles[0]).toMatchObject({ playable: 0, unverified: 1 });
+    expect(report.plugins[0]).toMatchObject({ playable: 0, unverified: 1 });
   });
 });
 

@@ -43,6 +43,8 @@ export const BUDGET = {
 } as const;
 
 export interface HostDeps {
+  /** Overrides for this host only (the dev scorecard waits for every plugin: no early return). */
+  budget?: Partial<Record<keyof typeof BUDGET, number>>;
   plugins(): LoadedPlugin[];
   run(plugin: LoadedPlugin, req: ResolveRequest, timeoutMs: number): Promise<unknown>;
   normalise(plugin: LoadedPlugin, raw: unknown): PluginStream[] | null;
@@ -65,7 +67,11 @@ export class PluginHost {
   /** Runs still going, by title|plugin: a second request joins one instead of running the plugin again. */
   private inflight = new Map<string, Promise<PluginStream[] | PluginFailure>>();
 
-  constructor(private readonly deps: HostDeps) {}
+  private readonly budget: { [K in keyof typeof BUDGET]: number };
+
+  constructor(private readonly deps: HostDeps) {
+    this.budget = { ...BUDGET, ...deps.budget };
+  }
 
   getStreams(
     req: ResolveRequest,
@@ -91,14 +97,14 @@ export class PluginHost {
         clearTimeout(idle);
         resolve({ streams: [...streams], failures: [...failures], ran: [...ran], complete });
       };
-      const overall = setTimeout(() => finish(false), BUDGET.overallMs);
+      const overall = setTimeout(() => finish(false), this.budget.overallMs);
       const add = (p: LoadedPlugin, list: PluginStream[]) => {
         if (finished || !list.length) return;
         streams.push(...list);
         opts.onStreams?.(p.key, list);
-        if (streams.length >= BUDGET.earlyCount) {
+        if (streams.length >= this.budget.earlyCount) {
           clearTimeout(idle);
-          idle = setTimeout(() => finish(false), BUDGET.earlyIdleMs);
+          idle = setTimeout(() => finish(false), this.budget.earlyIdleMs);
         }
       };
       const settle = () => {
@@ -113,7 +119,7 @@ export class PluginHost {
       // caller that started them only (once per run).
       const reuse = (p: LoadedPlugin): boolean => {
         const hit = this.cache.get(`${title}|${p.key}`);
-        if (hit && this.deps.now() - hit.at < BUDGET.cacheMs) {
+        if (hit && this.deps.now() - hit.at < this.budget.cacheMs) {
           add(p, hit.streams);
           settle();
           return true;
@@ -130,7 +136,7 @@ export class PluginHost {
       const queue = plugins.filter((p) => !reuse(p));
       let inFlight = 0;
       const pump = () => {
-        while (inFlight < BUDGET.parallel && queue.length) {
+        while (inFlight < this.budget.parallel && queue.length) {
           const p = queue.shift()!;
           if (reuse(p)) continue;
           inFlight++;
@@ -180,11 +186,11 @@ export class PluginHost {
   private async attempt(p: LoadedPlugin, req: ResolveRequest, title: string): Promise<PluginStream[] | PluginFailure> {
     const started = this.deps.now();
     try {
-      const raw = await this.deps.run(p, req, BUDGET.perPluginMs);
+      const raw = await this.deps.run(p, req, this.budget.perPluginMs);
       const ms = this.deps.now() - started;
       const list = this.deps.normalise(p, raw);
       if (list === null) return { pluginKey: p.key, reason: "bad-shape", ms };
-      if (list.length === 0 && ms < BUDGET.emptyFastMs) return { pluginKey: p.key, reason: "empty-fast", ms };
+      if (list.length === 0 && ms < this.budget.emptyFastMs) return { pluginKey: p.key, reason: "empty-fast", ms };
       this.cache.set(`${title}|${p.key}`, { at: this.deps.now(), streams: list });
       return list;
     } catch (e) {

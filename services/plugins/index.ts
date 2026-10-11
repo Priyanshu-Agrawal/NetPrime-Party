@@ -18,9 +18,18 @@ import { scorecardHost } from "./devScorecard";
 import { Traffic } from "./traffic";
 
 const store = mmkvPluginStore();
-const fetchDeps: PluginFetchDeps = { fetchOnce, limiter: new Limiter(2, 24), tmdbProxyBase: TMDB_PROXY_URL };
-const jars = new Map<string, CookieJar>();
 const traffic = new Traffic();
+// Counted at the native layer: every hop of every fetch (plugins, probes, downloads), failed or cut off ones included.
+const fetchDeps: PluginFetchDeps = {
+  fetchOnce: async (req) => {
+    const res = await fetchOnce(req);
+    traffic.add(res);
+    return res;
+  },
+  limiter: new Limiter(2, 24),
+  tmdbProxyBase: TMDB_PROXY_URL,
+};
+const jars = new Map<string, CookieJar>();
 
 /** Data the plugin layer has pulled since launch (the scorecard's budget). */
 export function bytesUsed(): number {
@@ -44,7 +53,6 @@ const URLISH = /\bhttps?:\/\/\S+/gi;
 export const sandboxBridge = new SandboxBridge({
   onFetch: async (pluginKey, req, alive) => {
     const r = await pluginFetch(jarFor(pluginKey), toPluginFetchRequest(req), fetchDeps, alive);
-    traffic.add(r);
     return { status: r.status, url: r.url, redirected: r.redirected, headers: r.headers, body: r.body, encoding: r.encoding };
   },
   // Dev builds only, and never with a URL in it: stream URLs and tokens must not reach any log.
@@ -52,16 +60,13 @@ export const sandboxBridge = new SandboxBridge({
 });
 
 /** The host's own fetch (the stream probe): the same per-hop guard and limits, and no plugin's cookies. */
-export async function hostFetch(req: PluginFetchRequest, alive?: () => boolean) {
-  const r = await pluginFetch(new CookieJar(), req, fetchDeps, alive);
-  traffic.add(r);
-  return r;
+export function hostFetch(req: PluginFetchRequest, alive?: () => boolean) {
+  return pluginFetch(new CookieJar(), req, fetchDeps, alive);
 }
 
 const registryJar = new CookieJar();
 async function download(url: string) {
   const r = await pluginFetch(registryJar, { url, responseType: "base64" }, fetchDeps); // raw bytes: decoded strictly by the registry
-  traffic.add(r);
   return { status: r.status, body: r.body, sha256: r.sha256 };
 }
 
@@ -114,8 +119,9 @@ export function runInSandbox(key: string, source: string, args: unknown[], timeo
 }
 
 /** Dev scorecard: a pinned candidate repo in memory, through the real sandbox and fetch path (never the user registry). */
-export function scorecardRepo(row: PluginRepoRow) {
+export function scorecardRepo(row: PluginRepoRow, shouldStop?: () => boolean) {
   return scorecardHost(row, {
+    shouldStop,
     download,
     run: (p, req, timeoutMs) =>
       sandboxBridge.run({ key: p.key, source: p.source }, [req.tmdbId, req.type, req.season ?? null, req.episode ?? null], ENV, timeoutMs),

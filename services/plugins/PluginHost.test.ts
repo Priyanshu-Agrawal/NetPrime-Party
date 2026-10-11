@@ -185,6 +185,27 @@ describe("PluginHost.getStreams", () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
+  it("a host given its own budget can wait for every plugin (the scorecard: no early return)", async () => {
+    const plugins = [plugin("a"), plugin("b")];
+    const pending = new Map<string, (v: unknown) => void>();
+    const host = new PluginHost({
+      plugins: () => plugins,
+      run: (p) => new Promise((res) => pending.set(p.key, res)),
+      normalise: (p, raw) => (Array.isArray(raw) ? raw.map((u) => stream(p.key, String(u))) : null),
+      now: () => Date.now(),
+      budget: { earlyCount: Infinity, overallMs: 120_000 },
+    });
+    let done = false;
+    const out = host.getStreams(REQ).then((r) => ((done = true), r));
+    await jest.advanceTimersByTimeAsync(0);
+    pending.get("r/a@1")!(["u1", "u2", "u3"]);
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect(done).toBe(false); // the default host would have returned at 3 streams + 1.2 s, and at 20 s overall
+    pending.get("r/b@1")!(["u4"]);
+    await jest.advanceTimersByTimeAsync(0);
+    expect((await out).streams.map((s) => s.url)).toEqual(["u1", "u2", "u3", "u4"]);
+  });
+
   it("caches per title for 15 minutes", async () => {
     const { host, run, answer } = harness([plugin("a")]);
     const out = host.getStreams(REQ);
