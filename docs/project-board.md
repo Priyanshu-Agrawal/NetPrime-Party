@@ -459,6 +459,10 @@ Measured on the Nothing Phone 1 (SD 778G+, 120 Hz) with atrace, gfxinfo, simplep
   native blur only on the focused screen and only while `active` (`a15d80b`, `8b12a11`). Party (dev): late frames
   94% → 35%, median 18 → 10 ms, p99 26 → 17 ms.
 
+**Release build, Nothing Phone 1, party playback before → after:** layout 153 → 6 ms/s · text redraws 26 → 1 ms/s ·
+slow-UI-thread frames 287 → 16 per 15 s · median 15 → 10 ms · p90 20 → 13 ms · p99 23 → 16 ms. Solo (release):
+median 8 ms, p99 12 ms, animation callbacks 176 → ~115 ms/s.
+
 **Notes:** solo playback was already smooth (0 dropped frames, p99 12–14 ms); the emulator's own stutter is the
 emulator (emulated GLES). Remaining always-on cost while video plays is the WebView's per-refresh tick (halves on
 60 Hz phones; a 60 Hz preferred refresh rate during playback is an option on 120 Hz phones).
