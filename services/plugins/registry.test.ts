@@ -1,5 +1,6 @@
 import type { PluginRepoRow } from "@/src/types/worker.types";
 import { sha256Hex } from "@/utils/sha256";
+import { createHash } from "crypto";
 import { collectGarbage, fileUrl, installRepo, loadPlugins, readInstalled } from "./registry";
 import { memoryPluginStore } from "./store";
 
@@ -33,10 +34,13 @@ const repo = (over: Partial<PluginRepoRow> = {}): PluginRepoRow => ({
   allowPlugins: null,
   ...over,
 });
-function server(contents: Record<string, string>) {
+/** Serves files as the raw bytes the native fetch hands back (base64), hashed like the native side hashes them. */
+function server(contents: Record<string, string | Buffer>) {
   return jest.fn(async (url: string) => {
     const body = url.startsWith(BASE) ? contents[url.slice(BASE.length)] : undefined;
-    return body == null ? { status: 404, body: "", sha256: "" } : { status: 200, body, sha256: sha256Hex(body) };
+    if (body == null) return { status: 404, body: "", sha256: "" };
+    const bytes = typeof body === "string" ? Buffer.from(body, "utf8") : body;
+    return { status: 200, body: bytes.toString("base64"), sha256: createHash("sha256").update(bytes).digest("hex") };
   });
 }
 const ids = (store: ReturnType<typeof memoryPluginStore>, row = repo()) => loadPlugins(row, store).map((p) => p.pluginId);
@@ -101,6 +105,18 @@ describe("installRepo + loadPlugins", () => {
     await expect(installRepo(repo({ files: pin(v1, ["providers/alpha.js"]) }), store, server(v1))).resolves.toMatchObject({ state: "failed", detail: "manifest not pinned" });
     const junk = { ...v1, "manifest.json": "nope" };
     await expect(installRepo(repo({ files: pin(junk) }), store, server(junk))).resolves.toMatchObject({ state: "failed", detail: "manifest unreadable" });
+  });
+
+  it("refuses a file that is not valid UTF-8 even when its hash matches — a server can't change what the bytes mean", async () => {
+    const store = memoryPluginStore();
+    // Inert as UTF-8, but Shift_JIS would swallow the closing quote and run the rest.
+    const bytes = Buffer.from([0x76, 0x61, 0x72, 0x20, 0x73, 0x3d, 0x22, 0x81, 0x22, 0x3b]);
+    const files = { ...v1, "providers/beta.js": bytes };
+    const pinned = repo({
+      files: pin(v1, PINNED).map((f) => (f.path === "providers/beta.js" ? { ...f, sha256: createHash("sha256").update(bytes).digest("hex") } : f)),
+    });
+    await expect(installRepo(pinned, store, server(files))).resolves.toMatchObject({ state: "failed", detail: "providers/beta.js is not UTF-8" });
+    expect(loadPlugins(pinned, store)).toEqual([]);
   });
 
   it("down unloads a repo without downloading, and keeps its files for when it comes back", async () => {

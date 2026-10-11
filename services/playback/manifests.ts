@@ -4,6 +4,8 @@
  */
 import { normalizeLanguage } from "@/components/player/native/languages";
 
+export { base64ToBytes } from "@/utils/bytes";
+
 export function isHls(text: string): boolean {
   return /^\s*#EXTM3U/.test(text);
 }
@@ -92,25 +94,6 @@ export function parseDash(text: string): { durationSec?: number; audioLanguages:
     if (audio) pushLang(audioLanguages, /\blang="([^"]+)"/.exec(tag)?.[1]);
   }
   return { durationSec: dur ? isoDuration(dur[1]) : undefined, audioLanguages };
-}
-
-const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-export function base64ToBytes(s: string): Uint8Array {
-  const clean = s.replace(/[^A-Za-z0-9+/]/g, "");
-  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
-  let buf = 0;
-  let bits = 0;
-  let j = 0;
-  for (const ch of clean) {
-    buf = (buf << 6) | B64.indexOf(ch);
-    bits += 6;
-    if (bits >= 8) {
-      bits -= 8;
-      out[j++] = (buf >> bits) & 0xff;
-    }
-  }
-  return out.subarray(0, j);
 }
 
 export function asciiHead(bytes: Uint8Array, n = 512): string {

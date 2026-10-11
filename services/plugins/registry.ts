@@ -1,4 +1,5 @@
 import type { PluginRepoRow } from "@/src/types/worker.types";
+import { base64ToBytes, decodeUtf8Strict } from "@/utils/bytes";
 import type { PluginStore } from "./store";
 
 /**
@@ -6,6 +7,7 @@ import type { PluginStore } from "./store";
  * against the sha256 /config pins; the repo's pointer moves only when the whole new version checked out, so a bad
  * update leaves the last good version running (spec §7 F10). A plugin runs only from a file the operator pinned.
  */
+/** A file's raw bytes (base64) and the native hash of exactly those bytes. */
 export type Download = (url: string) => Promise<{ status: number; body: string; sha256: string }>;
 
 export interface InstalledRepo {
@@ -47,7 +49,7 @@ interface ManifestEntry {
   contentLanguage?: unknown;
 }
 
-const MAX_FILE_CHARS = 4 * 1024 * 1024;
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const repoKey = (id: string) => `repo:${id}`;
 const blobKey = (sha: string) => `blob:${sha}`;
 const pathOf = (url: string) => url.split(/[?#]/)[0];
@@ -116,8 +118,12 @@ export async function installRepo(repo: PluginRepoRow, store: PluginStore, downl
       const res = await download(url);
       if (res.status !== 200) throw new Error(`HTTP ${res.status} for ${f.path}`);
       if (res.sha256 !== f.sha256) throw new Error(`hash mismatch for ${f.path}`);
-      if (res.body.length > MAX_FILE_CHARS) throw new Error(`${f.path} is too large`);
-      store.set(blobKey(f.sha256), res.body);
+      const bytes = base64ToBytes(res.body);
+      if (bytes.length > MAX_FILE_BYTES) throw new Error(`${f.path} is too large`);
+      // Decode the hashed bytes ourselves, strictly: a server-declared charset must not change what the code means.
+      const text = decodeUtf8Strict(bytes);
+      if (text == null) throw new Error(`${f.path} is not UTF-8`);
+      store.set(blobKey(f.sha256), text);
     }
     if (!parseManifest(store.get(blobKey(manifestFile.sha256)))) throw new Error("manifest unreadable");
     const next: InstalledRepo = {

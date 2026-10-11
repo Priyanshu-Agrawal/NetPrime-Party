@@ -44,7 +44,7 @@ export const sandboxBridge = new SandboxBridge({
 
 const registryJar = new CookieJar();
 async function download(url: string) {
-  const r = await pluginFetch(registryJar, { url }, fetchDeps);
+  const r = await pluginFetch(registryJar, { url, responseType: "base64" }, fetchDeps); // raw bytes: decoded strictly by the registry
   return { status: r.status, body: r.body, sha256: r.sha256 };
 }
 
