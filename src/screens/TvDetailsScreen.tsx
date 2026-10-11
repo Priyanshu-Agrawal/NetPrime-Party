@@ -56,6 +56,8 @@ import {
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DetailsError } from "@/src/ui/DetailsError";
+import { PlayLanguageRow } from "@/src/features/title/PlayLanguageRow";
+import { useLanguagePreview } from "@/src/features/title/useLanguagePreview";
 
 const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.3);
@@ -127,6 +129,16 @@ const TvDetailsScreen: React.FC = () => {
       ],
     };
   }, [d]);
+
+  // Language before Play (spec §6.1), for the episode Play opens: the selected season's first.
+  const preview = useLanguagePreview({
+    type: "tv",
+    tmdbId: String(id),
+    season: season ?? undefined,
+    episode: seasonData?.episodes?.[0]?.episode_number ?? 1,
+    details: d,
+    enabled: !!d && isReleased(d, "tv") && season !== null && !!seasonData,
+  });
 
   if (loading) {
     return <DetailsSkeleton />;
@@ -262,7 +274,7 @@ const TvDetailsScreen: React.FC = () => {
             {released ? (
               <>
                 <Button
-                  label="Play"
+                  label={preview.button.label}
                   icon="play"
                   variant="honey"
                   size="sm"
@@ -290,6 +302,7 @@ const TvDetailsScreen: React.FC = () => {
               />
             )}
           </View>
+          {released ? <PlayLanguageRow button={preview.button} onChoose={preview.choose} /> : null}
           </Appear>
 
           {/* Quick actions */}

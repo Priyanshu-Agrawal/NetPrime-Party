@@ -58,6 +58,8 @@ import {
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DetailsError } from "@/src/ui/DetailsError";
+import { PlayLanguageRow } from "@/src/features/title/PlayLanguageRow";
+import { useLanguagePreview } from "@/src/features/title/useLanguagePreview";
 
 const { width } = Dimensions.get("window");
 const HERO_H = Math.round(width * 1.3);
@@ -127,6 +129,9 @@ const MovieDetailsScreen: React.FC = () => {
       ],
     };
   }, [d]);
+
+  // Language before Play (spec §6.1): a look-ahead that relabels Play; never blocks it.
+  const preview = useLanguagePreview({ type: "movie", tmdbId: String(id), details: d, enabled: !!d && isReleased(d, "movie") });
 
   if (loading) {
     return <DetailsSkeleton />;
@@ -241,7 +246,7 @@ const MovieDetailsScreen: React.FC = () => {
             {released ? (
               <>
                 <Button
-                  label="Play"
+                  label={preview.button.label}
                   icon="play"
                   variant="honey"
                   size="sm"
@@ -269,6 +274,7 @@ const MovieDetailsScreen: React.FC = () => {
               />
             )}
           </View>
+          {released ? <PlayLanguageRow button={preview.button} onChoose={preview.choose} /> : null}
           </Appear>
 
           {/* Quick actions */}
