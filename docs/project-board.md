@@ -571,3 +571,48 @@ Spec `docs/superpowers/specs/2026-10-10-playback-languages-party-design.md` §9 
   lane/stage/ttff values are dropped instead of failing a report; success now waits for real playback. First full row:
   vidfast · Fight Club · success · embed · playing · ttff 9.3 s.
 - **Pending:** Android emulator + iOS 27 simulator legs (owner: not now), including running the iOS quality cap.
+
+## `[x]` Phase 2A — plugin host core (2026-10-11)
+
+Spec `docs/superpowers/specs/2026-10-10-playback-languages-party-design.md` §5.4, §7 F2/F3/F9/F10, §8 · plan
+`docs/superpowers/plans/2026-10-11-phase2a-plugin-host.md` · branch `feat/phase2a-plugin-host`. Phase 2 is split into
+2A (this), 2B (candidates → native player for real titles), 2C (title-page "▶ Play in Hindi"), 2D (benchmark + repo
+scorecard → recommendation to the owner).
+
+- **Registry:** operator-only Supabase table `plugin_repos` (migration `20261011153633`, RLS on with no policies, so
+  the anon key gets "permission denied") served as `/config.pluginRepos` by the worker (service-role key only;
+  edge-cached 60 s; last-known-good in KV `pluginRepos:lkg:v1`). Worker `6b229a44`.
+- **BearoomFetch** (`modules/bearoom-fetch`, Kotlin/OkHttp + Swift/URLSession): one exchange per call, no redirect
+  followed, no cookie store, public addresses only (Android checks every connection in the resolver; iOS checks the
+  resolved addresses before connecting). The JS layer walks redirects (≤ 5 hops, each re-checked), keeps a cookie jar
+  per plugin, strips Authorization/Cookie across hosts, caps 8 s / 20 MiB, limits 2 requests in flight per backend,
+  and sends direct TMDB calls through the app's proxy.
+- **Sandbox:** one hidden WebView on `https://plugin-sandbox.invalid/` with CSP `default-src 'none'; connect-src
+  'none'`; a fresh Worker per plugin call with network/storage globals removed; the page proves its CSP blocks a
+  worker's real fetch before the host runs anything; deadline kill, restart after 3 timeouts in a row or a dead
+  renderer. Bundled `cheerio/slim` + `crypto-js` (page 279 KB, `npm run build:sandbox`, a test fails when stale).
+- **PluginHost:** ≤ 12 plugins at once, 15 s each, 20 s overall, early return at ≥ 3 streams + 1.2 s quiet, 15-minute
+  per-title cache, failures never cached, empty answer < 100 ms = failure. Plugin output is cleaned (http(s) only,
+  zero-width characters stripped, 200 streams max, header injection dropped) and the plugin's jar cookies become the
+  stream's Cookie header.
+- **Open Movies** — Bearoom's own repo (`plugin-repos/open-movies`): Blender's Big Buck Bunny, Tears of Steel and Sintel
+  on publisher test streams; pinned at commit `9224948` by sha256 and enabled (it is our code, not a third-party repo).
+- **Flag:** KV `flags:v1` = `{"nativeLane":true,"pluginHost":true}` (2026-10-11 21:3x). With only Open Movies listed,
+  real titles are unaffected; nothing routes to the native player until 2B.
+- **Gate on the Nothing Phone 1 (release build, Plugin Lab: More → Test streams (dev) → Plugin lab):**
+
+  | Check | Result |
+  |---|---|
+  | Self-test (real sandbox + BearoomFetch) | **11/11** — globals gone; cheerio/CryptoJS; private IP, a name resolving to 127.0.0.1 and a redirect to 10.0.0.1 all refused; manual redirect returns the 302; redirects followed; cookie jar carries cookies; TMDB through the proxy; runaway plugin stopped at 3 s and the sandbox still answers |
+  | Repo install from `/config` | `open-movies · ok · runs v1` (both files hash-checked) |
+  | Resolve | Big Buck Bunny 1 stream (2.8 s) · Tears of Steel 2 (MOV with 6 subtitle languages, 3.0 s) · Sintel 1 DASH (1.6 s) · Fight Club 0, `empty-fast` (74 ms) as designed |
+  | Last-known-good | v2 with a wrong hash → `degraded · runs v1 (wants v2) · hash mismatch`, Big Buck Bunny still resolves; restored → `ok` |
+  | Playback with the sandbox mounted | Tears of Steel 24 fps: 100 % of frames on rhythm (126/126, 107/107) — the idle sandbox costs nothing per frame |
+  | Sandbox memory | its WebView renderer ≈ 118 MB PSS while mounted → 2B mounts it only while resolving |
+
+- **Found on the phone:** Expo wraps native rejections ("Call to function … rejected → Caused by: …"); plugins now get
+  the plain reason. Config changes reach the phone after the 60 s edge cache **and** an app launch (one launch caught
+  the old version once).
+- Also verified the built page in Chromium (Playwright harness): CSP blocks a worker's prototype `fetch`, kill + rerun.
+- **Pending:** iOS runtime of BearoomFetch (compiles; simulator leg when the owner frees it).
+

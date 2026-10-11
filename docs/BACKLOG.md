@@ -63,6 +63,9 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 |---|---|---|
 | Filterable providers bottomsheet + more UI | DEFERRED | Provider list in a filterable bottomsheet ("add as much as you can"). Memory: `providers-bottomsheet-and-proxy`. |
 | Hijack more providers | DEFERRED | Extend the bridge beyond videasy (Phase-6 QA: 8 other providers inject no script → videasy-only party today). |
+| Sandbox mounted only while resolving | PLANNED (2B) | Phase 2A measured the hidden plugin WebView's renderer at ≈ 118 MB PSS while mounted. Mount on first resolve (or the title-page dwell), release after ~2 min idle. |
+| Source health memory ignores `empty-fast` | PLANNED (2B) | 5 consecutive failures ⇒ down must not count `empty-fast` (Open Movies answers instantly for titles it lacks). |
+| BearoomFetch on iOS at runtime | PENDING (simulator) | Compiles (pod target). Run the Plugin Lab self-test on the iOS 27 simulator when the owner frees it. |
 | Optional proxy-all for ISP resilience | DEFERRED | Optionally proxy more/all providers. **NB:** scraping on the operator's own CF IP is a dealbreaker (see decisions). |
 
 ## F. UI / design polish
