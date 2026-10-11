@@ -614,5 +614,15 @@ scorecard → recommendation to the owner).
   the plain reason. Config changes reach the phone after the 60 s edge cache **and** an app launch (one launch caught
   the old version once).
 - Also verified the built page in Chromium (Playwright harness): CSP blocks a worker's prototype `fetch`, kill + rerun.
-- **Pending:** iOS runtime of BearoomFetch (compiles; simulator leg when the owner frees it).
+- **Final review (Opus) → ready with fixes; all fixed test-first:**
+  - C1: the sandbox's `incognito` wiped every WebView cookie and the cache app-wide on Android, on every mount.
+  - I1: the stored code was decoded with the server's declared charset, so pinned bytes could mean different code. The registry now decodes strict UTF-8 from the hashed bytes.
+  - I2: SQL injection through a manifest filename in the pin script.
+  - I3: shared-hosting backends and the TMDB proxy shared one limiter bucket.
+  - I4: three slow plugins restarted the page and killed healthy calls. A stuck page is now found by ping, and a page that never becomes ready is replaced.
+  - I5 + I6: per-call budgets of 150 fetches and 32 MiB, 1 MiB request bodies, and queued requests of a finished call never go out.
+  - I7: iOS now enforces the whole-request deadline and resolves DNS off the shared pool.
+  - Graded up for security: private stream/subtitle URLs dropped (M2), credentials stripped on any origin change (M3), TMDB proxy for reads only (M4), numeric hosts checked natively on Android (M5).
+  - Other minors are deferred in BACKLOG.
+- **iOS 27 simulator (owner allowed it 22:07):** the sandbox comes up in WKWebView with direct network blocked; a fresh install downloaded and hash-checked Open Movies through the iOS BearoomFetch; self-test **11/11** after one fix (iOS wraps native errors differently from Android; plugins now get the plain reason); Big Buck Bunny resolves in 1.5 s. Android phone re-run after the fixes: 11/11, all four lookups unchanged.
 

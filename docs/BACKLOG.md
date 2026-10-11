@@ -65,7 +65,7 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 | Hijack more providers | DEFERRED | Extend the bridge beyond videasy (Phase-6 QA: 8 other providers inject no script → videasy-only party today). |
 | Sandbox mounted only while resolving | PLANNED (2B) | Phase 2A measured the hidden plugin WebView's renderer at ≈ 118 MB PSS while mounted. Mount on first resolve (or the title-page dwell), release after ~2 min idle. |
 | Source health memory ignores `empty-fast` | PLANNED (2B) | 5 consecutive failures ⇒ down must not count `empty-fast` (Open Movies answers instantly for titles it lacks). |
-| BearoomFetch on iOS at runtime | PENDING (simulator) | Compiles (pod target). Run the Plugin Lab self-test on the iOS 27 simulator when the owner frees it. |
+| Plugin host review minors (2A) | DEFERRED | M6 system proxy honoured by OkHttp/URLSession · M7 iOS DNS-rebinding window (pre-resolve check) · M8 plugin key uses 8 hex of the sha · M9 pluginHost off leaves repo rows active (2B-2 routing checks the flag) · M10 `/cache/purge` skips the plugin-repos key; Supabase + KV both down → `[]` → app GCs plugins · M11 PluginHost cache never pruned, 12-parallel per call not global, no dedupe of concurrent resolves · M1 rest: CSP self-check timeout reads as `csp:false` with no retry. Ledger: `.superpowers/sdd/…phase2a…` (deleted after merge; this row is the record). |
 | Optional proxy-all for ISP resilience | DEFERRED | Optionally proxy more/all providers. **NB:** scraping on the operator's own CF IP is a dealbreaker (see decisions). |
 
 ## F. UI / design polish
