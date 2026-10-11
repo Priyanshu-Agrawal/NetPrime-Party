@@ -14,10 +14,18 @@ import type { RunEnv } from "./sandbox/protocol";
 import { SandboxBridge } from "./sandboxBridge";
 import { mmkvPluginStore } from "./mmkvStore";
 import { normaliseStreams } from "./streams";
+import { scorecardHost } from "./devScorecard";
+import { Traffic } from "./traffic";
 
 const store = mmkvPluginStore();
 const fetchDeps: PluginFetchDeps = { fetchOnce, limiter: new Limiter(2, 24), tmdbProxyBase: TMDB_PROXY_URL };
 const jars = new Map<string, CookieJar>();
+const traffic = new Traffic();
+
+/** Data the plugin layer has pulled since launch (the scorecard's budget). */
+export function bytesUsed(): number {
+  return traffic.bytes();
+}
 
 /** One jar per plugin (repo/plugin), shared across its versions; never shared between plugins. */
 export function jarFor(pluginKey: string): CookieJar {
@@ -36,6 +44,7 @@ const URLISH = /\bhttps?:\/\/\S+/gi;
 export const sandboxBridge = new SandboxBridge({
   onFetch: async (pluginKey, req, alive) => {
     const r = await pluginFetch(jarFor(pluginKey), toPluginFetchRequest(req), fetchDeps, alive);
+    traffic.add(r);
     return { status: r.status, url: r.url, redirected: r.redirected, headers: r.headers, body: r.body, encoding: r.encoding };
   },
   // Dev builds only, and never with a URL in it: stream URLs and tokens must not reach any log.
@@ -43,13 +52,16 @@ export const sandboxBridge = new SandboxBridge({
 });
 
 /** The host's own fetch (the stream probe): the same per-hop guard and limits, and no plugin's cookies. */
-export function hostFetch(req: PluginFetchRequest, alive?: () => boolean) {
-  return pluginFetch(new CookieJar(), req, fetchDeps, alive);
+export async function hostFetch(req: PluginFetchRequest, alive?: () => boolean) {
+  const r = await pluginFetch(new CookieJar(), req, fetchDeps, alive);
+  traffic.add(r);
+  return r;
 }
 
 const registryJar = new CookieJar();
 async function download(url: string) {
   const r = await pluginFetch(registryJar, { url, responseType: "base64" }, fetchDeps); // raw bytes: decoded strictly by the registry
+  traffic.add(r);
   return { status: r.status, body: r.body, sha256: r.sha256 };
 }
 
@@ -99,4 +111,14 @@ export const pluginHost = new PluginHost({
 /** Code through the real sandbox and fetch path, outside the registry — the dev Plugin Lab's self-test only. */
 export function runInSandbox(key: string, source: string, args: unknown[], timeoutMs: number): Promise<unknown> {
   return sandboxBridge.run({ key, source }, args, ENV, timeoutMs);
+}
+
+/** Dev scorecard: a pinned candidate repo in memory, through the real sandbox and fetch path (never the user registry). */
+export function scorecardRepo(row: PluginRepoRow) {
+  return scorecardHost(row, {
+    download,
+    run: (p, req, timeoutMs) =>
+      sandboxBridge.run({ key: p.key, source: p.source }, [req.tmdbId, req.type, req.season ?? null, req.episode ?? null], ENV, timeoutMs),
+    jarFor,
+  });
 }
