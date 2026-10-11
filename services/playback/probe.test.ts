@@ -112,6 +112,18 @@ describe("probeCandidate", () => {
     expect(calls[0].opts).toMatchObject({ maxBytes: 65536, responseType: "base64" });
   });
 
+  it("keeps a real QuickTime file whose first frame carries x264's settings as text (Tears of Steel's MOV)", async () => {
+    // The file's real first bytes: ftyp qt, wide, mdat, then an SEI with the encoder's options in plain ASCII — 96% printable.
+    const head = Buffer.from("000000146674797071742020000002007174202000000008776964651625daef6d646174000002c70605ffffc3dc45e9bde6d948b7962cd820d923eeef", "hex");
+    const x264 = Buffer.from(
+      "x264 - core 122 - H.264/MPEG-4 AVC codec - Copyleft 2003-2012 - http://www.videolan.org/x264.html - options: cabac=0 ref=2 deblock=1:0:0 analyse=0x1:0x111 me=dia subme=6 psy=0 mixed_ref=0 me_range=16 chroma_me=1 trellis=0 8x8dct=0 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=0 threads=1 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=0 b_adapt=1 b_bias=0 direct=3 weightb=0 open_gop=0 weightp=2 keyint=18 keyint_min=10 scenecut=40 intra_refresh=0 rc_lookahead=18 rc=cbr mbtree=0 bitrate=4000",
+      "ascii",
+    );
+    const url = "https://a.example.net/tears_of_steel_720p.mov";
+    const out = await probeCandidate(cand({ url, container: "mp4" }), FILM, server({ [url]: bin([...head, ...x264]) }).fetch);
+    expect(out).toMatchObject({ verdict: "unverified", container: "mp4" });
+  });
+
   it("re-reads an extensionless playlist as text", async () => {
     const url = "https://a.example.net/play?id=9";
     const { fetch } = server({ [`${url}|base64`]: bin(mediaOf([600])), [`${url}|text`]: text(mediaOf([600])), "https://a.example.net/seg0.jpg": bin([1]) });
@@ -147,6 +159,7 @@ describe("probeCandidate", () => {
     ["XHTML", '<?xml version="1.0"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"></html>'],
     ["a JSON error", '{"error":"token expired"}'],
     ["plain text", "Access denied"],
+    ["text that starts like a TS sync byte", "Gateway Timeout"],
     ["an empty body", ""],
   ])("rejects %s where a video should be", async (_, body) => {
     const url = "https://a.example.net/f.mp4";

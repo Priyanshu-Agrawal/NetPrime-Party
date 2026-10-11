@@ -128,10 +128,12 @@ async function inspect(c: PlaybackCandidate, ctx: ProbeContext, fetch: ProbeFetc
       // A playlist behind an extensionless URL: read it whole, as text.
       first = await fetch(c.url, c.headers, { maxBytes: PLAYLIST_BYTES, responseType: "text" });
       if (first.status >= 400) return reject(c, "unreachable");
-    } else if (looksLikeHtml(head) || isMostlyText(bytes)) {
-      return reject(c, "html-body"); // a page or an error message where a video should be
     } else if (isMatroska(bytes)) {
       return reject(c, "platform", { container: "unsupported", platforms: { ios: false, android: false } });
+    } else if (!isMp4(bytes) && (looksLikeHtml(head) || isMostlyText(bytes))) {
+      // A page or an error message where a video should be. An MP4/QuickTime header wins: x264 writes its settings
+      // as ASCII into the first frame, so a real file can read as "mostly text".
+      return reject(c, "html-body");
     } else {
       if (isMp4(bytes)) container = "mp4";
       durationSec = mp4Duration(bytes);
