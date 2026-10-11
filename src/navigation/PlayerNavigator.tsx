@@ -6,6 +6,7 @@ import CollectionScreen from "../screens/CollectionScreen";
 import MovieDetailsScreen from "../screens/MovieDetailsScreen";
 import PersonDetailsScreen from "../screens/PersonDetailsScreen";
 import { PlayerScreen } from "../screens/PlayerScreen";
+import NativePlayerScreen from "../screens/NativePlayerScreen";
 import TvDetailsScreen from "../screens/TvDetailsScreen";
 import type { PlayerStackParamList } from "./types";
 
@@ -29,6 +30,12 @@ export default function PlayerNavigator() {
       <PlayerStack.Screen
         name="Player"
         component={PlayerScreen}
+        options={{ animation: "fade", gestureEnabled: false }}
+      />
+      {/* Native lane (expo-video) — Phase 1B opens it from the dev test streams. */}
+      <PlayerStack.Screen
+        name="NativePlayer"
+        component={NativePlayerScreen}
         options={{ animation: "fade", gestureEnabled: false }}
       />
       <PlayerStack.Screen name="PersonDetails" component={PersonDetailsScreen} />
