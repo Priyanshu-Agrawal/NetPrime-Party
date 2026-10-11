@@ -95,9 +95,16 @@ function streamsFor(req: TitleRequest, deps: Pick<ResolveDeps, "getStreams" | "h
  */
 export async function previewPlayback(req: TitleRequest, deps: Omit<ResolveDeps, "probe">): Promise<{ ranked: PlaybackCandidate[]; complete: boolean }> {
   deps.warm?.();
-  const host = await streamsFor(req, deps);
+  // Only successes reach source health here: a preview runs on every title browsed, and its timeouts under load are
+  // ours, not the source's.
+  const host = await deps.getStreams(
+    { tmdbId: req.tmdbId, type: req.type, season: req.season, episode: req.episode },
+    { onSettled: (pluginKey, failure) => !failure && deps.health.record(sourceIdOf(pluginKey), true) },
+  );
   const all = toCandidates(host.streams, { originalLanguage: req.originalLanguage, titleName: req.titleName, originalTitle: req.originalTitle });
-  return { ranked: rankCandidates(all, { platform: deps.platform, languages: deps.languages, isDown: (id) => deps.health.isDown(id) }), complete: host.complete };
+  // Complete = every plugin answered: a failed one might have had the language. A quick "nothing here" is an answer.
+  const answered = host.complete && host.failures.every((f) => f.reason === "empty-fast");
+  return { ranked: rankCandidates(all, { platform: deps.platform, languages: deps.languages, isDown: (id) => deps.health.isDown(id) }), complete: answered };
 }
 
 export async function resolvePlayback(req: TitleRequest, deps: ResolveDeps): Promise<ResolveResult> {

@@ -10,7 +10,7 @@ export type PreviewStatus = "off" | "waiting" | "checking" | "done";
 export interface PreviewAnswer {
   /** Each ranked candidate's languages, best candidate first. */
   langs: string[][];
-  /** Every plugin answered (no early return). */
+  /** Every plugin answered — none still running, none failed — so a missing language is really missing. */
   complete: boolean;
 }
 
@@ -20,10 +20,10 @@ export interface PlayButton {
   others: { code: string; label: string }[];
 }
 
-/** Each stream's primary language, once, best first. */
+/** Every language any stream has (multi-audio streams count for each of theirs), once, best stream first. */
 export function foundLanguages(answer: PreviewAnswer): string[] {
   const out: string[] = [];
-  for (const l of answer.langs) if (l[0] && !out.includes(l[0])) out.push(l[0]);
+  for (const l of answer.langs) for (const code of l) if (!out.includes(code)) out.push(code);
   return out;
 }
 

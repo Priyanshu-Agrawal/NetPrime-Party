@@ -145,4 +145,41 @@ describe("previewPlayback", () => {
     expect(warm).toHaveBeenCalled();
     expect(recorded).toEqual([["r/a", true]]);
   });
+
+  it("a plugin that failed means the answer isn't complete (its streams might have had the language)", async () => {
+    const host: HostResult = {
+      streams: [stream("a", "https://x.example.net/e.m3u8", "English")],
+      failures: [{ pluginKey: "r/b@abc", reason: "timeout", ms: 15000 }],
+      ran: ["r/a@abc", "r/b@abc"],
+      complete: true,
+    };
+    const { d } = deps(host);
+    const { probe: _probe, ...noProbe } = d;
+    expect((await previewPlayback({ tmdbId: "1", type: "movie" }, noProbe)).complete).toBe(false);
+  });
+
+  it("a plugin that quickly had nothing for this title still counts as an answer", async () => {
+    const host: HostResult = {
+      streams: [stream("a", "https://x.example.net/e.m3u8", "English")],
+      failures: [{ pluginKey: "r/b@abc", reason: "empty-fast", ms: 40 }],
+      ran: ["r/a@abc", "r/b@abc"],
+      complete: true,
+    };
+    const { d } = deps(host);
+    const { probe: _probe, ...noProbe } = d;
+    expect((await previewPlayback({ tmdbId: "1", type: "movie" }, noProbe)).complete).toBe(true);
+  });
+
+  it("preview failures don't count against a source (browsing must not mark sources down)", async () => {
+    const host: HostResult = { streams: [], failures: [], ran: ["r/a@abc", "r/b@abc"], complete: true };
+    const { d, recorded } = deps(host);
+    d.getStreams.mockImplementation(async (_req, opts) => {
+      opts?.onSettled?.("r/a@abc");
+      opts?.onSettled?.("r/b@abc", { pluginKey: "r/b@abc", reason: "timeout", ms: 15000 });
+      return host;
+    });
+    const { probe: _probe, ...noProbe } = d;
+    await previewPlayback({ tmdbId: "1", type: "movie" }, noProbe);
+    expect(recorded).toEqual([["r/a", true]]);
+  });
 });

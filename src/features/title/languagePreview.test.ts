@@ -41,8 +41,14 @@ describe("playButton", () => {
   });
 });
 
+describe("multi-audio streams", () => {
+  it("a stream with Hindi as its second language still plays in Hindi", () => {
+    expect(playButton("done", done([["ta", "hi"]]), ["hi", "ta"])).toEqual({ label: "Play in Hindi", others: [{ code: "ta", label: "Tamil" }] });
+  });
+});
+
 describe("foundLanguages", () => {
-  it("takes each stream's primary language once, best first", () => {
-    expect(foundLanguages(done([["hi", "en"], ["en"], ["hi"]]))).toEqual(["hi", "en"]);
+  it("takes every language once, best stream first", () => {
+    expect(foundLanguages(done([["hi", "en"], ["ta"], ["hi"]]))).toEqual(["hi", "en", "ta"]);
   });
 });
