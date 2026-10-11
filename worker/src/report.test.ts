@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import app from "./index";
 
-const repoRow = { id: "open-movies", manifest_url: "https://h.test/m.json", version: 1, files: [], enabled: true, down: false, allow_plugins: null };
+const repoRow = { id: "open-movies", manifest_url: "https://h.test/m.json", version: 1, files: [], enabled: true, down: false, allow_plugins: ["open-movies"] };
 const providerRow = { id: "vidfast", name: "VidFast", enabled: true, priority: 1, url_movie: "https://v/{id}", url_tv: null, allowed_domain: "https://v", hijack: { supported: false }, script_version: null };
 
 function stub() {
@@ -56,6 +56,7 @@ describe("POST /report", () => {
   it("drops made-up sources, and plugin ids reported on the embed lane", async () => {
     const inserts = stub();
     expect(await report({ providerId: "made-up/x", lane: "native" })).toBe(202);
+    expect(await report({ providerId: "open-movies/made-up", lane: "native" })).toBe(202);
     expect(await report({ providerId: "open-movies/open-movies", lane: "embed" })).toBe(202);
     expect(inserts).toEqual([]);
   });

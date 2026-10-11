@@ -47,7 +47,8 @@ describe("toPluginRepo", () => {
 
 describe("isPluginSourceId", () => {
   const repos = [
-    { id: "open-movies", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: false, allowPlugins: null },
+    { id: "open-movies", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: false, allowPlugins: ["open-movies"] },
+    { id: "open-ended", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: false, allowPlugins: null },
     { id: "narrow", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: false, allowPlugins: ["ok"] },
     { id: "gone", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: true, allowPlugins: null },
   ];
@@ -59,5 +60,7 @@ describe("isPluginSourceId", () => {
     ["made-up/x", false],
     ["videasy", false],
     ["open-movies/../x", false],
+    ["open-movies/made-up", false],
+    ["open-ended/anything", false], // no allowlist: telemetry can't vouch for any id
   ])("%s → %s", (id, want) => expect(isPluginSourceId(id, repos)).toBe(want));
 });

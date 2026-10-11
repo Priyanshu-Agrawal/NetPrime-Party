@@ -28,6 +28,7 @@ async function get(url) {
 const manifestBytes = await get(manifestUrl);
 const manifest = JSON.parse(manifestBytes.toString("utf8"));
 const files = [{ path: manifestUrl.slice(base.length), sha256: sha(manifestBytes) }];
+const allowPlugins = [];
 for (const s of manifest.scrapers ?? []) {
   if (s.enabled === false) continue;
   const url = new URL(s.filename, base).toString();
@@ -37,8 +38,9 @@ for (const s of manifest.scrapers ?? []) {
     continue;
   }
   files.push({ path, sha256: sha(await get(url)) });
+  allowPlugins.push(s.id);
 }
 const id = opt("id", "repo");
 const version = Number(opt("version", "1"));
-console.log(JSON.stringify({ id, manifestUrl, version, files }, null, 2));
-console.log(`\n-- Review, then run as the operator (the repo stays disabled until enabled on purpose):\n${upsertSql({ id, manifestUrl, version, files })}`);
+console.log(JSON.stringify({ id, manifestUrl, version, files, allowPlugins }, null, 2));
+console.log(`\n-- Review, then run as the operator (the repo stays disabled until enabled on purpose):\n${upsertSql({ id, manifestUrl, version, files, allowPlugins })}`);
