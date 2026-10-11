@@ -1,0 +1,118 @@
+import { NavigationContext } from "@react-navigation/native";
+import React from "react";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
+
+const mockPlatform = { os: "android", androidApi: 35, liquidAvailable: false };
+jest.mock("./platform", () => ({
+  get glassPlatform() {
+    return mockPlatform; // read at render time: the factory runs before this file's consts exist
+  },
+  nativeTagOf: () => 42,
+}));
+jest.mock("@/modules/bearoom-glass", () => {
+  const R = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
+  return {
+    NativeGlassBackdrop: R.forwardRef((p: object, ref: unknown) => <View ref={ref} testID="backdrop" {...p} />),
+    NativeGlassView: (p: object) => <View testID="native-glass" {...p} />,
+  };
+});
+jest.mock("expo-glass-effect", () => {
+  const { View } = jest.requireActual("react-native");
+  return { GlassView: (p: object) => <View testID="liquid" {...p} /> };
+});
+jest.mock("expo-blur", () => {
+  const { View } = jest.requireActual("react-native");
+  return { BlurView: (p: object) => <View testID="system-blur" {...p} /> };
+});
+
+// eslint-disable-next-line import/first
+import { Glass } from "./Glass";
+// eslint-disable-next-line import/first
+import { GlassBackdrop, GlassLayer } from "./GlassBackdrop";
+
+const focused = { isFocused: () => true, addListener: () => () => {} };
+const onScreen = (el: React.ReactElement) => (
+  <NavigationContext.Provider value={focused as never}>{el}</NavigationContext.Provider>
+);
+function render(el: React.ReactElement): ReactTestRenderer {
+  let r!: ReactTestRenderer;
+  act(() => {
+    r = create(onScreen(el));
+  });
+  return r;
+}
+const all = (r: ReactTestRenderer, id: string) => r.root.findAll((n) => n.props?.testID === id);
+const has = (r: ReactTestRenderer, id: string) => all(r, id).length > 0;
+
+describe("Glass on Android", () => {
+  beforeEach(() => Object.assign(mockPlatform, { os: "android", androidApi: 35, liquidAvailable: false }));
+
+  it("blurs the focused screen's backdrop", () => {
+    const r = render(<><GlassBackdrop /><Glass material="bar" /></>);
+    expect(has(r, "native-glass")).toBe(true);
+    expect(all(r, "native-glass")[0].props.backdropTag).toBe(42);
+    act(() => r.unmount());
+  });
+
+  it("is crafted when it sits inside the backdrop it would blur (hero chips inside Home's content)", () => {
+    const r = render(<GlassBackdrop><Glass /></GlassBackdrop>);
+    expect(has(r, "native-glass")).toBe(false);
+    act(() => r.unmount());
+  });
+
+  it("is crafted with no backdrop on screen (party screen)", () => {
+    const r = render(<Glass />);
+    expect(has(r, "native-glass")).toBe(false);
+    act(() => r.unmount());
+  });
+
+  it("is crafted when the caller opts out (inside a Modal, a separate window)", () => {
+    const r = render(<><GlassBackdrop /><Glass backdrop="none" /></>);
+    expect(has(r, "native-glass")).toBe(false);
+    act(() => r.unmount());
+  });
+
+  it("is crafted below Android 12", () => {
+    mockPlatform.androidApi = 30;
+    const r = render(<><GlassBackdrop /><Glass /></>);
+    expect(has(r, "native-glass")).toBe(false);
+    act(() => r.unmount());
+  });
+
+  it("inside a GlassLayer blurs the layer's backdrop, never the screen's", () => {
+    const r = render(<><GlassBackdrop /><GlassLayer><Glass /></GlassLayer></>);
+    expect(has(r, "native-glass")).toBe(false); // the video backdrop hasn't mounted yet
+    act(() => r.update(onScreen(<><GlassBackdrop /><GlassLayer><GlassBackdrop /><Glass /></GlassLayer></>)));
+    expect(has(r, "native-glass")).toBe(true);
+    act(() => r.unmount());
+  });
+
+  it("falls back to crafted when its backdrop unmounts (screen popped, player source switched)", () => {
+    const r = render(<><GlassBackdrop /><Glass /></>);
+    expect(has(r, "native-glass")).toBe(true);
+    act(() => r.update(onScreen(<Glass />)));
+    expect(has(r, "native-glass")).toBe(false);
+    act(() => r.unmount());
+  });
+});
+
+describe("Glass on iOS", () => {
+  beforeEach(() => Object.assign(mockPlatform, { os: "ios", androidApi: 0, liquidAvailable: true }));
+
+  it("uses Liquid Glass for controls and switches it off while faded out", () => {
+    const r = render(<Glass material="control" />);
+    const liquid = () => all(r, "liquid")[0];
+    expect(liquid().props.glassEffectStyle).toMatchObject({ style: "regular", animate: true });
+    act(() => r.update(onScreen(<Glass material="control" visible={false} />)));
+    expect(liquid().props.glassEffectStyle).toMatchObject({ style: "none" });
+    act(() => r.unmount());
+  });
+
+  it("uses the system blur for sheets", () => {
+    const r = render(<Glass material="sheet" />);
+    expect(has(r, "system-blur")).toBe(true);
+    expect(has(r, "liquid")).toBe(false);
+    act(() => r.unmount());
+  });
+});
