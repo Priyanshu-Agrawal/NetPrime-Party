@@ -10,6 +10,11 @@ describe("registrableDomain", () => {
     ["cdn.example.co.in", "example.co.in"],
     ["8.8.8.8", "8.8.8.8"],
     ["localhost", "localhost"],
+    // Multi-tenant hosting: each tenant is its own backend.
+    ["tmdb.spiderfan-no1.workers.dev", "spiderfan-no1.workers.dev"],
+    ["someone.github.io", "someone.github.io"],
+    ["a.b.vercel.app", "b.vercel.app"],
+    ["d111.cloudfront.net", "d111.cloudfront.net"],
   ])("%s → %s", (h, d) => expect(registrableDomain(h)).toBe(d));
 });
 

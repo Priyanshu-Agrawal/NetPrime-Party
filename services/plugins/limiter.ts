@@ -39,11 +39,19 @@ export class Limiter {
 }
 
 const TWO_LEVEL = new Set(["co", "com", "net", "org", "gov", "ac", "edu"]);
+// Hosting where every tenant is a different backend: the tenant's label is part of the "domain".
+const MULTI_TENANT = [
+  "workers.dev", "pages.dev", "r2.dev", "github.io", "vercel.app", "netlify.app", "herokuapp.com", "onrender.com",
+  "fly.dev", "appspot.com", "web.app", "firebaseapp.com", "glitch.me", "replit.app", "azurewebsites.net",
+  "cloudfront.net", "b-cdn.net",
+];
 
-/** "a.b.example.co.uk" → "example.co.uk". No suffix list: good enough to group one backend's hostnames. */
+/** "a.b.example.co.uk" → "example.co.uk". No full suffix list: good enough to group one backend's hostnames. */
 export function registrableDomain(host: string): string {
   const h = host.toLowerCase().replace(/\.$/, "");
   if (/^\d+(\.\d+){3}$/.test(h) || h.includes(":")) return h;
+  const tenant = MULTI_TENANT.find((s) => h.endsWith(`.${s}`));
+  if (tenant) return h.split(".").slice(-(tenant.split(".").length + 1)).join(".");
   const parts = h.split(".");
   if (parts.length <= 2) return h;
   const twoLevel = parts[parts.length - 1].length === 2 && TWO_LEVEL.has(parts[parts.length - 2]);

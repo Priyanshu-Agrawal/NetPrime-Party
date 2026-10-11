@@ -83,8 +83,10 @@ export async function pluginFetch(jar: CookieJar, req: PluginFetchRequest, deps:
       if (fromJar) send.Cookie = fromJar;
     }
     let res: NativeResponse;
+    // The app's own TMDB proxy is not a plugin backend: it never waits behind one (most plugins call TMDB first).
+    const viaProxy = target !== verdict.url.toString();
     try {
-      res = await deps.limiter.run(registrableDomain(new URL(target).hostname), () =>
+      const exchange = () =>
         deps.fetchOnce({
           url: target,
           method,
@@ -93,8 +95,8 @@ export async function pluginFetch(jar: CookieJar, req: PluginFetchRequest, deps:
           timeoutMs: REQUEST_TIMEOUT_MS,
           maxBytes: MAX_BODY_BYTES,
           responseType: req.responseType ?? "text",
-        }),
-      );
+        });
+      res = viaProxy ? await exchange() : await deps.limiter.run(registrableDomain(new URL(target).hostname), exchange);
     } catch (e) {
       if (e instanceof NativeFetchError) throw new PluginFetchError(NATIVE_TO_PLUGIN[e.code], e.message);
       throw new PluginFetchError("network", (e as Error)?.message ?? "fetch failed");

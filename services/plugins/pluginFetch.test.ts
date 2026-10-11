@@ -124,6 +124,13 @@ describe("pluginFetch", () => {
     expect(out.url).toBe("https://api.themoviedb.org/3/movie/550?api_key=k&language=en");
   });
 
+  it("TMDB calls through the app's own proxy never queue behind a busy backend", async () => {
+    const { jar, deps } = setup({ "https://tmdb.proxy.test/movie/1": res({ body: "{}" }) });
+    deps.limiter = new Limiter(1, 1);
+    void deps.limiter.run("busy", () => new Promise(() => {})); // every slot taken, forever
+    await expect(pluginFetch(jar, { url: "https://api.themoviedb.org/3/movie/1" }, deps)).resolves.toMatchObject({ status: 200 });
+  });
+
   it("refuses bodies over 20 MiB", async () => {
     const { jar, deps } = setup({ "https://a.example.net/big": res({ truncated: true }) });
     await expect(pluginFetch(jar, { url: "https://a.example.net/big" }, deps)).rejects.toMatchObject({ code: "too-large" });
