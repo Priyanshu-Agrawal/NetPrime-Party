@@ -66,7 +66,7 @@ describe("Glass on Android", () => {
   });
 
   it("is crafted when it sits inside the backdrop it would blur (hero chips inside Home's content)", () => {
-    const r = render(<GlassBackdrop><Glass /></GlassBackdrop>);
+    const r = render(<GlassBackdrop><Glass material="bar" /></GlassBackdrop>);
     expect(has(r, "native-glass")).toBe(false);
     act(() => r.unmount());
   });
@@ -78,30 +78,30 @@ describe("Glass on Android", () => {
   });
 
   it("is crafted when the caller opts out (inside a Modal, a separate window)", () => {
-    const r = render(<><GlassBackdrop /><Glass backdrop="none" /></>);
+    const r = render(<><GlassBackdrop /><Glass material="bar" backdrop="none" /></>);
     expect(has(r, "native-glass")).toBe(false);
     act(() => r.unmount());
   });
 
   it("is crafted below Android 12", () => {
     mockPlatform.androidApi = 30;
-    const r = render(<><GlassBackdrop /><Glass /></>);
+    const r = render(<><GlassBackdrop /><Glass material="bar" /></>);
     expect(has(r, "native-glass")).toBe(false);
     act(() => r.unmount());
   });
 
   it("inside a GlassLayer blurs the layer's backdrop, never the screen's", () => {
-    const r = render(<><GlassBackdrop /><GlassLayer><Glass /></GlassLayer></>);
-    expect(has(r, "native-glass")).toBe(false); // the video backdrop hasn't mounted yet
-    act(() => r.update(onScreen(<><GlassBackdrop /><GlassLayer><GlassBackdrop /><Glass /></GlassLayer></>)));
+    const r = render(<><GlassBackdrop /><GlassLayer><Glass material="bar" /></GlassLayer></>);
+    expect(has(r, "native-glass")).toBe(false); // the layer's backdrop hasn't mounted yet
+    act(() => r.update(onScreen(<><GlassBackdrop /><GlassLayer><GlassBackdrop /><Glass material="bar" /></GlassLayer></>)));
     expect(has(r, "native-glass")).toBe(true);
     act(() => r.unmount());
   });
 
   it("falls back to crafted when its backdrop unmounts (screen popped, player source switched)", () => {
-    const r = render(<><GlassBackdrop /><Glass /></>);
+    const r = render(<><GlassBackdrop /><Glass material="bar" /></>);
     expect(has(r, "native-glass")).toBe(true);
-    act(() => r.update(onScreen(<Glass />)));
+    act(() => r.update(onScreen(<Glass material="bar" />)));
     expect(has(r, "native-glass")).toBe(false);
     act(() => r.unmount());
   });

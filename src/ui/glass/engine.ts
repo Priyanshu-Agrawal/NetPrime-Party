@@ -27,6 +27,15 @@ export function selectGlassEngine(i: EngineInput): GlassEngine {
     const floating = i.material === "control" || i.material === "bar";
     return floating && i.liquidAvailable ? "liquid" : "material";
   }
-  if (i.os === "android" && i.androidApi >= ANDROID_BLUR_MIN_API && i.backdrop === "available") return "backdrop";
+  // Android blurs live only the floating bars: every live glass re-renders the screen's drawing list each
+  // frame, and on the Nothing Phone 1 bars-only scrolled like no blur while bars + header + buttons doubled
+  // the janky frames. Headers, buttons and sheets get crafted glass.
+  if (
+    i.os === "android" &&
+    i.androidApi >= ANDROID_BLUR_MIN_API &&
+    i.material === "bar" &&
+    i.backdrop === "available"
+  )
+    return "backdrop";
   return "crafted";
 }

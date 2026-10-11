@@ -14,6 +14,12 @@ describe("selectGlassEngine", () => {
   it("blurs the backdrop on Android 12+", () => {
     expect(pick({})).toBe("backdrop");
   });
+  it("blurs live on Android only for floating bars — every live glass re-renders the screen each frame", () => {
+    // Nothing Phone 1, Home scroll A/B: bars only ≈ no blur (5–12 % janky); bars + header + buttons ≈ 2×.
+    expect(pick({ material: "control" })).toBe("crafted");
+    expect(pick({ material: "chrome" })).toBe("crafted");
+    expect(pick({ material: "sheet" })).toBe("crafted");
+  });
   it("falls back to crafted glass below Android 12 (no RenderEffect)", () => {
     expect(pick({ androidApi: 30 })).toBe("crafted");
   });
