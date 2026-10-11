@@ -49,6 +49,7 @@ import {
   type ScrapeResult,
 } from "./schemas";
 import { z } from "@hono/zod-openapi";
+import { getPluginRepos } from "./pluginRepos";
 
 /**
  * Client-facing app version. Keep in sync with `app.json` -> expo.version.
@@ -128,7 +129,10 @@ const configRoute = createRoute({
 });
 
 app.openapi(configRoute, async (c) => {
-  const { providers, stale, killswitch } = await getProvidersResult(c.env, c.executionCtx);
+  const [{ providers, stale, killswitch }, pluginRepos] = await Promise.all([
+    getProvidersResult(c.env, c.executionCtx),
+    getPluginRepos(c.env, c.executionCtx),
+  ]);
   // Lane switches: KV `flags:v1` overrides the FLAG_* var baseline (see flags.ts).
   // KV reads are edge-cached for 60 s; a KV error just means "baseline".
   const kvFlags = c.env.CONFIG_LKG
@@ -149,6 +153,7 @@ app.openapi(configRoute, async (c) => {
       providers,
       stale,
       killswitch,
+      pluginRepos,
       flags: resolveFlags(parseFlags(c.env as unknown as Record<string, unknown>), kvFlags),
     },
     200,

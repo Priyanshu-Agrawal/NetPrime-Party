@@ -137,6 +137,20 @@ export const FeatureFlagsSchema = z
   })
   .openapi("FeatureFlags");
 
+export const PluginRepoSchema = z
+  .object({
+    id: z.string(),
+    manifestUrl: z.string(),
+    version: z.number().int(),
+    files: z.array(z.object({ path: z.string(), sha256: z.string() })),
+    enabled: z.boolean(),
+    down: z.boolean(),
+    allowPlugins: z.array(z.string()).nullable(),
+  })
+  .openapi("PluginRepo");
+
+export type PluginRepo = z.infer<typeof PluginRepoSchema>;
+
 export const AppConfigSchema = z
   .object({
     appVersion: z.string().openapi({ example: "2.0.0" }),
@@ -151,6 +165,8 @@ export const AppConfigSchema = z
     killswitch: z.boolean().optional().openapi({ example: false }),
     /** Remote lane switches (worker vars FLAG_*). All off by default. */
     flags: FeatureFlagsSchema.optional(),
+    /** Operator-listed plugin repos (enabled rows only), each file pinned by sha256 (spec §5.4). */
+    pluginRepos: z.array(PluginRepoSchema).optional(),
     /** Optional server-driven Home feed. Omitted → client renders its fallback. */
     homeFeed: FeedManifestSchema.optional(),
   })

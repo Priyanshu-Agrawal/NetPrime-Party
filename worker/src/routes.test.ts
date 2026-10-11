@@ -21,7 +21,7 @@ const row = (id: string): Row => ({
 });
 
 /** Supabase stub: decides the response per REST resource. */
-type SupaMode = { providers: "ok" | "503" | "throw" | "not-array"; rows?: Row[]; scripts?: Row[] };
+type SupaMode = { providers: "ok" | "503" | "throw" | "not-array"; rows?: Row[]; scripts?: Row[]; pluginRepos?: Row[] };
 
 function stubSupabase(mode: SupaMode) {
   const calls: string[] = [];
@@ -32,6 +32,7 @@ function stubSupabase(mode: SupaMode) {
     if (mode.providers === "throw") throw new TypeError("network down");
     if (mode.providers === "503") return new Response("paused", { status: 503 });
     if (mode.providers === "not-array") return new Response(JSON.stringify({ message: "gateway says hi" }), { status: 200 });
+    if (url.includes("plugin_repos")) return new Response(JSON.stringify(mode.pluginRepos ?? []), { status: 200 });
     if (url.includes("bridge_script")) return new Response(JSON.stringify(mode.scripts ?? []), { status: 200 });
     return new Response(JSON.stringify(mode.rows ?? [row("a"), row("b")]), { status: 200 });
   });
@@ -141,6 +142,42 @@ describe("GET /config", () => {
     const { body } = await call("/config", { ...baseEnv, CONFIG_LKG: kv });
     expect(body.flags).toEqual({ embedApiLane: true, nativeLane: false, pluginHost: false });
   });
+
+    const repoRow = {
+      id: "open-movies",
+      manifest_url: "https://h.test/x/manifest.json",
+      version: 2,
+      files: [{ path: "manifest.json", sha256: "b".repeat(64) }],
+      enabled: true,
+      down: false,
+      allow_plugins: null,
+    };
+
+    it("lists enabled plugin repos, read with the service-role key, and mirrors them to KV", async () => {
+      const calls = stubSupabase({ providers: "ok", pluginRepos: [repoRow, { ...repoRow, id: "bad", version: 0 }] });
+      const kv = fakeKv();
+      const { body } = await call("/config", { ...baseEnv, SUPABASE_SERVICE_ROLE_KEY: "svc", CONFIG_LKG: kv });
+      expect(body.pluginRepos).toEqual([
+        { id: "open-movies", manifestUrl: "https://h.test/x/manifest.json", version: 2, files: repoRow.files, enabled: true, down: false, allowPlugins: null },
+      ]);
+      expect(calls.some((u) => u.includes("plugin_repos") && u.includes("enabled=eq.true"))).toBe(true);
+      expect(JSON.parse(kv.store["pluginRepos:lkg:v1"]).items).toHaveLength(1);
+    });
+
+    it("during an outage serves the stored plugin repos", async () => {
+      stubSupabase({ providers: "503" });
+      const stored = [{ id: "open-movies", manifestUrl: "https://h.test/x/manifest.json", version: 1, files: [], enabled: true, down: false, allowPlugins: null }];
+      const kv = fakeKv({ "pluginRepos:lkg:v1": JSON.stringify({ items: stored, savedAt: "x" }) });
+      const { body } = await call("/config", { ...baseEnv, SUPABASE_SERVICE_ROLE_KEY: "svc", CONFIG_LKG: kv });
+      expect(body.pluginRepos).toEqual(stored);
+    });
+
+    it("never reads plugin repos with the anon key", async () => {
+      const calls = stubSupabase({ providers: "ok", pluginRepos: [repoRow] });
+      const { body } = await call("/config", { ...baseEnv, CONFIG_LKG: fakeKv() });
+      expect(body.pluginRepos).toEqual([]);
+      expect(calls.some((u) => u.includes("plugin_repos"))).toBe(false);
+    });
 });
 
 describe("GET /scripts", () => {
