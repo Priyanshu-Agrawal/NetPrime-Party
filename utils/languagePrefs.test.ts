@@ -1,8 +1,8 @@
+import { DEFAULT_ORDER, getTitleLanguage, languageOrder, resolveOrder, setTitleLanguage, titleKeyOf } from "./languagePrefs";
+
 // MMKV can't load under jest (native module); every test passes its own in-memory store.
 jest.mock("@/services/storage/universalStorage", () => ({ universalStorage: { getString: () => undefined, set: () => {} } }));
 jest.mock("@/utils/prefs", () => ({ getPreferredAudio: () => null }));
-
-import { DEFAULT_ORDER, getTitleLanguage, languageOrder, resolveOrder, setTitleLanguage, titleKeyOf } from "./languagePrefs";
 
 function memory() {
   const m = new Map<string, string>();
