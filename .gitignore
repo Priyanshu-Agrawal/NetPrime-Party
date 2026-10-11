@@ -63,3 +63,7 @@ bearoom_*_render.png
 .opencode/package.json
 .opencode/package-lock.json
 .opencode/bun.lock
+
+# Local native modules: Gradle output
+modules/*/android/build/
+modules/*/android/.cxx/

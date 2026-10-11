@@ -17,16 +17,22 @@ import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.views.ExpoView
 import kotlin.math.ceil
 
+/** Glass works at 1/DOWNSAMPLE resolution: the blur hides it, and it is 16× fewer pixels. */
+private const val DOWNSAMPLE = 4f
+
+/** Blurred motion hides a 60 Hz refresh on a 120 Hz screen. */
+private const val REFRESH_INTERVAL_MS = 14L
+
 /**
- * Real glass on Android 12+. Samples its backdrop's shared quarter-resolution copy — only the part under this
- * view, plus a blur margin — into a small RenderNode carrying a RenderEffect blur, scales it back up, and lays
- * an opaque base under it and a tint over it. Every layer involved is tiny, the backdrop's content is rendered
- * once per frame however many glass views use it, and there is no window capture, software drawing or timer.
+ * Real glass on Android 12+. Draws the part of its backdrop under this view (plus a blur margin), at quarter
+ * resolution, into a tiny RenderNode carrying a RenderEffect blur, scales it back up, and lays an opaque base
+ * under it and a tint over it. No window capture, no software drawing, no timer.
  */
 class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val blur: Blur? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Blur() else null
   private var backdrop: BearoomGlassBackdropView? = null
   private var blurRadiusDp = 20f
+  private var lastRefreshMs = 0L
   private var saturation = 1f
   private var baseColor = Color.TRANSPARENT
   private var overlayColor = Color.TRANSPARENT
@@ -47,8 +53,11 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
       if (own[0] != drawnDx || own[1] != drawnDy) {
         invalidate()
       } else {
-        b.refreshSmall(AnimationUtils.currentAnimationTimeMillis())
-        blur.refresh()
+        val now = AnimationUtils.currentAnimationTimeMillis()
+        if (now - lastRefreshMs >= REFRESH_INTERVAL_MS) {
+          lastRefreshMs = now
+          blur.refresh()
+        }
       }
     }
     true
@@ -105,8 +114,8 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   override fun onDraw(canvas: Canvas) {
     super.onDraw(canvas)
     val b = backdrop
-    val small = b?.small
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && small != null &&
+    val source = b?.renderNode
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && source != null &&
       canvas.isHardwareAccelerated && canBlur(b)
     ) {
       measureOffset(b)
@@ -116,7 +125,7 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
       // the blurred copy stay see-through and the sharp originals show through the glass.
       if (baseColor != Color.TRANSPARENT) canvas.drawColor(baseColor)
       val radiusPx = blurRadiusDp * resources.displayMetrics.density
-      blur.draw(canvas, small, width, height, drawnDx, drawnDy, radiusPx, saturation)
+      blur.draw(canvas, source, width, height, drawnDx, drawnDy, radiusPx, saturation)
     }
     if (overlayColor != Color.TRANSPARENT) canvas.drawColor(overlayColor)
   }
@@ -157,15 +166,17 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
       node.setPivotX(if (flip) 1f else 0f)
     }
 
-    /** Everything here runs at the backdrop's quarter resolution; the result is scaled up by DOWNSAMPLE. */
-    fun draw(canvas: Canvas, small: RenderNode, width: Int, height: Int, dx: Int, dy: Int, radiusPx: Float, saturation: Float) {
+    /** Everything here runs at 1/DOWNSAMPLE resolution; the result is scaled back up. */
+    fun draw(canvas: Canvas, source: RenderNode, width: Int, height: Int, dx: Int, dy: Int, radiusPx: Float, saturation: Float) {
       val radius = radiusPx / DOWNSAMPLE
       val margin = ceil(radius).toInt()
       node.setPosition(0, 0, ceil(width / DOWNSAMPLE).toInt() + 2 * margin, ceil(height / DOWNSAMPLE).toInt() + 2 * margin)
       val recording = node.beginRecording()
       try {
-        recording.translate(margin - dx / DOWNSAMPLE, margin - dy / DOWNSAMPLE)
-        recording.drawRenderNode(small)
+        recording.translate(margin.toFloat(), margin.toFloat())
+        recording.scale(1f / DOWNSAMPLE, 1f / DOWNSAMPLE)
+        recording.translate(-dx.toFloat(), -dy.toFloat())
+        recording.drawRenderNode(source)
       } finally {
         node.endRecording()
       }
