@@ -32,6 +32,8 @@ jest.mock("expo-blur", () => {
 import { Glass } from "./Glass";
 // eslint-disable-next-line import/first
 import { GlassBackdrop, GlassLayer } from "./GlassBackdrop";
+// eslint-disable-next-line import/first
+import { GlassVisible } from "./visibility";
 
 const focused = { isFocused: () => true, addListener: () => () => {} };
 const onScreen = (el: React.ReactElement) => (
@@ -111,12 +113,42 @@ describe("Glass on iOS", () => {
   beforeEach(() => Object.assign(mockPlatform, { os: "ios", androidApi: 0, liquidAvailable: true }));
 
   it("uses Liquid Glass for controls and switches it off while faded out", () => {
+    jest.useFakeTimers();
     const r = render(<Glass material="control" />);
     const liquid = () => all(r, "liquid")[0];
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
     expect(liquid().props.glassEffectStyle).toMatchObject({ style: "regular", animate: true });
     act(() => r.update(onScreen(<Glass material="control" visible={false} />)));
     expect(liquid().props.glassEffectStyle).toMatchObject({ style: "none" });
     act(() => r.unmount());
+    jest.useRealTimers();
+  });
+
+  it("turns Liquid Glass on only once the parent's fade-in has left 0 (expo issue 41024)", () => {
+    jest.useFakeTimers();
+    const r = render(<Glass material="bar" visible={false} />);
+    const style = () => all(r, "liquid")[0].props.glassEffectStyle.style;
+    act(() => r.update(onScreen(<Glass material="bar" visible />)));
+    expect(style()).toBe("none"); // the fade starts from opacity 0 in this same commit
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    expect(style()).toBe("regular");
+    act(() => r.unmount());
+    jest.useRealTimers();
+  });
+
+  it("follows the visibility of the surface it sits in (party top buttons inside the fading controls)", () => {
+    jest.useFakeTimers();
+    const r = render(<GlassVisible value={false}><Glass material="control" /></GlassVisible>);
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    expect(all(r, "liquid")[0].props.glassEffectStyle.style).toBe("none");
+    act(() => r.unmount());
+    jest.useRealTimers();
   });
 
   it("uses the system blur for sheets", () => {

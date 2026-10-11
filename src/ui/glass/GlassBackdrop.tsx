@@ -9,7 +9,8 @@ export const GlassLayerContext = createContext<BackdropRegistry | null>(null);
 /** Ids of the backdrops this subtree sits inside. */
 export const GlassInsideContext = createContext<readonly number[]>([]);
 
-/** A private backdrop for its subtree — the player's controls blur the video box, not the screen. */
+/** A private backdrop slot for its subtree, so glass inside never blurs the screen (the players use one with no
+ *  backdrop: a WebView must never be blurred — see modules/bearoom-glass). */
 export function GlassLayer({ children }: { children: ReactNode }) {
   const slot = useMemo(() => createBackdropRegistry(), []);
   return <GlassLayerContext.Provider value={slot}>{children}</GlassLayerContext.Provider>;

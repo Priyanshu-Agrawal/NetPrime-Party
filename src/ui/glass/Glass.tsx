@@ -3,20 +3,36 @@ import { colors, glassHighlight, glassLift, glassMaterials } from "@/theme/bearo
 import { BlurView } from "expo-blur";
 import { GlassView } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useContext, useSyncExternalStore } from "react";
+import React, { useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { processColor, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { selectGlassEngine, type GlassMaterial } from "./engine";
 import { GlassInsideContext, GlassLayerContext } from "./GlassBackdrop";
 import { glassPlatform, nativeTagOf } from "./platform";
 import { resolveBackdrop, screenBackdrops } from "./registry";
 import { useReduceTransparency } from "./useReduceTransparency";
+import { GlassVisibleContext } from "./visibility";
+
+/** Liquid Glass switched on while an ancestor is still at opacity 0 doesn't render (expo issue 41024): wait
+ *  until the fade-in has started. */
+const LIQUID_ON_DELAY_MS = 50;
+
+/** On only after the surface has been showing for LIQUID_ON_DELAY_MS; off at once. */
+function useLiquidOn(show: boolean, enabled: boolean): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const t = setTimeout(() => setOn(show), show ? LIQUID_ON_DELAY_MS : 0);
+    return () => clearTimeout(t);
+  }, [show, enabled]);
+  return show && on;
+}
 
 export interface GlassProps {
   /** What kind of surface this is (spec D1). */
   material?: GlassMaterial;
   /** "none" = never blur what's behind — surfaces inside a Modal (a separate window on Android). */
   backdrop?: "auto" | "none";
-  /** False while the surface is faded out: Liquid Glass must not sit at alpha 0 (expo #41024). */
+  /** False while the surface is faded out: Liquid Glass must not sit at alpha 0 (expo issue 41024). */
   visible?: boolean;
   /** Corner radius of the glass shape. */
   radius?: number;
@@ -39,6 +55,8 @@ export function Glass({ material = "control", backdrop = "auto", visible = true,
   const reduceTransparency = useReduceTransparency();
   const resolved = resolveBackdrop(backdrop, current, inside);
   const engine = selectGlassEngine({ ...glassPlatform, reduceTransparency, material, backdrop: resolved.state });
+  const parentVisible = useContext(GlassVisibleContext);
+  const liquidOn = useLiquidOn(visible && parentVisible, engine === "liquid");
   const m = glassMaterials[material];
   const shape = [style ?? StyleSheet.absoluteFill, { borderRadius: radius, overflow: "hidden" as const }];
 
@@ -47,7 +65,7 @@ export function Glass({ material = "control", backdrop = "auto", visible = true,
       <GlassView
         pointerEvents="none"
         style={shape}
-        glassEffectStyle={{ style: visible ? "regular" : "none", animate: true, animationDuration: 0.2 }}
+        glassEffectStyle={{ style: liquidOn ? "regular" : "none", animate: true, animationDuration: 0.2 }}
         tintColor={m.liquidTint}
         colorScheme="dark"
         isInteractive={interactive}

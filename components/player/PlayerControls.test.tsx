@@ -16,7 +16,8 @@ jest.mock("@/components/ui/GlassCard", () => {
 });
 jest.mock("@/src/ui/glass", () => {
   const { View } = jest.requireActual("react-native");
-  return { Glass: (p: object) => <View testID="glass" {...p} /> };
+  const actual = jest.requireActual("@/src/ui/glass/visibility");
+  return { Glass: (p: object) => <View testID="glass" {...p} />, ...actual };
 });
 
 const base = {
@@ -73,5 +74,21 @@ describe("PlayerControls glass", () => {
     const overlay = r.root.findAll((n) => typeof n.props?.onPress === "function")[0];
     act(() => overlay.props.onPress());
     expect(glass().every((g) => g.props.visible === false)).toBe(true);
+  });
+});
+
+describe("PlayerControls top bar", () => {
+  it("tells glass in the top bar when the controls hide (the party's back button and ROOM pill)", () => {
+    const { GlassVisibleContext } = jest.requireActual("@/src/ui/glass/visibility");
+    const seen: boolean[] = [];
+    function Probe() {
+      seen.push(React.useContext(GlassVisibleContext));
+      return null;
+    }
+    const r = render(<PlayerControls {...base} topBar={<Probe />} />);
+    expect(seen[seen.length - 1]).toBe(true);
+    const overlay = r.root.findAll((n) => typeof n.props?.onPress === "function")[0];
+    act(() => overlay.props.onPress());
+    expect(seen[seen.length - 1]).toBe(false);
   });
 });

@@ -60,23 +60,28 @@ pick a **material** and stay out of engine details:
 |---|---|---|
 | `liquid` | iOS 26+ with the Liquid Glass API, materials `control`/`bar` | `expo-glass-effect` `GlassView` (`regular`, dark scheme, warm tint) |
 | `material` | iOS for `chrome`/`sheet`, and every material on iOS < 26 | `expo-blur` `BlurView` (system blur, OS-composited) |
-| `backdrop` | Android 12+ (API 31+) with a usable backdrop | our own small native view (`modules/bearoom-glass`, D3) |
+| `backdrop` | Android 12+ (API 31+), material `bar` only, with a usable backdrop | our own small native view (`modules/bearoom-glass`, D3) |
 | `crafted` | everything else | no blur: warm tint + top highlight + hairline (D6) |
+
+Android blurs live only the floating bars (tab bar, party bar): every live glass re-renders the screen's drawing
+list each frame, and on the Nothing Phone 1 bars-only scrolled like no blur (5.4–12.4 % vs 5.4–11.6 % janky,
+alternating A/B) while bars + header + buttons reached 6.9–28.8 %. Android headers, buttons and sheets are
+`crafted`.
 
 `crafted` is also forced when iOS **Reduce Transparency** is on, on Android < 12, on Android inside a `Modal` (a
 separate window — the caller passes `backdrop="none"`), and whenever the only backdrop is one the glass sits inside.
 
-**D3 — Android engine: a shared quarter-resolution copy, tiny blurs.** `modules/bearoom-glass` (local Expo
-module, Android only):
+**D3 — Android engine: each glass blurs its own patch at quarter resolution.** `modules/bearoom-glass` (local
+Expo module, Android only):
 - `BearoomGlassBackdrop` — records its children into a `RenderNode` during its normal draw (no extra work: it is
-  the draw that happens anyway) and keeps a **quarter-resolution copy** of that node as a compositing layer,
-  rendered once per frame however many glass views use it.
-- `BearoomGlassView` — samples the part of that copy under itself (plus a blur margin) into a tiny `RenderNode`
-  with a `RenderEffect` blur (+ saturation lift), scales it back up, and lays an **opaque base** (the app
+  the draw that happens anyway).
+- `BearoomGlassView` — draws the part of that node under itself (plus a blur margin) at **quarter resolution**
+  into a tiny `RenderNode` with a `RenderEffect` blur (+ saturation lift), scales it back up, and lays an **opaque base** (the app
   background) under it and the material tint over it. The base matters: a backdrop records content, not the
   background behind it, so without it text and gaps in the blurred copy stay see-through.
-- Freshness: the renderer caches these layers, so on every frame the window draws anyway the glass nudges a
-  no-op property (pivot) on them; that never schedules a frame. Offset changes (scrolling, transitions) are
+- Freshness: on frames the window draws anyway (at most every 14 ms) the glass nudges a no-op property (pivot)
+  on its layer so the renderer re-renders it; that never schedules a frame. (A shared quarter-resolution
+  full-screen layer was tried and dropped: re-rendering the whole screen each frame cost 13–16 % janky.) Offset changes (scrolling, transitions) are
   checked in the same pre-draw pass.
 - Native safety net: a glass inside its own backdrop draws only its tint.
 - No window-wide capture, no software rasterising, no timers.
@@ -95,8 +100,10 @@ module, Android only):
 - **Guard**: every `GlassBackdrop` tells its descendants "you are inside backdrop #id"; a glass whose resolved
   backdrop is one it sits inside renders `crafted`. (Hero chips inside Home's scroll content → crafted.)
 
-**D5 — Fades.** `Glass` takes `visible` (default `true`). On `liquid`, `visible={false}` switches the glass style to
-`none` (animated, 0.2 s) so a parent opacity fade never leaves Liquid Glass at alpha 0 (Expo issue #41024). On
+**D5 — Fades.** `Glass` takes `visible` (default `true`) and also reads `GlassVisible` from a fading container
+(the player controls provide it, so glass passed into their top bar follows). On `liquid`, hidden switches the
+style to `none` at once; shown switches it back to `regular` only 50 ms later, once the parent's fade-in has left
+opacity 0 — Liquid Glass applied at alpha 0 doesn't render (Expo issue 41024). On
 Android a fully transparent parent is skipped by the renderer, so a hidden glass costs nothing.
 
 **D6 — Look (starting values, tuned on the phone).** Warm charcoal `rgb(16,13,10)` tint over the blur; a top

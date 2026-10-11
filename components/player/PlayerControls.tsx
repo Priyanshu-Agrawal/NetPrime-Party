@@ -15,7 +15,7 @@
  * (party.tsx) doesn't re-render its chat list on every 1 s tick.
  */
 import GlassCard from "@/components/ui/GlassCard";
-import { Glass } from "@/src/ui/glass";
+import { Glass, GlassVisible } from "@/src/ui/glass";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { absoluteFill } from "@/theme/styles/layout";
 import { gradients } from "@/theme/styles/gradients";
@@ -295,156 +295,160 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           style={[StyleSheet.absoluteFill, { opacity: fade }]}
           pointerEvents={visible ? "auto" : "none"}
         >
-          {/* Warm cinema scrim — subtle top vignette, stronger under the bar. */}
-          <LinearGradient
-            colors={[...gradients.playerControls]}
-            locations={[0, 0.4, 0.72, 1]}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
+          <GlassVisible value={visible}>
+            {/* Warm cinema scrim — subtle top vignette, stronger under the bar. */}
+            <LinearGradient
+              colors={[...gradients.playerControls]}
+              locations={[0, 0.4, 0.72, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
 
-          {/* Top overlay header — custom topBar (party) OR default back + title/episode
-              (solo, portrait + fullscreen). Shares the auto-hide fade + scrim. */}
-          {topBar ? (
-            <View
-              style={[styles.topBarCustom, { top: headerTop }]}
-              pointerEvents="box-none"
-            >
-              {topBar}
-            </View>
-          ) : onBack || title ? (
-            // The player is now full-bleed (its SafeAreaView drops the top edge so the
-            // video/loading backdrop reaches behind the status bar), so the header adds the
-            // top inset ITSELF — same as topBarCustom above. Landscape hides the status bar
-            // → flat ms(10). Matches the detail-screen header offset.
-            <View
-              style={[styles.topRow, { top: headerTop }]}
-              pointerEvents="box-none"
-            >
-              {onBack ? (
-                <Pressable
-                  style={({ pressed }) => [styles.topBackBtn, pressed && styles.pressed]}
-                  onPress={() => {
-                    onBack();
-                    show();
-                  }}
-                  hitSlop={10}
-                >
-                  <Glass material="control" radius={radius.pill} visible={visible} />
-                  <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
-                </Pressable>
-              ) : (
-                <View style={styles.topSpacer} />
-              )}
-
-              {title ? (
-                <View style={styles.topTitleCard} pointerEvents="none">
-                  <Text style={styles.topTitle} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  {subtitle ? (
-                    <Text style={styles.topSubtitle} numberOfLines={1}>
-                      {subtitle}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : (
-                <View style={{ flex: 1 }} />
-              )}
-
-              <View style={styles.topSpacer} />
-            </View>
-          ) : null}
-
-          {/* Overlay children (badges, reaction pills) that fade with the controls. */}
-          {overlayChildren}
-
-          {/* Center transport / indicator */}
-          <View style={styles.center} pointerEvents="box-none">
-            {canControl ? (
-              <View style={styles.centerRow} pointerEvents="box-none">
-                <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
-                  <Glass material="control" radius={radius.pill} visible={visible} />
-                  <MaterialIcons name="replay-10" size={ms(29)} color={colors.text} />
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}
-                  onPress={() => {
-                    if (paused) onPlay();
-                    else onPause();
-                    // Flip the icon immediately instead of waiting up to ~1s for the
-                    // next tick (or a videasy poster-swap that stalls events) — the
-                    // control would otherwise desync from what the tap just did. The
-                    // next real playback event confirms or corrects this.
-                    setPaused((p) => !p);
-                    show();
-                  }}
-                  hitSlop={10}
-                >
-                  <Ionicons
-                    name={paused ? "play" : "pause"}
-                    size={ms(32)}
-                    color={colors.onHoney}
-                    style={paused ? { marginLeft: ms(3) } : undefined}
-                  />
-                </Pressable>
-                <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
-                  <Glass material="control" radius={radius.pill} visible={visible} />
-                  <MaterialIcons name="forward-10" size={ms(29)} color={colors.text} />
-                </Pressable>
+            {/* Top overlay header — custom topBar (party) OR default back + title/episode
+                (solo, portrait + fullscreen). Shares the auto-hide fade + scrim. */}
+            {topBar ? (
+              <View
+                style={[styles.topBarCustom, { top: headerTop }]}
+                pointerEvents="box-none"
+              >
+                {topBar}
               </View>
-            ) : outOfSync ? (
-              <Pressable style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]} onPress={() => { onTapSync?.(); show(); }} hitSlop={10}>
-                <Ionicons name="flash" size={ms(16)} color={colors.onHoney} />
-                <Text style={styles.syncText}>Tap to sync</Text>
-              </Pressable>
-            ) : paused ? (
-              <View style={styles.indicator} pointerEvents="none">
-                <Ionicons name="play" size={ms(28)} color={colors.honeyBright} style={{ marginLeft: ms(3) }} />
+            ) : onBack || title ? (
+              // The player is now full-bleed (its SafeAreaView drops the top edge so the
+              // video/loading backdrop reaches behind the status bar), so the header adds the
+              // top inset ITSELF — same as topBarCustom above. Landscape hides the status bar
+              // → flat ms(10). Matches the detail-screen header offset.
+              <View
+                style={[styles.topRow, { top: headerTop }]}
+                pointerEvents="box-none"
+              >
+                {onBack ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.topBackBtn, pressed && styles.pressed]}
+                    onPress={() => {
+                      onBack();
+                      show();
+                    }}
+                    hitSlop={10}
+                  >
+                    <Glass material="control" radius={radius.pill} visible={visible} />
+                    <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
+                  </Pressable>
+                ) : (
+                  <View style={styles.topSpacer} />
+                )}
+
+                {title ? (
+                  <View style={styles.topTitleCard} pointerEvents="none">
+                    <Text style={styles.topTitle} numberOfLines={1}>
+                      {title}
+                    </Text>
+                    {subtitle ? (
+                      <Text style={styles.topSubtitle} numberOfLines={1}>
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View style={{ flex: 1 }} />
+                )}
+
+                <View style={styles.topSpacer} />
               </View>
             ) : null}
-          </View>
 
-          {/* Glass bottom bar: time · scrub · time · actions. It blurs the video box only (the player's
-              GlassLayer), never the window — see docs/superpowers/specs/2026-10-11-glass-design.md. */}
-          <GlassCard material="bar" visible={visible} rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
-            <View style={styles.bottomRow} pointerEvents="box-none">
-              <Text style={styles.time}>{fmt(displayTime)}</Text>
-              <View
-                style={styles.trackHit}
-                onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width)}
-                {...(canControl ? pan.panHandlers : {})}
-              >
-                <View style={styles.track}>
-                  <View style={[styles.fill, { width: `${progress * 100}%` }]} />
-                  {canControl ? <View style={[styles.thumb, { left: `${progress * 100}%` }]} /> : null}
+            {/* Overlay children (badges, reaction pills) that fade with the controls. */}
+            {overlayChildren}
+
+            {/* Center transport / indicator */}
+            <View style={styles.center} pointerEvents="box-none">
+              {canControl ? (
+                <View style={styles.centerRow} pointerEvents="box-none">
+                  <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
+                    <Glass material="control" radius={radius.pill} visible={visible} />
+                    <MaterialIcons name="replay-10" size={ms(29)} color={colors.text} />
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}
+                    onPress={() => {
+                      if (paused) onPlay();
+                      else onPause();
+                      // Flip the icon immediately instead of waiting up to ~1s for the
+                      // next tick (or a videasy poster-swap that stalls events) — the
+                      // control would otherwise desync from what the tap just did. The
+                      // next real playback event confirms or corrects this.
+                      setPaused((p) => !p);
+                      show();
+                    }}
+                    hitSlop={10}
+                  >
+                    <Ionicons
+                      name={paused ? "play" : "pause"}
+                      size={ms(32)}
+                      color={colors.onHoney}
+                      style={paused ? { marginLeft: ms(3) } : undefined}
+                    />
+                  </Pressable>
+                  <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
+                    <Glass material="control" radius={radius.pill} visible={visible} />
+                    <MaterialIcons name="forward-10" size={ms(29)} color={colors.text} />
+                  </Pressable>
                 </View>
-              </View>
-              <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
-              {onEpisodes ? (
-                <Pressable
-                  style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]}
-                  onPress={() => {
-                    onEpisodes();
-                    show();
-                  }}
-                  hitSlop={8}
-                >
-                  <Ionicons name="list" size={ms(18)} color={colors.text} />
+              ) : outOfSync ? (
+                <Pressable style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]} onPress={() => { onTapSync?.(); show(); }} hitSlop={10}>
+                  <Ionicons name="flash" size={ms(16)} color={colors.onHoney} />
+                  <Text style={styles.syncText}>Tap to sync</Text>
                 </Pressable>
-              ) : null}
-              {onOpenSettings ? (
-                <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
-                  <Ionicons name="settings-outline" size={ms(16)} color={colors.text} />
-                </Pressable>
-              ) : null}
-              {onToggleFullscreen ? (
-                <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={onToggleFullscreen} hitSlop={8}>
-                  <Ionicons name={fullscreen ? "contract" : "expand"} size={ms(17)} color={colors.text} />
-                </Pressable>
+              ) : paused ? (
+                <View style={styles.indicator} pointerEvents="none">
+                  <Ionicons name="play" size={ms(28)} color={colors.honeyBright} style={{ marginLeft: ms(3) }} />
+                </View>
               ) : null}
             </View>
-          </GlassCard>
+
+            {/* Glass bottom bar: time · scrub · time · actions. Over the video it is crafted glass on Android and
+                Liquid Glass on iOS (the player's GlassLayer has no backdrop) — see
+                docs/superpowers/specs/2026-10-11-glass-design.md. Everything in this fade, the top bar included,
+                learns the controls' visibility from GlassVisible. */}
+            <GlassCard material="bar" visible={visible} rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
+              <View style={styles.bottomRow} pointerEvents="box-none">
+                <Text style={styles.time}>{fmt(displayTime)}</Text>
+                <View
+                  style={styles.trackHit}
+                  onLayout={(e: LayoutChangeEvent) => setBarWidth(e.nativeEvent.layout.width)}
+                  {...(canControl ? pan.panHandlers : {})}
+                >
+                  <View style={styles.track}>
+                    <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+                    {canControl ? <View style={[styles.thumb, { left: `${progress * 100}%` }]} /> : null}
+                  </View>
+                </View>
+                <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
+                {onEpisodes ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]}
+                    onPress={() => {
+                      onEpisodes();
+                      show();
+                    }}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="list" size={ms(18)} color={colors.text} />
+                  </Pressable>
+                ) : null}
+                {onOpenSettings ? (
+                  <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
+                    <Ionicons name="settings-outline" size={ms(16)} color={colors.text} />
+                  </Pressable>
+                ) : null}
+                {onToggleFullscreen ? (
+                  <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={onToggleFullscreen} hitSlop={8}>
+                    <Ionicons name={fullscreen ? "contract" : "expand"} size={ms(17)} color={colors.text} />
+                  </Pressable>
+                ) : null}
+              </View>
+            </GlassCard>
+          </GlassVisible>
         </Animated.View>
 
         {/* Buffering spinner — OUTSIDE the auto-hide fade, so a stalled stream shows
