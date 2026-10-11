@@ -55,7 +55,28 @@ export interface NativePlayerViewProps {
   /** "S1 · E3" under the title. */
   subtitle?: string;
   onNextEpisode?: () => void;
+  /** Positions the viewer has really reached: none until this stream's start seek has landed. */
+  onPosition?: (sec: number) => void;
+  /** Wanted audio languages (ISO-639-1), most wanted first: picked once inside a multi-audio stream. */
+  preferredAudio?: string[];
+  /** Controlled fullscreen: the caller owns the screen orientation (a stream switch must not rotate the screen). */
+  fullscreen?: boolean;
+  onFullscreenChange?: (next: boolean) => void;
+  /** The viewer's settings from the previous stream, applied to this one. */
+  carry?: ViewerSettings;
+  onViewerSettings?: (s: ViewerSettings) => void;
 }
+
+/** What a viewer set and expects to keep when the stream underneath changes. */
+export interface ViewerSettings {
+  rate: number;
+  /** The picked subtitle's language; null = off. */
+  subtitleLanguage: string | null;
+  paused: boolean;
+  subOffset: number;
+}
+
+export const DEFAULT_VIEWER: ViewerSettings = { rate: 1, subtitleLanguage: null, paused: false, subOffset: 0 };
 
 const noop = () => {};
 
@@ -90,6 +111,12 @@ export function NativePlayerView({
   onNoticeDone,
   subtitle,
   onNextEpisode,
+  onPosition,
+  preferredAudio,
+  fullscreen: fullscreenProp,
+  onFullscreenChange,
+  carry,
+  onViewerSettings,
 }: NativePlayerViewProps) {
   const playerRef = useRef<PlayerHandle>(null);
   const controlsRef = useRef<PlayerControlsHandle>(null);
@@ -99,11 +126,24 @@ export function NativePlayerView({
   const startDone = useRef(false);
   const onPlayerEventRef = useRef(onPlayerEvent);
   const onStreamErrorRef = useRef(onStreamError);
+  const onPositionRef = useRef(onPosition);
+  const onViewerSettingsRef = useRef(onViewerSettings);
+  const preferredAudioRef = useRef(preferredAudio);
   useEffect(() => {
     startAtRef.current = startAt;
     onPlayerEventRef.current = onPlayerEvent;
     onStreamErrorRef.current = onStreamError;
-  }, [startAt, onPlayerEvent, onStreamError]);
+    onPositionRef.current = onPosition;
+    onViewerSettingsRef.current = onViewerSettings;
+    preferredAudioRef.current = preferredAudio;
+  }, [startAt, onPlayerEvent, onStreamError, onPosition, onViewerSettings, preferredAudio]);
+  // Mount-time settings: this view lives for one stream, so later carry updates are for the next one.
+  const [initial] = useState<ViewerSettings>(() => carry ?? DEFAULT_VIEWER);
+  const viewer = useRef<ViewerSettings>(initial);
+  const positionLive = useRef(false);
+  const audioPicked = useRef(false);
+  const subsCarried = useRef(initial.subtitleLanguage == null);
+  const [frameShown, setFrameShown] = useState(false);
   const firstFrameSeen = useRef(false);
   const [coverOpacity] = useState(() => new Animated.Value(1));
   const [coverGone, setCoverGone] = useState(false);
@@ -113,12 +153,14 @@ export function NativePlayerView({
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [qualityNow, setQualityNow] = useState<string | undefined>(undefined);
   const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
-  const [rate, setRate] = useState(1);
+  const [rate, setRate] = useState(initial.rate);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [subOffset, setSubOffset] = useState(0);
+  const [subOffset, setSubOffset] = useState(initial.subOffset);
   const [subSize, setSubSize] = useState<SubtitleSize>(getSubtitleSize);
   const [controlsShown, setControlsShown] = useState(true);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [ownFullscreen, setOwnFullscreen] = useState(false);
+  const controlled = fullscreenProp != null;
+  const fullscreen = controlled ? fullscreenProp : ownFullscreen;
   const [hud, setHud] = useState<Hud>({});
   const pos = useRef(0);
   const paused = useRef(true);
@@ -129,6 +171,12 @@ export function NativePlayerView({
 
   useEffect(() => {
     t0.current ??= Date.now();
+    if (initial.rate !== 1) playerRef.current?.setRate(initial.rate);
+  }, [initial.rate]);
+
+  const tellViewer = useCallback((patch: Partial<ViewerSettings>) => {
+    viewer.current = { ...viewer.current, ...patch };
+    onViewerSettingsRef.current?.(viewer.current);
   }, []);
   useEffect(() => {
     errorRef.current = error;
@@ -138,7 +186,29 @@ export function NativePlayerView({
     if (e.event === "ready" && !startDone.current) {
       startDone.current = true;
       const at = startAtRef.current;
-      if (at && at > 1) void playerRef.current?.seek(at);
+      const landed = at && at > 1 ? playerRef.current?.seek(at) : undefined;
+      // Until the start seek lands, the player reports 0 s: those positions aren't the viewer's.
+      if (landed) {
+        void landed.then(
+          () => (positionLive.current = true),
+          () => (positionLive.current = true),
+        );
+      } else positionLive.current = true;
+    }
+    if (e.event === "tracks" && !audioPicked.current) {
+      const audio = (e.tracks ?? []).filter((t) => t.kind === "audio");
+      if (audio.length) {
+        audioPicked.current = true;
+        const want = (preferredAudioRef.current ?? []).map((l) => audio.find((t) => t.language === l)).find(Boolean);
+        if (audio.length > 1 && want && !want.selected) playerRef.current?.setAudio(want.label);
+      }
+    }
+    if (e.event === "subs" && !subsCarried.current) {
+      const row = (e.subs ?? []).find((t) => t.language === viewer.current.subtitleLanguage);
+      if (row) {
+        subsCarried.current = true;
+        playerRef.current?.setSubtitle(row.id);
+      }
     }
     if (e.event === "audio") {
       setAudios(e.audios ?? []);
@@ -147,7 +217,10 @@ export function NativePlayerView({
     } else if (e.event === "subs") {
       setSubtitles(e.subs ?? []);
     } else if (e.event !== "tracks") {
-      if (Number.isFinite(e.currentTime)) pos.current = e.currentTime;
+      if (Number.isFinite(e.currentTime)) {
+        pos.current = e.currentTime;
+        if (positionLive.current) onPositionRef.current?.(e.currentTime);
+      }
       paused.current = e.paused;
       controlsRef.current?.setPlayback({
         currentTime: e.currentTime,
@@ -181,6 +254,7 @@ export function NativePlayerView({
   const onFirstFrame = useCallback(() => {
     if (firstFrameSeen.current) return;
     firstFrameSeen.current = true;
+    setFrameShown(true);
     setHud((h) => ({ ...h, ttffMs: Date.now() - (t0.current ?? Date.now()) }));
     Animated.timing(coverOpacity, { toValue: 0, duration: 250, useNativeDriver: true }).start(({ finished }) => {
       if (finished) setCoverGone(true);
@@ -209,14 +283,22 @@ export function NativePlayerView({
 
   const toggleFullscreen = useCallback(() => {
     const next = !fullscreen;
-    setFullscreen(next);
+    if (controlled) {
+      onFullscreenChange?.(next);
+      return;
+    }
+    setOwnFullscreen(next);
     (next ? ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE) : ScreenOrientation.unlockAsync()).catch(
       () => {},
     );
-  }, [fullscreen]);
+  }, [controlled, fullscreen, onFullscreenChange]);
+  const controlledRef = useRef(controlled);
+  useEffect(() => {
+    controlledRef.current = controlled;
+  }, [controlled]);
   useEffect(
     () => () => {
-      ScreenOrientation.unlockAsync().catch(() => {});
+      if (!controlledRef.current) ScreenOrientation.unlockAsync().catch(() => {});
     },
     [],
   );
@@ -253,6 +335,7 @@ export function NativePlayerView({
       subtitleOffsetSec={subOffset}
       subtitleSize={subSize}
       subtitlesLifted={controlsShown}
+      autoPlay={!initial.paused}
       onPlayerEvent={onEvent}
       onFirstFrame={onFirstFrame}
       onFatalError={onFatal}
@@ -273,8 +356,14 @@ export function NativePlayerView({
                 ref={controlsRef}
                 canControl
                 roomPlaying={false}
-                onPlay={() => playerRef.current?.play()}
-                onPause={() => playerRef.current?.pause()}
+                onPlay={() => {
+                  tellViewer({ paused: false });
+                  playerRef.current?.play();
+                }}
+                onPause={() => {
+                  tellViewer({ paused: true });
+                  playerRef.current?.pause();
+                }}
                 onSeekTo={seekTo}
                 onSeekBy={(d) => seekTo(Math.max(0, pos.current + d))}
                 onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
@@ -289,12 +378,13 @@ export function NativePlayerView({
                 onNextEpisode={onNextEpisode}
               />
             ) : null}
-            <PlayerToast notice={notice ?? null} onDone={onNoticeDone ?? noop} />
             {!coverGone ? (
               <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: coverOpacity }]}>
                 <PlayerLoadingCard posterUrl={posterUrl} status="Starting…" />
               </Animated.View>
             ) : null}
+            {/* Above the loading cover, and held until the first frame so its 5 s are seen. */}
+            <PlayerToast notice={frameShown ? (notice ?? null) : null} onDone={onNoticeDone ?? noop} />
             {error ? (
               <PlayerErrorCard
                 title="Couldn’t play this stream"
@@ -329,6 +419,7 @@ export function NativePlayerView({
         rate={rate}
         onSetRate={(r) => {
           setRate(r);
+          tellViewer({ rate: r });
           playerRef.current?.setRate(r);
         }}
         qualities={qualities}
@@ -339,13 +430,20 @@ export function NativePlayerView({
         showAudio={audioRows.length > 1}
         showQuality={qualities.length > 1}
         subtitles={subtitles}
-        onSetSubtitle={(id) => playerRef.current?.setSubtitle(id)}
+        onSetSubtitle={(id) => {
+          subsCarried.current = true;
+          tellViewer({ subtitleLanguage: id ? (subtitles.find((t) => t.id === id)?.language ?? null) : null });
+          playerRef.current?.setSubtitle(id);
+        }}
         subtitleAdjust={
           sidecarSelected
             ? {
                 offsetSec: subOffset,
                 size: subSize,
-                onOffset: setSubOffset,
+                onOffset: (o) => {
+                  setSubOffset(o);
+                  tellViewer({ subOffset: o });
+                },
                 onSize: (s) => {
                   setSubSize(s);
                   setSubtitleSize(s);

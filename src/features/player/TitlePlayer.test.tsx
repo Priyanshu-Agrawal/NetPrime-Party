@@ -52,6 +52,8 @@ jest.mock("@/components/player/PlayerErrorCard", () => {
     ),
   };
 });
+jest.mock("@/hooks/useConnectivity", () => ({ useConnectivity: () => false }));
+jest.mock("expo-screen-orientation", () => ({ lockAsync: async () => {}, unlockAsync: async () => {}, OrientationLock: { LANDSCAPE: 1, PORTRAIT_UP: 2 } }));
 jest.mock("react-native-safe-area-context", () => {
   const { View } = jest.requireActual("react-native");
   return { SafeAreaView: ({ children }: any) => <View>{children}</View> };
@@ -77,7 +79,12 @@ const texts = (r: ReactTestRenderer) =>
 const flush = () => act(async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();
 });
-const tick = (t: number, paused = false) => act(() => mockViewProps.onPlayerEvent({ event: "tick", currentTime: t, duration: 600, paused }));
+/** A tick the view has vouched for: an event, and (as NativePlayerView does once the start seek landed) a position. */
+const tick = (t: number, paused = false) =>
+  act(() => {
+    mockViewProps.onPlayerEvent({ event: "tick", currentTime: t, duration: 600, paused });
+    mockViewProps.onPosition(t);
+  });
 
 async function mount(props: Partial<React.ComponentProps<typeof TitlePlayer>> = {}) {
   const onUseWeb = jest.fn();
@@ -209,6 +216,24 @@ describe("TitlePlayer", () => {
     await flush();
     expect(mockViewProps.source.uri).toBe("https://cdn.example.net/hi1-fresh.m3u8");
     expect(mockViewProps.startAt).toBe(300);
+  });
+
+  it("a re-resolve that hangs gives up at the cap and fails over", async () => {
+    jest.useFakeTimers();
+    try {
+      mockResolve.mockResolvedValueOnce(result(cand("hi1", ["hi"]), cand("hi2", ["hi"])));
+      const { r } = await mount();
+      mockResolve.mockReturnValue(new Promise(() => {}));
+      act(() => {
+        mockViewProps.onStreamError("HTTP 403");
+      });
+      expect(texts(r)).toContain("Reconnecting…");
+      act(() => jest.advanceTimersByTime(RESOLVE_CAP_MS));
+      await flush();
+      expect(mockViewProps.source.uri).toContain("hi2");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("F6: then the next stream in the same language, then another language with a notice, then the error card", async () => {

@@ -226,12 +226,14 @@ describe("NativePlayerView", () => {
     expect(onPick).not.toHaveBeenCalled();
   });
 
-  it("shows a notice and passes episode controls to the controls layer", () => {
+  it("shows a notice once the first frame is up, and passes episode controls to the controls layer", () => {
     let r!: ReactTestRenderer;
     const onNextEpisode = jest.fn();
     act(() => {
       r = create(view({ notice: { id: 1, message: "Hindi isn't available for this title — playing original audio" }, subtitle: "S1 · E3", onNextEpisode }));
     });
+    expect(texts(r)).not.toContain("Hindi isn't available for this title — playing original audio");
+    act(() => mockPlayerProps.onFirstFrame());
     expect(texts(r)).toContain("Hindi isn't available for this title — playing original audio");
     expect(mockControlsProps.subtitle).toBe("S1 · E3");
     expect(mockControlsProps.onNextEpisode).toBe(onNextEpisode);

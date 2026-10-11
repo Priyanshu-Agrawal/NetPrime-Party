@@ -49,7 +49,8 @@ export function PlayerToast({ notice, onDone }: { notice: PlayerNotice | null; o
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: "absolute", top: ms(10), left: ms(12), right: ms(12), alignItems: "center" },
+  // Below the controls' top bar, so the back button stays reachable while a notice shows.
+  wrap: { position: "absolute", top: ms(56), left: ms(12), right: ms(12), alignItems: "center" },
   toast: {
     flexDirection: "row",
     alignItems: "center",
