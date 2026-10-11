@@ -46,7 +46,7 @@ import {
 import { settingsRows, type BridgeCaps, type OS } from "@/components/player/capabilities";
 import { controlChips } from "@/components/player/chips";
 import { nextEpisode } from "@/components/player/nextEpisode";
-import { stageFor } from "@/components/player/reportFields";
+import { stageFor, successReport } from "@/components/player/reportFields";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import type { SubtitleTrack } from "@/components/player/types";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
@@ -560,14 +560,14 @@ export const PlayerScreen: React.FC = () => {
     if (Number.isFinite(e.currentTime)) posRef.current = e.currentTime;
     pausedRef.current = !!e.paused;
     if (e.event === "play" || e.event === "playing" || t > 0) anyPlaybackRef.current = true;
-    // Telemetry: report a one-time 'success' once playback sustains past 30s —
+    // Telemetry: report a one-time 'success' once playback has really progressed past 30 s —
     // the denominator that makes provider_health a failure RATE, not a raw count.
-    if (!initialOutcomeRef.current && (Number(e.currentTime) || 0) >= 30) {
+    const due = initialOutcomeRef.current
+      ? null
+      : successReport(Number(e.currentTime) || 0, firstProgressAtRef.current, mountTsRef.current);
+    if (due) {
       initialOutcomeRef.current = true;
-      report(
-        "success",
-        firstProgressAtRef.current != null ? { ttffMs: firstProgressAtRef.current - mountTsRef.current } : undefined,
-      );
+      report("success", due);
       if (selected) clearProviderFailure(mediaKey(media), selected.id); // works now — forget it
     }
     controlsRef.current?.setPlayback({
