@@ -2,6 +2,7 @@
 //   node scripts/pin-plugin-repo.mjs <https manifest URL> --id <repo-id> [--version <n>]
 // Downloads the manifest and every enabled scraper file it names, hashes the exact bytes, and prints the row plus an
 // upsert that leaves the repo DISABLED. Pin commit-addressed URLs (a commit SHA in the path), never a branch.
+import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 
 const [manifestUrl, ...rest] = process.argv.slice(2);
