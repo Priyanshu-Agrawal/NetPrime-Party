@@ -27,19 +27,23 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   private var backdrop: BearoomGlassBackdropView? = null
   private var blurRadiusDp = 20f
   private var saturation = 1f
+  private var baseColor = Color.TRANSPARENT
   private var overlayColor = Color.TRANSPARENT
   private val own = IntArray(2)
   private val theirs = IntArray(2)
   private var drawnDx = Int.MIN_VALUE
   private var drawnDy = Int.MIN_VALUE
 
-  // Scrolling and transitions move this view (or the backdrop) without redrawing it: re-check the offset each
-  // frame — two getLocationInWindow calls — and redraw only when it changed.
-  private val offsetWatcher = ViewTreeObserver.OnPreDrawListener {
+  // Runs only for frames the window draws anyway (scrolling, video, animations) — never schedules one.
+  // - Scrolling and transitions move this view (or the backdrop) without redrawing it: re-check the offset
+  //   (two getLocationInWindow calls) and redraw only when it changed.
+  // - The blur layer is cached and is not refreshed when only the backdrop's content changes, so it would
+  //   freeze on the first frame: mark it for re-render in this frame (see Blur.refresh).
+  private val frameWatcher = ViewTreeObserver.OnPreDrawListener {
     val b = backdrop
-    if (blur != null && b != null && b.isAttachedToWindow) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && b.isAttachedToWindow) {
       measureOffset(b)
-      if (own[0] != drawnDx || own[1] != drawnDy) invalidate()
+      if (own[0] != drawnDx || own[1] != drawnDy) invalidate() else blur.refresh()
     }
     true
   }
@@ -68,6 +72,12 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
     invalidate()
   }
 
+  fun setBaseColor(color: Int) {
+    if (color == baseColor) return
+    baseColor = color
+    invalidate()
+  }
+
   fun setOverlayColor(color: Int) {
     if (color == overlayColor) return
     overlayColor = color
@@ -76,11 +86,11 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
 
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
-    viewTreeObserver.addOnPreDrawListener(offsetWatcher)
+    viewTreeObserver.addOnPreDrawListener(frameWatcher)
   }
 
   override fun onDetachedFromWindow() {
-    viewTreeObserver.removeOnPreDrawListener(offsetWatcher)
+    viewTreeObserver.removeOnPreDrawListener(frameWatcher)
     super.onDetachedFromWindow()
   }
 
@@ -97,6 +107,9 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
       drawnDx = own[0]
       drawnDy = own[1]
       val radiusPx = blurRadiusDp * resources.displayMetrics.density
+      // The backdrop records content, not the background behind it: without an opaque base, text and gaps in
+      // the blurred copy stay see-through and the sharp originals show through the glass.
+      if (baseColor != Color.TRANSPARENT) canvas.drawColor(baseColor)
       blur.draw(canvas, source, width, height, drawnDx, drawnDy, radiusPx, saturation)
     }
     if (overlayColor != Color.TRANSPARENT) canvas.drawColor(overlayColor)
@@ -124,6 +137,17 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   private class Blur {
     private val node = RenderNode("BearoomGlass")
     private var effectDirty = true
+    private var flip = false
+
+    /**
+     * Re-render the cached blur layer this frame. A changed property is what makes the renderer redraw a
+     * layer; the pivot has no visible effect here (no rotation or scale), and setting it never schedules a
+     * frame, so this costs one small blur only on frames that are being drawn anyway.
+     */
+    fun refresh() {
+      flip = !flip
+      node.setPivotX(if (flip) 1f else 0f)
+    }
 
     fun markDirty() {
       effectDirty = true

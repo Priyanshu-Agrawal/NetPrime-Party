@@ -1,6 +1,8 @@
 import { NavigationContext } from "@react-navigation/native";
 import React from "react";
+import { processColor } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { colors } from "@/theme/bearoom";
 
 const mockPlatform = { os: "android", androidApi: 35, liquidAvailable: false };
 jest.mock("./platform", () => ({
@@ -52,6 +54,14 @@ describe("Glass on Android", () => {
     const r = render(<><GlassBackdrop /><Glass material="bar" /></>);
     expect(has(r, "native-glass")).toBe(true);
     expect(all(r, "native-glass")[0].props.backdropTag).toBe(42);
+    act(() => r.unmount());
+  });
+
+  it("paints the screen background under the blurred copy, so text behind the glass can't show through", () => {
+    // The backdrop holds the screen's content, not its background: blurred on its own, text and gaps stay
+    // see-through and the sharp originals show through the glass.
+    const r = render(<><GlassBackdrop /><Glass material="bar" /></>);
+    expect(all(r, "native-glass")[0].props.baseColor).toBe(processColor(colors.bg));
     act(() => r.unmount());
   });
 

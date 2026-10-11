@@ -1,5 +1,5 @@
 import { NativeGlassView } from "@/modules/bearoom-glass";
-import { glassHighlight, glassLift, glassMaterials } from "@/theme/bearoom";
+import { colors, glassHighlight, glassLift, glassMaterials } from "@/theme/bearoom";
 import { BlurView } from "expo-blur";
 import { GlassView } from "expo-glass-effect";
 import { LinearGradient } from "expo-linear-gradient";
@@ -65,6 +65,7 @@ export function Glass({ material = "control", backdrop = "auto", visible = true,
           backdropTag={nativeTagOf(resolved.entry?.ref.current ?? null)}
           blurRadius={m.blur}
           saturation={m.saturation}
+          baseColor={processColor(colors.bg) as number}
           overlayColor={processColor(m.tint) as number}
         />
       ) : null}

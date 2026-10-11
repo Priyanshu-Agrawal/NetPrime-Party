@@ -9,6 +9,8 @@ export interface NativeGlassViewProps extends ViewProps {
   blurRadius: number;
   /** Saturation multiplier applied to the blurred backdrop (1 = unchanged). */
   saturation: number;
+  /** processColor() result painted under the blurred copy: the backdrop holds content, not its background. */
+  baseColor: number | null;
   /** processColor() result drawn over the blur. */
   overlayColor: number | null;
 }

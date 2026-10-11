@@ -17,6 +17,7 @@ class BearoomGlassModule : Module() {
       Prop("backdropTag") { view: BearoomGlassView, tag: Int? -> view.setBackdropTag(tag) }
       Prop("blurRadius") { view: BearoomGlassView, dp: Float -> view.setBlurRadiusDp(dp) }
       Prop("saturation") { view: BearoomGlassView, value: Float -> view.setSaturation(value) }
+      Prop("baseColor") { view: BearoomGlassView, color: Int? -> view.setBaseColor(color ?: Color.TRANSPARENT) }
       Prop("overlayColor") { view: BearoomGlassView, color: Int? -> view.setOverlayColor(color ?: Color.TRANSPARENT) }
     }
   }
