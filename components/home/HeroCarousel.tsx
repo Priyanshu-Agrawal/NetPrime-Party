@@ -9,12 +9,15 @@ import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { genRoomCode } from "@/utils/roomCode";
 import { Button, GlassChip, Text } from "@/src/ui";
+import { Shimmer } from "@/src/ui/Shimmer";
+import { useAutoAdvance } from "@/hooks/useAutoAdvance";
+import { useScreenFocused } from "@/hooks/useScreenFocused";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useHeroQuery } from "@/src/store/services/tmdbApi";
 import { openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -24,9 +27,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
 
-const Shimmer = createShimmerPlaceholder(LinearGradient);
 const SHIMMER = [...gradients.shimmerDark];
 
 const { width } = Dimensions.get("window");
@@ -81,16 +82,19 @@ export function HeroCarousel() {
   const listRef = useRef<FlatList<MediaItem>>(null);
   const idxRef = useRef(0);
 
-  useEffect(() => {
-    if (items.length < 2) return;
-    const t = setInterval(() => {
+  // Autoplay only while Home is on screen: Home stays mounted under the player and the
+  // party, and an animated scroll there still costs the UI thread frames.
+  const onScreen = useScreenFocused();
+  useAutoAdvance(
+    () => {
       const next = (idxRef.current + 1) % items.length;
       listRef.current?.scrollToOffset({ offset: next * width, animated: true });
       idxRef.current = next;
       setIndex(next);
-    }, 6000);
-    return () => clearInterval(t);
-  }, [items.length]);
+    },
+    6000,
+    onScreen && items.length >= 2,
+  );
 
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);

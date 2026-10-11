@@ -1,12 +1,10 @@
 import { layoutTokens, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { gridColumnWidth } from "@/theme/styles/layout";
-import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
-import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
+import { Shimmer } from "./Shimmer";
 
-const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 const SHIMMER = [...gradients.shimmerDark];
 const DEFAULT_W = gridColumnWidth(3);
 
@@ -21,13 +19,13 @@ export function PosterSkeleton({
   return (
     <View style={[styles.card, { width }, style]}>
       <View style={[styles.posterWrap, { width, height }]}>
-        <ShimmerPlaceholder
+        <Shimmer
           shimmerColors={SHIMMER}
           style={[styles.poster, { width, height }]}
         />
       </View>
       {/* Title line placeholder */}
-      <ShimmerPlaceholder
+      <Shimmer
         shimmerColors={SHIMMER}
         style={[styles.titleLine, { width: width * 0.75 }]}
       />

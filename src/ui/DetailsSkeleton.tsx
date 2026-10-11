@@ -8,10 +8,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Dimensions, ScrollView, StyleSheet, View } from "react-native";
-import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
+import { Shimmer } from "./Shimmer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const Shimmer = createShimmerPlaceholder(LinearGradient);
 const SHIMMER = [...gradients.shimmerDark];
 
 const { width } = Dimensions.get("window");
