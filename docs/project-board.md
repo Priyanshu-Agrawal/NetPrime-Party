@@ -440,3 +440,25 @@ vidnest 2, vixsrc 3, vidlink 4, then plain embeds; no script for mycineby, 111mo
   To check: same test on Airtel mobile data. If Jio users can't stream, tell them up front (no workaround of a
   provider's blocking).
 * After a host scrub a guest lands 2–3 s behind and catches up at 1.1× (~25 s on slow devices) — seek guests slightly ahead or allow a faster catch-up.
+
+## `[x]` Performance pass — playback on weaker phones (2026-10-11)
+Measured on the Nothing Phone 1 (SD 778G+, 120 Hz) with atrace, gfxinfo, simpleperf and WebView devtools.
+
+**Fixed:**
+* `[x]` Hidden provider UI under our controls: VidFast's transitions kept ~72 style recalcs/s (page work 235 → 100 ms/s
+  with transitions off) and its looping spinners ticked the main thread every refresh — the bridge now stops both
+  once our controls own the surface (`ab930ac`, `425e579`, live as bridge `0d0ef2de`).
+* `[x]` Skeleton shimmers looped forever on screens that weren't on screen — Search mounts at launch (tabs are not
+  lazy) and, frozen while unfocused, never committed its loaded state: 24 shimmers ≈ 300 ms/s of the UI thread
+  (dev). One shared `Shimmer` animates only while its screen is focused (`ecd4701`). Release solo: animation
+  callbacks 176 → ~110 ms/s.
+* `[x]` The Home hero carousel kept smooth-scrolling every 6 s under the player and the party (`useAutoAdvance`).
+* `[x]` **Live blur on hidden surfaces**: the Android blur (`@sbaiahmed1/react-native-blur` → qmblurview) hooks the
+  whole window's pre-draw, so ANY mounted blur re-blurs every video frame, visible or not — the floating tab bar
+  and the party tray (faded to 0) ate 73% of the main thread during party playback. `Frost` now renders the
+  native blur only on the focused screen and only while `active` (`a15d80b`, `8b12a11`). Party (dev): late frames
+  94% → 35%, median 18 → 10 ms, p99 26 → 17 ms.
+
+**Notes:** solo playback was already smooth (0 dropped frames, p99 12–14 ms); the emulator's own stutter is the
+emulator (emulated GLES). Remaining always-on cost while video plays is the WebView's per-refresh tick (halves on
+60 Hz phones; a 60 Hz preferred refresh rate during playback is an option on 120 Hz phones).
