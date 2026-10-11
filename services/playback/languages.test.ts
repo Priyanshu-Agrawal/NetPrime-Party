@@ -58,6 +58,13 @@ describe("streamLanguages", () => {
     expect(streamLanguages({ name: "Hindi Medium", title: "" }, { titleName: "Something Else", originalTitle: "Hindi Medium" })).toEqual([]);
   });
 
+  it("a subtitle mention isn't the stream's audio, with or without a title to strip", () => {
+    expect(streamLanguages({ name: "Vidrock", title: "English | Subs: Hindi" }, { titleName: "Jawan" })).toEqual(["en"]);
+    expect(streamLanguages({ name: "Vidrock", title: "Subtitles - Hindi" }, { titleName: "Jawan" })).toEqual([]);
+    expect(streamLanguages({ name: "Jawan.2023 • English • Subs: Hindi", title: "" }, { titleName: "Jawan" })).toEqual(["en"]);
+    expect(streamLanguages({ name: "ENG-SUB Korean", title: "" }, { titleName: "Parasite" })).toEqual(["ko"]);
+  });
+
   it("removes the title only on word boundaries", () => {
     expect(streamLanguages({ name: "Thailand Thai dub", title: "" }, { titleName: "Land" })).toEqual(["th"]);
   });

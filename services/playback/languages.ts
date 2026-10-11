@@ -38,8 +38,9 @@ const NAMES: [RegExp, string][] = [
 const CODES = new Set(["hin", "eng", "tam", "tel", "jpn", "kor", "fre", "fra", "ger", "deu", "ita", "rus", "ara", "zho"]);
 
 const SEP = "[\\s._\\-+()\\[\\]{}|/,:;•·]";
-// "Hindi Subs", "English (soft) subtitles", "ENG-SUB": a subtitle language, not an audio one.
-const SUB_AFTER = new RegExp(`^${SEP}*(?:(?:soft|hard|forced|full|cc|sdh)${SEP}+)?(?:sub|subs|subtitle|subtitles|subbed)\\b`);
+// "Hindi Subs", "English (soft) subtitles", "ENG-SUB": a subtitle language, not an audio one. Not "English | Subs: Hindi",
+// where "Subs:" labels the language after it.
+const SUB_AFTER = new RegExp(`^${SEP}*(?:(?:soft|hard|forced|full|cc|sdh)${SEP}+)?(?:sub|subs|subtitle|subtitles|subbed)\\b(?!\\s*[:\\-–])`);
 // "Subs: English", "Subtitles - Hindi" (a colon or dash, so "ENG-SUB Korean" still reads Korean audio).
 const SUB_BEFORE = /(?:sub|subs|subtitle|subtitles)\s*[:\-–]\s*$/;
 
@@ -85,22 +86,26 @@ export function languageOf(value: string | undefined): string | undefined {
 
 const TOKEN_SEP = /[\s._\-+()[\]{}|/,:;•·'"!?]+/;
 
-/** The text minus every whole-word run of a title's words ("English.Vinglish.2012" loses "English Vinglish"). */
+/**
+ * The text minus every whole-word run of a title's words ("English.Vinglish.2012" loses "English Vinglish"). The
+ * separators stay as they were, so "Subs: Hindi" still reads as a subtitle mention afterwards.
+ */
 function withoutTitles(text: string, titles: (string | undefined)[]): string {
-  let words = text.toLowerCase().split(TOKEN_SEP).filter(Boolean);
+  // Words at even indexes, the separators between them at odd ones.
+  let parts = text.toLowerCase().split(new RegExp(`(${TOKEN_SEP.source})`));
   for (const title of titles) {
     const t = title?.toLowerCase().split(TOKEN_SEP).filter(Boolean) ?? [];
     if (!t.length) continue;
     const kept: string[] = [];
-    for (let i = 0; i < words.length; ) {
-      if (t.every((w, k) => words[i + k] === w)) {
+    for (let i = 0; i < parts.length; ) {
+      if (i % 2 === 0 && t.every((w, k) => parts[i + 2 * k] === w)) {
         kept.push("·");
-        i += t.length;
-      } else kept.push(words[i++]);
+        i += 2 * t.length - 1; // the run's words and the separators inside it; one slot replaces an odd count
+      } else kept.push(parts[i++]);
     }
-    words = kept;
+    parts = kept;
   }
-  return words.join(" ");
+  return parts.join("");
 }
 
 export function streamLanguages(
