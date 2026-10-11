@@ -36,7 +36,8 @@ export default function PluginSandbox({ bridge }: { bridge: Bridge }) {
         javaScriptEnabled
         domStorageEnabled={false}
         cacheEnabled={false}
-        incognito
+        // Not `incognito`: on Android it wipes every WebView cookie and the cache app-wide. This page has no network,
+        // no cache and no DOM storage, so there is nothing for incognito to protect.
         thirdPartyCookiesEnabled={false}
         sharedCookiesEnabled={false}
         allowFileAccess={false}

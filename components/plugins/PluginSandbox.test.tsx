@@ -64,7 +64,6 @@ describe("PluginSandbox", () => {
       javaScriptEnabled: true,
       domStorageEnabled: false,
       cacheEnabled: false,
-      incognito: true,
       thirdPartyCookiesEnabled: false,
       sharedCookiesEnabled: false,
       allowFileAccess: false,
@@ -73,6 +72,11 @@ describe("PluginSandbox", () => {
       setSupportMultipleWindows: false,
       javaScriptCanOpenWindowsAutomatically: false,
     });
+  });
+
+  it("never clears the app's cookies or cache (Android's incognito wipes every WebView's cookies app-wide)", () => {
+    render(fakeBridge());
+    expect(mockProps.incognito).toBeFalsy();
   });
 
   it("refuses to navigate anywhere but the sandbox page", () => {
