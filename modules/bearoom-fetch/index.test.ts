@@ -45,6 +45,15 @@ describe("fetchOnce", () => {
     await expect(fetchOnce(REQ)).rejects.toMatchObject({ code: "ERR_BLOCKED_ADDRESS", message: "Blocked non-public address" });
   });
 
+  it("gives the plain reason from iOS's wrapper too", async () => {
+    const wrapped =
+      "FunctionCallException: Calling the 'fetchOnce' function has failed (at ExpoModulesCore/ConcurrentFunctionDefinition.swift:88)\n" +
+      "→ Caused by: BearoomFetchError: Blocked non-public address (at BearoomFetch/BearoomFetchModule.swift:66)";
+    mockNative = { fetchOnce: jest.fn().mockRejectedValue(Object.assign(new Error(wrapped), { code: "ERR_BLOCKED_ADDRESS" })) };
+    const { fetchOnce } = load();
+    await expect(fetchOnce(REQ)).rejects.toMatchObject({ code: "ERR_BLOCKED_ADDRESS", message: "Blocked non-public address" });
+  });
+
   it("reports any other failure as a network error", async () => {
     mockNative = { fetchOnce: jest.fn().mockRejectedValue(new Error("weird")) };
     const { fetchOnce } = load();
