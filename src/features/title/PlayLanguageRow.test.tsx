@@ -26,6 +26,13 @@ describe("PlayLanguageRow", () => {
     expect(render(<PlayLanguageRow button={{ label: "Play", others: [] }} onChoose={jest.fn()} />).toJSON()).toBeNull();
   });
 
+  it("holds its line while the preview may still speak, so the page below doesn't jump", () => {
+    const r = render(<PlayLanguageRow button={{ label: "Play", others: [] }} reserve onChoose={jest.fn()} />);
+    const row = r.toJSON() as { props: { style: unknown } } | null;
+    expect(row).not.toBeNull();
+    expect(texts(r)).toEqual([]);
+  });
+
   it("shows the quiet note", () => {
     const r = render(<PlayLanguageRow button={{ label: "Play", note: "Hindi not available for this title", others: [] }} onChoose={jest.fn()} />);
     expect(texts(r)).toEqual(["Hindi not available for this title"]);

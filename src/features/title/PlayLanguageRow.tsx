@@ -8,11 +8,20 @@ import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { PlayButton } from "./languagePreview";
 
-export function PlayLanguageRow({ button, onChoose }: { button: PlayButton; onChoose(code: string): void }) {
+export function PlayLanguageRow({
+  button,
+  reserve = false,
+  onChoose,
+}: {
+  button: PlayButton;
+  /** The preview may still speak: keep its line so the page below doesn't jump when the note arrives. */
+  reserve?: boolean;
+  onChoose(code: string): void;
+}) {
   const [open, setOpen] = useState(false);
-  if (!button.note && !button.others.length) return null;
+  if (!reserve && !button.note && !button.others.length) return null;
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, reserve && styles.reserved]}>
       {button.note ? <Text style={styles.note}>{button.note}</Text> : null}
       {button.others.length ? (
         <View style={styles.chips}>
@@ -37,6 +46,7 @@ export function PlayLanguageRow({ button, onChoose }: { button: PlayButton; onCh
 
 const styles = StyleSheet.create({
   row: { paddingHorizontal: ms(16), marginTop: ms(10), gap: ms(8) },
-  note: { color: colors.textDim, fontFamily: font.body, fontSize: ms(12.5) },
+  note: { color: colors.textDim, fontFamily: font.body, fontSize: ms(12.5), lineHeight: ms(17) },
+  reserved: { minHeight: ms(17) },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: ms(8) },
 });
