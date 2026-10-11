@@ -655,3 +655,11 @@ Spec §5.3, §5.5–5.7, §7 F5.
 - **iOS 27 simulator:** Sintel → 0 playable (DASH filtered for iPhone); Big Buck Bunny resolves.
 - **Found:** Android keeps WebView's renderer process (~50–57 MB PSS) after the sandbox unmounts. The page itself is freed; getting the process back would need `WebViewRenderProcess.terminate()` (API 29+) — backlog.
 
+- **Final review (Opus) → ready with fixes; all fixed test-first:**
+  - C1: when the host returned early, plugins still running were recorded as healthy. Health is now recorded as each plugin actually settles.
+  - I1–I3: the probe let HTML/JSON error bodies through, a single blip locked a title out for 15 min via the probe cache, and it kept fetching after its budget. Error bodies are refused, blips leave a stream `unverified`, only conclusive results are cached, and the probe stops at its budget.
+  - I4–I6: dotted file names, "Hindi Subs" and regional last-picked languages produced languages that weren't there.
+  - I7: `/report` accepted made-up plugin ids from a repo with no allow list. A plugin id now counts only if the operator listed it (`allow_plugins`, pin script fills it; worker `4d22bdfd`).
+  - I8: candidate keys moved between re-resolves. Opaque path tokens are masked whole; quality and the title (numbers masked) are part of the key; a URL two plugins share always goes to the lowest source id.
+  - Graded up: a namespaced `<mpd:MPD>` was rejected; everyday words (spa/por/chi/tha/tur) read as languages; a show-level TV runtime would have rejected long pilots (episodes skip the length check until per-episode runtime lands).
+  - Other minors are deferred in BACKLOG.
