@@ -78,8 +78,13 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 | Item | Status | Detail |
 |---|---|---|
 | Per-surface blur decision | DEFERRED | Where to keep real blur vs drop it. **Proven rule:** no blur AND no elevation on any screen that plays video (both re-sample every frame → stutter). Memory: `playback-stutter-is-dimezis-blur`. |
-| Low-end validation of `@sbaiahmed1/react-native-blur@4.7.1` | DEFERRED | Validate on weak devices. |
-| Capability gate in `Frost` | DEFERRED | Auto static-tint on weak devices (expo-device class), honor reduce-transparency, optional "Reduce effects" toggle. Frost was written then reverted. Memory: `low-end-blur-capability-gate`. |
+| Glass: iOS 27 simulator check | OPEN | Liquid Glass on tab bar/buttons, system blur on headers, fades without pop (simulator was busy 2026-10-11). |
+| Glass: Android lens/refraction | DEFERRED | AGSL `RuntimeShader` (API 33+) chained on `modules/bearoom-glass`'s blur for a Liquid-Glass edge. |
+| Glass: remote kill switch | DEFERRED | `/config` flag to force crafted glass if a device misbehaves. |
+| Glass over video (Android) | DEFERRED → Phase 1B | Live blur over the native player once it renders into a `TextureView`; WebView backdrops are banned (36–50 % janky / black when scaled). |
+| Glass: low-end Android check | DEFERRED | Bar blur on a weak Android 12+ device (gate is already API 31+ and bars-only). |
+| Party playback jank | OPEN | 10–52 % janky frames (~33 fps drawn, p99 15–20 ms) with no blur over the video, 2026-10-11 — investigate separately. |
+| Home scroll animation frames | OPEN | 50–67 ms frames inside main-thread animation callbacks while scrolling Home (pre-existing, not glass). |
 
 ## H. Atmospheric background
 | Item | Status | Detail |
