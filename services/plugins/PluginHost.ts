@@ -1,0 +1,157 @@
+import type { LoadedPlugin } from "./registry";
+import type { PluginStream } from "./streams";
+
+/**
+ * Asks every loaded plugin for a title's streams within the spec's budgets (§5.4, Cove): ≤ 12 at once, 15 s each,
+ * 20 s overall; returns early once ≥ 3 streams arrived and 1.2 s passed with nothing new. Plugins still running then
+ * finish into a 15-minute per-title cache. Failures are never cached, and an empty answer in under 100 ms counts as
+ * one (a silent contract break, e.g. a missing global).
+ */
+export interface ResolveRequest {
+  tmdbId: string;
+  type: "movie" | "tv";
+  season?: number;
+  episode?: number;
+}
+
+export type FailureReason = "timeout" | "error" | "bad-shape" | "empty-fast" | "unsafe" | "not-ready" | "crashed";
+
+export interface PluginFailure {
+  pluginKey: string;
+  reason: FailureReason;
+  detail?: string;
+  ms: number;
+}
+
+export interface HostResult {
+  streams: PluginStream[];
+  failures: PluginFailure[];
+  /** Plugins started for this call (cached answers are not listed). */
+  ran: string[];
+  /** True when every plugin answered before the call returned. */
+  complete: boolean;
+}
+
+export const BUDGET = {
+  parallel: 12,
+  perPluginMs: 15_000,
+  overallMs: 20_000,
+  earlyCount: 3,
+  earlyIdleMs: 1_200,
+  cacheMs: 15 * 60_000,
+  emptyFastMs: 100,
+} as const;
+
+export interface HostDeps {
+  plugins(): LoadedPlugin[];
+  run(plugin: LoadedPlugin, req: ResolveRequest, timeoutMs: number): Promise<unknown>;
+  normalise(plugin: LoadedPlugin, raw: unknown): PluginStream[] | null;
+  now(): number;
+}
+
+export function titleKey(req: ResolveRequest): string {
+  return req.type === "movie" ? `movie:${req.tmdbId}` : `tv:${req.tmdbId}:${req.season ?? 0}:${req.episode ?? 0}`;
+}
+
+const SANDBOX_REASONS = new Set<FailureReason>(["timeout", "unsafe", "not-ready", "crashed"]);
+
+function reasonOf(e: unknown): FailureReason {
+  const code = (e as { code?: unknown })?.code;
+  return typeof code === "string" && SANDBOX_REASONS.has(code as FailureReason) ? (code as FailureReason) : "error";
+}
+
+export class PluginHost {
+  private cache = new Map<string, { at: number; streams: PluginStream[] }>();
+
+  constructor(private readonly deps: HostDeps) {}
+
+  getStreams(req: ResolveRequest, opts: { onStreams?(pluginKey: string, streams: PluginStream[]): void } = {}): Promise<HostResult> {
+    const title = titleKey(req);
+    const plugins = this.deps.plugins().filter((p) => p.supportedTypes.includes(req.type));
+    const streams: PluginStream[] = [];
+    const failures: PluginFailure[] = [];
+    const ran: string[] = [];
+    return new Promise<HostResult>((resolve) => {
+      let finished = false;
+      let settled = 0;
+      let idle: ReturnType<typeof setTimeout> | undefined;
+      const finish = (complete: boolean) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(overall);
+        clearTimeout(idle);
+        resolve({ streams: [...streams], failures: [...failures], ran: [...ran], complete });
+      };
+      const overall = setTimeout(() => finish(false), BUDGET.overallMs);
+      const add = (p: LoadedPlugin, list: PluginStream[]) => {
+        if (finished || !list.length) return;
+        streams.push(...list);
+        opts.onStreams?.(p.key, list);
+        if (streams.length >= BUDGET.earlyCount) {
+          clearTimeout(idle);
+          idle = setTimeout(() => finish(false), BUDGET.earlyIdleMs);
+        }
+      };
+      const settle = () => {
+        if (++settled === plugins.length) finish(true);
+      };
+      if (!plugins.length) {
+        finish(true);
+        return;
+      }
+      const queue: LoadedPlugin[] = [];
+      for (const p of plugins) {
+        const hit = this.cache.get(`${title}|${p.key}`);
+        if (hit && this.deps.now() - hit.at < BUDGET.cacheMs) {
+          add(p, hit.streams);
+          settle();
+        } else queue.push(p);
+      }
+      let inFlight = 0;
+      const pump = () => {
+        while (inFlight < BUDGET.parallel && queue.length) {
+          const p = queue.shift()!;
+          inFlight++;
+          ran.push(p.key);
+          void this.runOne(p, req, title, failures, add).finally(() => {
+            inFlight--;
+            settle();
+            pump();
+          });
+        }
+      };
+      pump();
+    });
+  }
+
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  private async runOne(
+    p: LoadedPlugin,
+    req: ResolveRequest,
+    title: string,
+    failures: PluginFailure[],
+    add: (p: LoadedPlugin, list: PluginStream[]) => void,
+  ): Promise<void> {
+    const started = this.deps.now();
+    try {
+      const raw = await this.deps.run(p, req, BUDGET.perPluginMs);
+      const ms = this.deps.now() - started;
+      const list = this.deps.normalise(p, raw);
+      if (list === null) {
+        failures.push({ pluginKey: p.key, reason: "bad-shape", ms });
+        return;
+      }
+      if (list.length === 0 && ms < BUDGET.emptyFastMs) {
+        failures.push({ pluginKey: p.key, reason: "empty-fast", ms });
+        return;
+      }
+      this.cache.set(`${title}|${p.key}`, { at: this.deps.now(), streams: list });
+      add(p, list);
+    } catch (e) {
+      failures.push({ pluginKey: p.key, reason: reasonOf(e), detail: String((e as Error)?.message ?? e).slice(0, 200), ms: this.deps.now() - started });
+    }
+  }
+}
