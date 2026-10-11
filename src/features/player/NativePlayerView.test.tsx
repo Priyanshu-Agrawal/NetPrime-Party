@@ -30,16 +30,25 @@ jest.mock("@/components/player/native/NativePlayer", () => {
     }),
   };
 });
+let mockControlsProps: any = null;
 jest.mock("@/components/player/PlayerControls", () => {
   const R = jest.requireActual("react");
   return {
-    PlayerControls: R.forwardRef((_p: any, ref: any) => {
+    PlayerControls: R.forwardRef((p: any, ref: any) => {
+      mockControlsProps = p;
       R.useImperativeHandle(ref, () => ({ setPlayback: jest.fn() }));
       return null;
     }),
   };
 });
-jest.mock("@/components/player/PlayerSettingsSheet", () => ({ __esModule: true, default: () => null }));
+let mockSheetProps: any = null;
+jest.mock("@/components/player/PlayerSettingsSheet", () => ({
+  __esModule: true,
+  default: (p: any) => {
+    mockSheetProps = p;
+    return null;
+  },
+}));
 jest.mock("@/components/player/PlayerLoadingCard", () => {
   const { Text } = jest.requireActual("react-native");
   return { PlayerLoadingCard: ({ status }: { status: string }) => <Text>{status}</Text> };
@@ -157,5 +166,74 @@ describe("NativePlayerView", () => {
     });
     act(() => r.unmount());
     expect(mockUnlock).toHaveBeenCalled();
+  });
+
+  const ev = (event: string, currentTime = 0) => ({ event, currentTime, duration: 900, paused: false });
+
+  it("starts at the given position once the stream is ready, once", () => {
+    act(() => {
+      create(view({ startAt: 754 }));
+    });
+    act(() => mockPlayerProps.onPlayerEvent(ev("ready")));
+    act(() => mockPlayerProps.onPlayerEvent(ev("ready")));
+    expect(mockHandle.seek).toHaveBeenCalledTimes(1);
+    expect(mockHandle.seek).toHaveBeenCalledWith(754);
+  });
+
+  it("passes every event on to the caller", () => {
+    const onPlayerEvent = jest.fn();
+    act(() => {
+      create(view({ onPlayerEvent }));
+    });
+    act(() => mockPlayerProps.onPlayerEvent(ev("tick", 12)));
+    expect(onPlayerEvent).toHaveBeenCalledWith(expect.objectContaining({ event: "tick", currentTime: 12 }));
+  });
+
+  it("lets the caller handle a fatal error instead of showing the card", () => {
+    let r!: ReactTestRenderer;
+    const onStreamError = jest.fn(() => true);
+    act(() => {
+      r = create(view({ onStreamError }));
+    });
+    act(() => mockPlayerProps.onFatalError("HTTP 403"));
+    expect(onStreamError).toHaveBeenCalledWith("HTTP 403");
+    expect(texts(r)).not.toContain("Couldn’t play this stream");
+  });
+
+  it("offers sibling languages when the stream has one audio track, and the picks go to the caller", () => {
+    const onPick = jest.fn();
+    act(() => {
+      create(view({ audioChoices: { options: [{ label: "Hindi", active: true }, { label: "English", active: false }], onPick } }));
+    });
+    act(() => mockPlayerProps.onPlayerEvent({ ...ev("audio"), audios: [{ label: "English", active: true }] }));
+    expect(mockSheetProps.audios).toEqual([{ label: "Hindi", active: true }, { label: "English", active: false }]);
+    expect(mockSheetProps.showAudio).toBe(true);
+    act(() => mockSheetProps.onSetAudio("English"));
+    expect(onPick).toHaveBeenCalledWith("English");
+    expect(mockHandle.setAudio).not.toHaveBeenCalled();
+    expect(mockControlsProps.chips.audio).toBe("Hindi");
+  });
+
+  it("keeps the stream's own audio tracks when it has several", () => {
+    const onPick = jest.fn();
+    act(() => {
+      create(view({ audioChoices: { options: [{ label: "Hindi", active: true }, { label: "English", active: false }], onPick } }));
+    });
+    act(() => mockPlayerProps.onPlayerEvent({ ...ev("audio"), audios: [{ label: "Tamil", active: true }, { label: "Telugu", active: false }] }));
+    expect(mockSheetProps.audios.map((a: { label: string }) => a.label)).toEqual(["Tamil", "Telugu"]);
+    act(() => mockSheetProps.onSetAudio("Telugu"));
+    expect(mockHandle.setAudio).toHaveBeenCalledWith("Telugu");
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it("shows a notice and passes episode controls to the controls layer", () => {
+    let r!: ReactTestRenderer;
+    const onNextEpisode = jest.fn();
+    act(() => {
+      r = create(view({ notice: { id: 1, message: "Hindi isn't available for this title — playing original audio" }, subtitle: "S1 · E3", onNextEpisode }));
+    });
+    expect(texts(r)).toContain("Hindi isn't available for this title — playing original audio");
+    expect(mockControlsProps.subtitle).toBe("S1 · E3");
+    expect(mockControlsProps.onNextEpisode).toBe(onNextEpisode);
   });
 });

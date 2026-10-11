@@ -10,6 +10,7 @@ import { PlayerControls, type ControlChips, type PlayerControlsHandle } from "@/
 import { PlayerErrorCard } from "@/components/player/PlayerErrorCard";
 import { PlayerLoadingCard } from "@/components/player/PlayerLoadingCard";
 import PlayerSettingsSheet from "@/components/player/PlayerSettingsSheet";
+import { PlayerToast, type PlayerNotice } from "@/components/player/PlayerToast";
 import type { SubtitleSize } from "@/components/player/subtitles/SubtitleOverlay";
 import type { PlayerEvent, PlayerHandle, QualityLevel, SubtitleTrack } from "@/components/player/types";
 import { useConnectivity } from "@/hooks/useConnectivity";
@@ -41,7 +42,22 @@ export interface NativePlayerViewProps {
   devHud?: boolean;
   onClose: () => void;
   onOpenSource: () => void;
+  /** Seconds to start at once the stream is ready (a switch keeps the position). */
+  startAt?: number;
+  /** Every player event, after the view has handled it (position, telemetry). */
+  onPlayerEvent?: (e: PlayerEvent) => void;
+  /** A fatal stream error: return true when the caller handles it (no error card). */
+  onStreamError?: (message: string) => boolean;
+  /** Languages from sibling streams, offered while the stream itself has at most one audio track. */
+  audioChoices?: { options: QualityLevel[]; onPick: (label: string) => void };
+  notice?: PlayerNotice | null;
+  onNoticeDone?: () => void;
+  /** "S1 · E3" under the title. */
+  subtitle?: string;
+  onNextEpisode?: () => void;
 }
+
+const noop = () => {};
 
 interface Hud {
   ttffMs?: number;
@@ -66,11 +82,28 @@ export function NativePlayerView({
   devHud = false,
   onClose,
   onOpenSource,
+  startAt,
+  onPlayerEvent,
+  onStreamError,
+  audioChoices,
+  notice,
+  onNoticeDone,
+  subtitle,
+  onNextEpisode,
 }: NativePlayerViewProps) {
   const playerRef = useRef<PlayerHandle>(null);
   const controlsRef = useRef<PlayerControlsHandle>(null);
   // TTFF baseline: the Play press, else when this view mounted (set in an effect — render stays pure).
   const t0 = useRef<number | null>(startedAt ?? null);
+  const startAtRef = useRef(startAt);
+  const startDone = useRef(false);
+  const onPlayerEventRef = useRef(onPlayerEvent);
+  const onStreamErrorRef = useRef(onStreamError);
+  useEffect(() => {
+    startAtRef.current = startAt;
+    onPlayerEventRef.current = onPlayerEvent;
+    onStreamErrorRef.current = onStreamError;
+  }, [startAt, onPlayerEvent, onStreamError]);
   const firstFrameSeen = useRef(false);
   const [coverOpacity] = useState(() => new Animated.Value(1));
   const [coverGone, setCoverGone] = useState(false);
@@ -102,6 +135,11 @@ export function NativePlayerView({
   }, [error]);
 
   const onEvent = useCallback((e: PlayerEvent) => {
+    if (e.event === "ready" && !startDone.current) {
+      startDone.current = true;
+      const at = startAtRef.current;
+      if (at && at > 1) void playerRef.current?.seek(at);
+    }
     if (e.event === "audio") {
       setAudios(e.audios ?? []);
     } else if (e.event === "quality") {
@@ -119,6 +157,7 @@ export function NativePlayerView({
         bufferedTime: e.bufferedAheadSec != null ? e.currentTime + e.bufferedAheadSec : undefined,
       });
     }
+    onPlayerEventRef.current?.(e);
   }, []);
 
   // F8: losing the network pauses (the app-wide banner explains why); getting it back resumes from the same
@@ -152,6 +191,11 @@ export function NativePlayerView({
     setError(null);
     playerRef.current?.reload();
     playerRef.current?.play();
+  }, []);
+
+  const onFatal = useCallback((message: string) => {
+    if (onStreamErrorRef.current?.(message)) return;
+    setError(message);
   }, []);
 
   const seekTo = useCallback(
@@ -194,7 +238,10 @@ export function NativePlayerView({
     beforeClose: () => beforeClose.current(),
   });
 
-  const chips = controlChips(audios, qualities, subtitles, qualityNow);
+  // Sibling streams stand in for audio tracks when the stream itself has at most one (spec §6.2 Language row).
+  const siblingAudio = !!audioChoices && audios.length <= 1;
+  const audioRows = siblingAudio && audioChoices ? audioChoices.options : audios;
+  const chips = controlChips(audioRows, qualities, subtitles, qualityNow);
   const sidecarSelected = subtitles.some((s) => s.selected && s.id.startsWith("side:"));
 
   const video = (
@@ -208,7 +255,7 @@ export function NativePlayerView({
       subtitlesLifted={controlsShown}
       onPlayerEvent={onEvent}
       onFirstFrame={onFirstFrame}
-      onFatalError={setError}
+      onFatalError={onFatal}
       onQualitySummary={setQualityNow}
       style={StyleSheet.absoluteFill}
     />
@@ -238,8 +285,11 @@ export function NativePlayerView({
                 onOpenSettings={() => setSettingsOpen(true)}
                 chips={chips}
                 onVisibilityChange={setControlsShown}
+                subtitle={subtitle}
+                onNextEpisode={onNextEpisode}
               />
             ) : null}
+            <PlayerToast notice={notice ?? null} onDone={onNoticeDone ?? noop} />
             {!coverGone ? (
               <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: coverOpacity }]}>
                 <PlayerLoadingCard posterUrl={posterUrl} status="Starting…" />
@@ -284,9 +334,9 @@ export function NativePlayerView({
         qualities={qualities}
         onSetQuality={(label) => playerRef.current?.setQuality(label)}
         qualitySummary={qualityNow}
-        audios={audios}
-        onSetAudio={(label) => playerRef.current?.setAudio(label)}
-        showAudio={audios.length > 1}
+        audios={audioRows}
+        onSetAudio={(label) => (siblingAudio && audioChoices ? audioChoices.onPick(label) : playerRef.current?.setAudio(label))}
+        showAudio={audioRows.length > 1}
         showQuality={qualities.length > 1}
         subtitles={subtitles}
         onSetSubtitle={(id) => playerRef.current?.setSubtitle(id)}
