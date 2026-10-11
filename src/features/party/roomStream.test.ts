@@ -21,8 +21,10 @@ const resolved = (...ranked: PlaybackCandidate[]) => async () => ({ ranked, reje
 const TITLE = { tmdbId: "1", type: "movie" as const };
 
 describe("roomStream", () => {
-  it("plays the host's stream first, with its headers", () => {
+  it("plays the host's stream first, with its headers and container", () => {
     expect(hostSource(H)).toEqual({ uri: H.url, headers: H.headers });
+    expect(hostSource({ ...H, container: "hls" })).toEqual({ uri: H.url, headers: H.headers, contentType: "hls" });
+    expect(hostSource({ ...H, container: "mp4" })).toEqual({ uri: H.url, headers: H.headers, contentType: "progressive" });
   });
 
   it("±2.5 s is the same cut; unknown on either side can't be checked", () => {

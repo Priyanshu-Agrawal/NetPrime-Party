@@ -117,6 +117,7 @@ export interface PartyChatValue {
 }
 
 const NOOP_ASYNC = async () => {};
+const NATIVE_ROOM_CAPS = { fractionalRate: true, partySync: true };
 const IDLE: PartySessionValue = {
   request: null,
   client: null,
@@ -291,8 +292,14 @@ function PartySessionInner({
       pause: () => playerRef.current?.pause(),
       seek: (s) => playerRef.current?.seek(s),
       setRate: (r) => playerRef.current?.setRate(r),
+      // Only the native room player opts into the §6.4 buffering protocol; WebView rooms keep today's behaviour.
+      capabilities: () => (playerRef.current?.engine === "native" ? NATIVE_ROOM_CAPS : undefined),
     };
-    return new PartySyncEngine(client, player, { onDetach: setDetached });
+    return new PartySyncEngine(client, player, {
+      onDetach: setDetached,
+      // Host's player stalled > 3 s while the room played: pause the room; resume when it recovers.
+      onHostStall: (stalled) => void (stalled ? client.pause() : client.play()),
+    });
   }, [client]);
 
   useEffect(() => {

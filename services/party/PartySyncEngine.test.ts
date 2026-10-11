@@ -40,6 +40,16 @@ describe("PartySyncEngine — native rooms (partySync)", () => {
     expect(onHostStall).toHaveBeenLastCalledWith(false);
   });
 
+  it("a host stall in a room that's already paused does nothing (and recovery never un-pauses it)", () => {
+    const onHostStall = jest.fn();
+    const e = new PartySyncEngine(client(true), player(NATIVE), { onHostStall });
+    e.setAnchor(anchor({ status: "paused" }));
+    e.onPlayerEvent(ev("buffering", 100, { buffering: true }));
+    jest.advanceTimersByTime(5000);
+    e.onPlayerEvent(ev("buffering", 100, { buffering: false }));
+    expect(onHostStall).not.toHaveBeenCalled();
+  });
+
   it("a guest's long stall never touches the room; on recovery it jumps to the live position + 1 s", () => {
     const onHostStall = jest.fn();
     const c = client(false);

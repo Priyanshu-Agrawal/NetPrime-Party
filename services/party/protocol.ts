@@ -205,11 +205,14 @@ export interface StreamHandoff {
   sourceId: string;
   url: string;
   headers: Record<string, string>;
+  /** What the stream is, when the URL doesn't say (extensionless HLS). */
+  container?: "hls" | "dash" | "mp4";
   durationSec?: number;
   language?: string;
 }
 
 const HANDOFF_MAX_URL = 4096;
+const HANDOFF_CONTAINERS = new Set(["hls", "dash", "mp4"]);
 const HANDOFF_MAX_HEADERS = 32;
 const HANDOFF_MAX_HEADER_BYTES = 8192;
 
@@ -234,6 +237,10 @@ export function parseStreamHandoff(raw: unknown): StreamHandoff | null {
   const headers = Object.fromEntries(entries) as Record<string, string>;
   if (JSON.stringify(headers).length > HANDOFF_MAX_HEADER_BYTES) return null;
   const out: StreamHandoff = { itemId, key, sourceId, url, headers };
+  if (o.container != null) {
+    if (typeof o.container !== "string" || !HANDOFF_CONTAINERS.has(o.container)) return null;
+    out.container = o.container as StreamHandoff["container"];
+  }
   if (o.durationSec != null) {
     if (typeof o.durationSec !== "number" || !Number.isFinite(o.durationSec) || o.durationSec <= 0) return null;
     out.durationSec = o.durationSec;

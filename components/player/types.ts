@@ -97,6 +97,8 @@ export interface PlayerCapabilities {
 }
 
 export interface PlayerHandle {
+  /** v2: which engine this is, when it matters to the party (the native room player says "native"). */
+  readonly engine?: EngineId;
   play(): void;
   pause(): void;
   /** v2: resolves with the LANDED position in seconds (engines that can't know it

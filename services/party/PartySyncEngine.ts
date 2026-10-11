@@ -29,7 +29,7 @@ export interface PlayerControl {
   seek(seconds: number): void;
   setRate(rate: number): void;
   /** What the player can do (PlayerHandle v2). Absent = today's WebView behaviour, unchanged. */
-  capabilities?(): { fractionalRate: boolean; partySync: boolean };
+  capabilities?(): { fractionalRate: boolean; partySync: boolean } | undefined;
 }
 
 // --- drift tunables (identical to the proven SyncEngine values) -------------
@@ -74,6 +74,8 @@ export class PartySyncEngine {
   private lastHardSeek = 0;
   private stallTimer: ReturnType<typeof setTimeout> | null = null;
   private stalled = false;
+  /** The room was paused because of the host's stall (so recovery resumes it — and only then). */
+  private pausedForStall = false;
 
   constructor(
     private client: PartyClient,
@@ -147,7 +149,10 @@ export class PartySyncEngine {
       this.stallTimer = setTimeout(() => {
         this.stallTimer = null;
         this.stalled = true;
-        if (this.client.isHost) this.opts.onHostStall?.(true);
+        if (this.client.isHost && this.anchor?.status === "playing") {
+          this.pausedForStall = true;
+          this.opts.onHostStall?.(true);
+        }
       }, STALL_MS);
       return;
     }
@@ -157,8 +162,12 @@ export class PartySyncEngine {
     }
     if (!this.stalled) return;
     this.stalled = false;
-    if (this.client.isHost) this.opts.onHostStall?.(false);
-    else if (!this.detached && this.anchor?.status === "playing") this.player.seek(this.expectedSec() + CATCH_UP_LEAD_S);
+    if (this.client.isHost) {
+      if (this.pausedForStall) {
+        this.pausedForStall = false;
+        this.opts.onHostStall?.(false);
+      }
+    } else if (!this.detached && this.anchor?.status === "playing") this.player.seek(this.expectedSec() + CATCH_UP_LEAD_S);
   }
 
   // --- helpers --------------------------------------------------------------

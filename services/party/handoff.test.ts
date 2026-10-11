@@ -13,6 +13,7 @@ const ok = {
 describe("parseStreamHandoff", () => {
   it("accepts a well-formed handoff", () => {
     expect(parseStreamHandoff(ok)).toEqual(ok);
+    expect(parseStreamHandoff({ ...ok, container: "dash" })).toEqual({ ...ok, container: "dash" });
   });
 
   it.each([
@@ -22,6 +23,7 @@ describe("parseStreamHandoff", () => {
     ["too many headers", { ...ok, headers: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`h${i}`, "v"])) }],
     ["an oversized URL", { ...ok, url: `https://cdn.example.net/${"a".repeat(5000)}` }],
     ["a negative length", { ...ok, durationSec: -3 }],
+    ["an unknown container", { ...ok, container: "mkv" }],
     ["no item id", { ...ok, itemId: "" }],
     ["not an object", "hello"],
   ])("refuses %s", (_, raw) => {

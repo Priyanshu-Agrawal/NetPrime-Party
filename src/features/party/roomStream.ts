@@ -10,8 +10,10 @@ import type { ResolveResult, TitleRequest } from "@/services/playback/resolver";
 
 export const SAME_CUT_SEC = 2.5;
 
+const CONTENT_TYPE = { hls: "hls", dash: "dash", mp4: "progressive" } as const;
+
 export function hostSource(h: StreamHandoff): NativeSource {
-  return { uri: h.url, headers: h.headers };
+  return { uri: h.url, headers: h.headers, ...(h.container ? { contentType: CONTENT_TYPE[h.container] } : {}) };
 }
 
 export function withinCut(a?: number, b?: number): boolean {
