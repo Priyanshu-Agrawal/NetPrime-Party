@@ -131,6 +131,17 @@ describe("pluginFetch", () => {
     await expect(pluginFetch(jar, { url: "https://api.themoviedb.org/3/movie/1" }, deps)).resolves.toMatchObject({ status: 200 });
   });
 
+  it("a request queued for a call that already ended never goes out", async () => {
+    const { seen, jar, deps } = setup({ "https://a.example.net/x": res() });
+    deps.limiter = new Limiter(1, 1);
+    let open!: () => void;
+    void deps.limiter.run("example.net", () => new Promise<void>((r) => (open = r)));
+    const out = pluginFetch(jar, { url: "https://a.example.net/x" }, deps, () => false);
+    open();
+    await expect(out).rejects.toMatchObject({ code: "network", message: "cancelled" });
+    expect(seen).toHaveLength(0);
+  });
+
   it("refuses bodies over 20 MiB", async () => {
     const { jar, deps } = setup({ "https://a.example.net/big": res({ truncated: true }) });
     await expect(pluginFetch(jar, { url: "https://a.example.net/big" }, deps)).rejects.toMatchObject({ code: "too-large" });
@@ -145,6 +156,12 @@ describe("rewriteTmdb", () => {
 });
 
 describe("toPluginFetchRequest", () => {
+  it("refuses request bodies over 1 MiB", () => {
+    expect(() => toPluginFetchRequest({ url: "https://a.example.net/", method: "POST", body: "x".repeat(1024 * 1024 + 1) })).toThrow(
+      expect.objectContaining({ code: "bad-request" }),
+    );
+  });
+
   it("fills defaults and keeps only string headers", () => {
     expect(toPluginFetchRequest({ url: "https://a.example.net/", headers: { A: "1", B: 2 } })).toEqual({
       url: "https://a.example.net/",

@@ -29,13 +29,17 @@ export interface SandboxState {
 }
 
 export interface BridgeDeps {
-  onFetch(pluginKey: string, req: unknown): Promise<FetchResultPayload>;
+  /** `alive` stays true while the call that asked is running. */
+  onFetch(pluginKey: string, req: unknown, alive: () => boolean): Promise<FetchResultPayload>;
   onLog?(pluginKey: string, level: string, msg: string): void;
 }
 
 export const READY_TIMEOUT_MS = 15_000;
 /** After a kill the page must answer a ping this fast, or it is replaced (a stuck page, not a slow plugin). */
 export const PING_TIMEOUT_MS = 2_000;
+/** Per plugin call: how many fetches, and how many response characters in total (one call can't flood the app). */
+export const MAX_FETCHES_PER_CALL = 150;
+export const MAX_CALL_BYTES = 32 * 1024 * 1024;
 
 /** A frame as a script for WebView.injectJavaScript (U+2028/2029 escaped so the literal always parses). */
 export function frameScript(frame: HostFrame): string {
@@ -45,6 +49,8 @@ export function frameScript(frame: HostFrame): string {
 
 interface Call {
   pluginKey: string;
+  fetches: number;
+  bytes: number;
   resolve(v: unknown): void;
   reject(e: Error): void;
   timer: ReturnType<typeof setTimeout>;
@@ -141,8 +147,16 @@ export class SandboxBridge {
     if (!call) return;
     if (m.t === "fetch") {
       const { id, reqId } = m;
-      this.deps.onFetch(call.pluginKey, m.req).then(
-        (res) => this.send({ t: "fetchResult", id, reqId, ok: true, res }),
+      if (++call.fetches > MAX_FETCHES_PER_CALL) {
+        this.send({ t: "fetchResult", id, reqId, ok: false, error: "Fetch budget exceeded", code: "budget" });
+        return;
+      }
+      this.deps.onFetch(call.pluginKey, m.req, () => this.calls.has(id)).then(
+        (res) => {
+          call.bytes += res.body.length;
+          if (call.bytes > MAX_CALL_BYTES) this.send({ t: "fetchResult", id, reqId, ok: false, error: "Byte budget exceeded", code: "budget" });
+          else this.send({ t: "fetchResult", id, reqId, ok: true, res });
+        },
         (e: Error & { code?: string }) =>
           this.send({ t: "fetchResult", id, reqId, ok: false, error: e?.message ?? "fetch failed", code: e?.code ?? "network" }),
       );
@@ -167,7 +181,7 @@ export class SandboxBridge {
     const id = `c${++this.seq}`;
     return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => this.expire(id), timeoutMs);
-      this.calls.set(id, { pluginKey: plugin.key, resolve, reject, timer });
+      this.calls.set(id, { pluginKey: plugin.key, fetches: 0, bytes: 0, resolve, reject, timer });
       this.send({ t: "run", id, key: plugin.key, args, env });
       this.emit();
     });

@@ -34,8 +34,8 @@ const ENV: RunEnv = { tmdbApiKey: "bearoom-proxy", settings: {}, debug: __DEV__ 
 const URLISH = /\bhttps?:\/\/\S+/gi;
 
 export const sandboxBridge = new SandboxBridge({
-  onFetch: async (pluginKey, req) => {
-    const r = await pluginFetch(jarFor(pluginKey), toPluginFetchRequest(req), fetchDeps);
+  onFetch: async (pluginKey, req, alive) => {
+    const r = await pluginFetch(jarFor(pluginKey), toPluginFetchRequest(req), fetchDeps, alive);
     return { status: r.status, url: r.url, redirected: r.redirected, headers: r.headers, body: r.body, encoding: r.encoding };
   },
   // Dev builds only, and never with a URL in it: stream URLs and tokens must not reach any log.

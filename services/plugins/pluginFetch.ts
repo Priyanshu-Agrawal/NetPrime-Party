@@ -49,6 +49,7 @@ export const MAX_HOPS = 5;
 export const REQUEST_TIMEOUT_MS = 8000;
 export const MAX_BODY_BYTES = 20 * 1024 * 1024;
 const TMDB_API_HOST = "api.themoviedb.org";
+const MAX_REQUEST_BODY = 1024 * 1024;
 const METHODS = new Set(["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"]);
 
 const NATIVE_TO_PLUGIN: Record<NativeFetchError["code"], PluginFetchErrorCode> = {
@@ -68,7 +69,13 @@ export function rewriteTmdb(url: URL, proxyBase: string): URL {
   return out;
 }
 
-export async function pluginFetch(jar: CookieJar, req: PluginFetchRequest, deps: PluginFetchDeps): Promise<PluginFetchResponse> {
+/** `alive`: the sandbox call that asked is still running; a request it queued is dropped once it isn't. */
+export async function pluginFetch(
+  jar: CookieJar,
+  req: PluginFetchRequest,
+  deps: PluginFetchDeps,
+  alive?: () => boolean,
+): Promise<PluginFetchResponse> {
   let method = (req.method ?? "GET").toUpperCase();
   let body = req.body;
   let headers = cleanHeaders(req.headers ?? {});
@@ -96,7 +103,8 @@ export async function pluginFetch(jar: CookieJar, req: PluginFetchRequest, deps:
           maxBytes: MAX_BODY_BYTES,
           responseType: req.responseType ?? "text",
         });
-      res = viaProxy ? await exchange() : await deps.limiter.run(registrableDomain(new URL(target).hostname), exchange);
+      if (alive && !alive()) throw new Error("cancelled");
+      res = viaProxy ? await exchange() : await deps.limiter.run(registrableDomain(new URL(target).hostname), exchange, alive);
     } catch (e) {
       if (e instanceof NativeFetchError) throw new PluginFetchError(NATIVE_TO_PLUGIN[e.code], e.message);
       throw new PluginFetchError("network", (e as Error)?.message ?? "fetch failed");
@@ -134,6 +142,7 @@ export function toPluginFetchRequest(v: unknown): PluginFetchRequest {
   if (o.headers && typeof o.headers === "object") {
     for (const [k, val] of Object.entries(o.headers as Record<string, unknown>)) if (typeof val === "string") headers[k] = val;
   }
+  if (typeof o.body === "string" && o.body.length > MAX_REQUEST_BODY) throw new PluginFetchError("bad-request", "Request body over 1 MiB");
   return {
     url: o.url,
     method,

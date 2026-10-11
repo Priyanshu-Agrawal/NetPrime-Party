@@ -1,5 +1,5 @@
 import type { HostFrame } from "./sandbox/protocol";
-import { frameScript, PING_TIMEOUT_MS, READY_TIMEOUT_MS, SandboxBridge } from "./sandboxBridge";
+import { frameScript, MAX_CALL_BYTES, MAX_FETCHES_PER_CALL, PING_TIMEOUT_MS, READY_TIMEOUT_MS, SandboxBridge } from "./sandboxBridge";
 
 const ENV = { tmdbApiKey: "k", settings: {}, debug: false };
 const PLUGIN = { key: "r/p@abc", source: "module.exports = { getStreams: () => [] };" };
@@ -80,13 +80,63 @@ describe("SandboxBridge", () => {
     bridge.onMessage(JSON.stringify({ t: "fetch", id, reqId: 7, req: { url: "https://a.test/" } }));
     bridge.onMessage(JSON.stringify({ t: "fetch", id, reqId: 8, req: { url: "http://10.0.0.1/" } }));
     await jest.advanceTimersByTimeAsync(0);
-    expect(onFetch).toHaveBeenCalledWith(PLUGIN.key, { url: "https://a.test/" });
+    expect(onFetch).toHaveBeenCalledWith(PLUGIN.key, { url: "https://a.test/" }, expect.any(Function));
     expect(framesOf(inject).filter((f) => f.t === "fetchResult")).toEqual([
       { t: "fetchResult", id, reqId: 7, ok: true, res: payload },
       { t: "fetchResult", id, reqId: 8, ok: false, error: "Blocked URL (host)", code: "blocked" },
     ]);
     done(id, { ok: true, result: [] });
     await p;
+  });
+
+  it(`gives one call at most ${MAX_FETCHES_PER_CALL} fetches`, async () => {
+    const payload = { status: 200, url: "u", redirected: false, headers: {}, body: "", encoding: "text" };
+    const onFetch = jest.fn().mockResolvedValue(payload);
+    const { bridge, inject, ready, done } = setup(onFetch);
+    ready();
+    const p = bridge.run(PLUGIN, [], ENV, 60_000);
+    await jest.advanceTimersByTimeAsync(0);
+    const id = runIds(inject)[0];
+    for (let reqId = 1; reqId <= MAX_FETCHES_PER_CALL + 1; reqId++) bridge.onMessage(JSON.stringify({ t: "fetch", id, reqId, req: { url: "https://a.example.net/" } }));
+    await jest.advanceTimersByTimeAsync(0);
+    expect(onFetch).toHaveBeenCalledTimes(MAX_FETCHES_PER_CALL);
+    expect(framesOf(inject).find((f) => f.t === "fetchResult" && f.reqId === MAX_FETCHES_PER_CALL + 1)).toMatchObject({ ok: false, code: "budget" });
+    done(id, { ok: true, result: [] });
+    await p;
+  });
+
+  it("caps the bytes one call's responses can bring in", async () => {
+    const half = { status: 200, url: "u", redirected: false, headers: {}, body: "x".repeat(MAX_CALL_BYTES / 2 + 1), encoding: "text" };
+    const onFetch = jest.fn().mockResolvedValue(half);
+    const { bridge, inject, ready, done } = setup(onFetch);
+    ready();
+    const p = bridge.run(PLUGIN, [], ENV, 60_000);
+    await jest.advanceTimersByTimeAsync(0);
+    const id = runIds(inject)[0];
+    bridge.onMessage(JSON.stringify({ t: "fetch", id, reqId: 1, req: {} }));
+    await jest.advanceTimersByTimeAsync(0);
+    bridge.onMessage(JSON.stringify({ t: "fetch", id, reqId: 2, req: {} }));
+    await jest.advanceTimersByTimeAsync(0);
+    const results = framesOf(inject).filter((f) => f.t === "fetchResult");
+    expect(results.map((f) => (f as { ok: boolean }).ok)).toEqual([true, false]);
+    expect(results[1]).toMatchObject({ code: "budget" });
+    done(id, { ok: true, result: [] });
+    await p;
+  });
+
+  it("tells the fetch layer when the call that asked is gone", async () => {
+    const onFetch = jest.fn(() => new Promise<never>(() => {}));
+    const { bridge, inject, ready, done } = setup(onFetch);
+    ready();
+    const p = bridge.run(PLUGIN, [], ENV, 60_000);
+    await jest.advanceTimersByTimeAsync(0);
+    const id = runIds(inject)[0];
+    bridge.onMessage(JSON.stringify({ t: "fetch", id, reqId: 1, req: {} }));
+    const alive = (onFetch.mock.calls[0] as unknown[])[2] as () => boolean;
+    expect(alive()).toBe(true);
+    done(id, { ok: true, result: [] });
+    await p;
+    expect(alive()).toBe(false);
   });
 
   it("ignores frames for calls it does not know", () => {

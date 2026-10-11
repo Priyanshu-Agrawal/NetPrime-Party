@@ -5,13 +5,18 @@
 export class Limiter {
   private active = new Map<string, number>();
   private total = 0;
-  private queue: { key: string; start: () => void }[] = [];
+  private queue: { key: string; start: () => boolean }[] = [];
 
   constructor(private readonly perKey: number, private readonly overall: number) {}
 
-  run<T>(key: string, task: () => Promise<T>): Promise<T> {
+  /** `alive` is asked when the task's turn comes: a task whose caller is gone is dropped without using a slot. */
+  run<T>(key: string, task: () => Promise<T>, alive?: () => boolean): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const start = () => {
+        if (alive && !alive()) {
+          reject(new Error("cancelled"));
+          return false;
+        }
         this.total++;
         this.active.set(key, (this.active.get(key) ?? 0) + 1);
         task()
@@ -21,6 +26,7 @@ export class Limiter {
             this.active.set(key, (this.active.get(key) ?? 1) - 1);
             this.pump();
           });
+        return true;
       };
       this.queue.push({ key, start });
       this.pump();
@@ -32,7 +38,7 @@ export class Limiter {
       const next = this.queue[i];
       if ((this.active.get(next.key) ?? 0) < this.perKey) {
         this.queue.splice(i, 1);
-        next.start();
+        next.start(); // a dropped task frees nothing; the loop just moves on
       } else i++;
     }
   }

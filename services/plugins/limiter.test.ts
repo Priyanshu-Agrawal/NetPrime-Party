@@ -44,4 +44,19 @@ describe("Limiter", () => {
     await expect(lim.run("k", async () => Promise.reject(new Error("x")))).rejects.toThrow("x");
     await expect(lim.run("k", async () => 8)).resolves.toBe(8);
   });
+
+  it("skips a queued task whose caller is gone, without using a slot", async () => {
+    const lim = new Limiter(1, 1);
+    let open!: () => void;
+    const first = lim.run("k", () => new Promise<void>((r) => (open = r)));
+    let alive = true;
+    const ran = jest.fn(async () => 1);
+    const queued = lim.run("k", ran, () => alive);
+    alive = false;
+    open();
+    await first;
+    await expect(queued).rejects.toThrow("cancelled");
+    expect(ran).not.toHaveBeenCalled();
+    await expect(lim.run("k", async () => 2)).resolves.toBe(2);
+  });
 });
