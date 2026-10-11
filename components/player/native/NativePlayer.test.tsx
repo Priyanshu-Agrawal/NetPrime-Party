@@ -152,6 +152,16 @@ describe("NativePlayer", () => {
     expect(player.play).toHaveBeenCalled();
   });
 
+  it("play after the end replays from the start (ExoPlayer won't restart on play)", () => {
+    const { ref, player, fire } = setup();
+    fire("statusChange", { status: "readyToPlay" });
+    fire("playToEnd");
+    player.play.mockClear();
+    act(() => ref.current!.play());
+    expect(player.replay).toHaveBeenCalled();
+    expect(player.play).not.toHaveBeenCalled();
+  });
+
   it("forwards the first frame", () => {
     const { r, onFirstFrame } = setup();
     act(() => r.root.find((n) => n.props?.testID === "video-view").props.onFirstFrameRender());

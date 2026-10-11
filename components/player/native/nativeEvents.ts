@@ -27,6 +27,7 @@ export class NativeEventMachine {
   private buffered = 0;
   private ready = false;
   private stalled = false;
+  private atEnd = false;
   private seek: PendingSeek | null = null;
 
   constructor(
@@ -43,8 +44,13 @@ export class NativeEventMachine {
   get isBuffering(): boolean {
     return this.stalled;
   }
+  /** Playback reached the end and hasn't been sent anywhere since (a plain play won't restart it). */
+  get ended(): boolean {
+    return this.atEnd;
+  }
 
   setIntent(play: boolean): void {
+    if (play) this.atEnd = false;
     if (play === this.wantPlaying) return;
     this.wantPlaying = play;
     this.out(play ? "play" : "pause");
@@ -81,6 +87,7 @@ export class NativeEventMachine {
   }
 
   onEnded(): void {
+    this.atEnd = true;
     this.wantPlaying = false;
     this.updateStall();
     this.out("ended");
@@ -89,6 +96,7 @@ export class NativeEventMachine {
   /** Starts a seek; resolves with the LANDED position. A newer seek resolves an older one where playback is. */
   beginSeek(target: number): Promise<number> {
     const t = Math.max(0, this.duration > 0 ? Math.min(target, this.duration) : target);
+    this.atEnd = false;
     this.seek?.resolve(this.time);
     this.out("seeking", undefined, t);
     return new Promise((resolve) => {

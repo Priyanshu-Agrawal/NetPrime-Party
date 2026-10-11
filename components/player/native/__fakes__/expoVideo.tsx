@@ -23,6 +23,10 @@ export class FakeVideoPlayer {
   pause = jest.fn(() => {
     this.playing = false;
   });
+  replay = jest.fn(() => {
+    this.currentTime = 0;
+    this.playing = true;
+  });
   replaceAsync = jest.fn(async (source: unknown) => {
     this.source = source;
   });

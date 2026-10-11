@@ -215,8 +215,11 @@ export const NativePlayer = forwardRef<PlayerHandle, NativePlayerProps>(function
     ref,
     (): PlayerHandle => ({
       play: () => {
+        // ExoPlayer stays at the end on play(); replay() starts over (AVPlayer behaves the same through it).
+        const replay = machine.ended;
         machine.setIntent(true);
-        player.play();
+        if (replay) player.replay();
+        else player.play();
       },
       pause: () => {
         machine.setIntent(false);

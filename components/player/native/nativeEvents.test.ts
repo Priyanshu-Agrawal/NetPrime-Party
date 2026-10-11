@@ -101,4 +101,17 @@ describe("NativeEventMachine", () => {
     m.onEnded();
     expect(events[events.length - 1]).toMatchObject({ event: "ended", paused: true });
   });
+
+  it("remembers it ended until playback is sent somewhere else", () => {
+    const { m } = setup();
+    m.onStatus("readyToPlay", 60);
+    m.setIntent(true);
+    m.onEnded();
+    expect(m.ended).toBe(true);
+    void m.beginSeek(10);
+    expect(m.ended).toBe(false);
+    m.onEnded();
+    m.setIntent(true);
+    expect(m.ended).toBe(false);
+  });
 });
