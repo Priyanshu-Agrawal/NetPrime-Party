@@ -418,7 +418,10 @@ we already have.
   guest vs host end to end p50 0.13 s · **p95 0.34 s** · max 0.60 s (gate ≤ 1 s); no provider UI on either.
 * Dead providers skipped silently (vixsrc TV, vidlink, mycineby, 111movies); F4 (`id=99999999`) ends on the branded
   error card with Retry · Try another source.
-* `[ ]` Phone leg (Nothing Phone 1 disconnected) · `[x]` **published 2026-10-11 06:21** — bridge `37f02567` on vidfast, vidnest, vixsrc, vidlink (priorities 1–4), videasy disabled; verified live with the dev switch off (Fight Club → VidFast, our controls, picture).
+* `[x]` Phone leg (2026-10-11 06:55, phone host, emulator + iOS guests, 12 min): iOS p95 **0.45 s**; emulator p95
+  1.12 s (marginal — slow post-seek catch-up on the emulated decoder). It found one more bug, fixed and republished:
+  VidFast resets playback speed after a seek, so a guest couldn't catch up (bridge `677a675f` holds the speed).
+* `[x]` **published 2026-10-11 06:21** — bridge `37f02567` on vidfast, vidnest, vixsrc, vidlink (priorities 1–4), videasy disabled; verified live with the dev switch off (Fight Club → VidFast, our controls, picture).
 
 **Publish plan (after the owner says yes):** scripts for vidfast, vidnest, vixsrc, vidlink only; priority vidfast 1,
 vidnest 2, vixsrc 3, vidlink 4, then plain embeds; no script for mycineby, 111movies (dead), vidcore, vidphantom
@@ -430,3 +433,4 @@ vidnest 2, vixsrc 3, vidlink 4, then plain embeds; no script for mycineby, 111mo
 * Unhandled `party_set_playback: not host` rejection if the host role flips mid-press (silent in release).
 * Player controls have no accessibility labels.
 * Exiting fullscreen on the iOS simulator stays landscape (no tilt sensor) — confirm portrait returns on a phone.
+* After a host scrub a guest lands 2–3 s behind and catches up at 1.1× (~25 s on slow devices) — seek guests slightly ahead or allow a faster catch-up.
