@@ -446,12 +446,16 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                     }}
                     hitSlop={10}
                   >
-                    <Ionicons
-                      name={paused ? "play" : "pause"}
-                      size={ms(32)}
-                      color={colors.onHoney}
-                      style={paused ? { marginLeft: ms(3) } : undefined}
-                    />
+                    {buffering ? (
+                      <ActivityIndicator testID="play-buffering" accessibilityLabel="Buffering" color={colors.onHoney} />
+                    ) : (
+                      <Ionicons
+                        name={paused ? "play" : "pause"}
+                        size={ms(32)}
+                        color={colors.onHoney}
+                        style={paused ? { marginLeft: ms(3) } : undefined}
+                      />
+                    )}
                   </Pressable>
                   <Pressable
                     accessibilityLabel="Forward 10 seconds"
@@ -577,9 +581,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           </View>
         ) : null}
 
-        {/* Buffering spinner — outside the fade, so a stall shows even with the controls hidden. */}
-        {buffering ? (
-          <View style={styles.bufferLayer} pointerEvents="none">
+        {/* Buffering spinner — outside the fade, so a stall shows even with the controls hidden. While they show,
+            the play button carries the spinner instead (one centre element, not two stacked). */}
+        {buffering && (!shown || !canControl) ? (
+          <View testID="buffer-layer" style={styles.bufferLayer} pointerEvents="none">
             <View style={styles.bufferBadge} accessibilityLabel="Buffering">
               <ActivityIndicator color={colors.honeyBright} size="large" />
             </View>

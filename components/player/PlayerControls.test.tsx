@@ -182,6 +182,16 @@ describe("PlayerControls timing", () => {
     expect(glassShown(r)).toBe(false);
   });
 
+  it("while the controls show, the spinner takes the play button's place instead of stacking on it", () => {
+    const ref = React.createRef<PlayerControlsHandle>();
+    const r = render(<PlayerControls ref={ref} {...base} />);
+    act(() => ref.current!.setPlayback({ currentTime: 5, duration: 100, paused: false, readyState: 2 }));
+    act(() => jest.advanceTimersByTime(350));
+    const inButton = r.root.findAll((n) => n.props?.accessibilityLabel === "Buffering" && n.props?.testID === "play-buffering");
+    expect(inButton.length).toBeGreaterThan(0);
+    expect(r.root.findAll((n) => n.props?.testID === "buffer-layer")).toHaveLength(0);
+  });
+
   it("shows the buffering spinner only after a 300 ms stall, and drops it at once", () => {
     const ref = React.createRef<PlayerControlsHandle>();
     const r = render(<PlayerControls ref={ref} {...base} />);
