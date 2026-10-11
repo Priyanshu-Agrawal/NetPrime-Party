@@ -43,8 +43,8 @@ export const sandboxBridge = new SandboxBridge({
 });
 
 /** The host's own fetch (the stream probe): the same per-hop guard and limits, and no plugin's cookies. */
-export function hostFetch(req: PluginFetchRequest) {
-  return pluginFetch(new CookieJar(), req, fetchDeps);
+export function hostFetch(req: PluginFetchRequest, alive?: () => boolean) {
+  return pluginFetch(new CookieJar(), req, fetchDeps, alive);
 }
 
 const registryJar = new CookieJar();

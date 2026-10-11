@@ -1,5 +1,5 @@
 import type { PlaybackCandidate } from "./candidate";
-import { PROBE_BUDGET_MS, probeCandidate, type ProbeFetch, type ProbeResponse } from "./probe";
+import { mergeProbe, PROBE_BUDGET_MS, ProbeCache, probeCandidate, type ProbeFetch, type ProbeResponse } from "./probe";
 
 const cand = (over: Partial<PlaybackCandidate> = {}): PlaybackCandidate => ({
   key: "r/p:k",
@@ -27,7 +27,7 @@ const bin = (bytes: number[] | string, over: Partial<ProbeResponse> = {}): Probe
 
 /** Routes by "url|responseType" first, then by url. */
 function server(routes: Record<string, ProbeResponse | Error | (() => Promise<ProbeResponse>)>) {
-  const calls: { url: string; headers: Record<string, string>; opts: { maxBytes: number; responseType: string } }[] = [];
+  const calls: { url: string; headers: Record<string, string>; opts: { maxBytes: number; responseType: string; alive?: () => boolean } }[] = [];
   const fetch: ProbeFetch = async (url, headers, opts) => {
     calls.push({ url, headers, opts });
     const r = routes[`${url}|${opts.responseType}`] ?? routes[url];
@@ -65,7 +65,7 @@ describe("probeCandidate", () => {
     expect(out).toMatchObject({ verdict: "ok", durationSec: 600, languages: ["hi"], quality: { label: "720p", height: 720 }, container: "hls" });
     expect(calls.map((c) => c.url)).toEqual(["https://a.example.net/x/master.m3u8", "https://a.example.net/x/v/720.m3u8", "https://a.example.net/x/v/seg0.jpg"]);
     expect(calls[2].headers).toEqual({ Referer: "https://r.example.net/", Range: "bytes=0-2047" });
-    expect(calls[2].opts).toEqual({ maxBytes: 4096, responseType: "base64" });
+    expect(calls[2].opts).toMatchObject({ maxBytes: 4096, responseType: "base64" });
   });
 
   it("leaves a live playlist unverified", async () => {
@@ -109,7 +109,7 @@ describe("probeCandidate", () => {
     const out = await probeCandidate(cand({ url: "https://a.example.net/f.mp4", container: "mp4" }), FILM, fetch);
     expect(out).toMatchObject({ verdict: "ok", durationSec: 600, container: "mp4" });
     expect(calls[0].headers.Range).toBe("bytes=0-65535");
-    expect(calls[0].opts).toEqual({ maxBytes: 65536, responseType: "base64" });
+    expect(calls[0].opts).toMatchObject({ maxBytes: 65536, responseType: "base64" });
   });
 
   it("re-reads an extensionless playlist as text", async () => {
@@ -129,11 +129,62 @@ describe("probeCandidate", () => {
     expect(out.platforms).toEqual({ ios: false, android: true });
   });
 
-  it("a network error rejects as unreachable", async () => {
-    await expect(probeCandidate(cand(), FILM, server({ "https://a.example.net/x/master.m3u8": new Error("boom") }).fetch)).resolves.toMatchObject({
-      verdict: "rejected",
-      rejectReason: "unreachable",
-    });
+  it("a passing network error or a busy server is not evidence: the stream stays playable, unverified", async () => {
+    for (const r of [new Error("boom"), text("", { status: 503 }), text("", { status: 429 }), text("", { status: 408 })]) {
+      await expect(probeCandidate(cand(), FILM, server({ "https://a.example.net/x/master.m3u8": r }).fetch)).resolves.toMatchObject({ verdict: "unverified" });
+    }
+  });
+
+  it("a refused private address or a 404 is evidence: rejected", async () => {
+    const blocked = Object.assign(new Error("Blocked URL (host)"), { code: "blocked" });
+    await expect(probeCandidate(cand(), FILM, server({ "https://a.example.net/x/master.m3u8": blocked }).fetch)).resolves.toMatchObject({ verdict: "rejected", rejectReason: "unreachable" });
+    await expect(probeCandidate(cand(), FILM, server({ "https://a.example.net/x/master.m3u8": text("", { status: 404 }) }).fetch)).resolves.toMatchObject({ verdict: "rejected", rejectReason: "unreachable" });
+  });
+
+  it.each([
+    ["a BOM before an HTML page", "\uFEFF<!DOCTYPE html><html><body>login</body></html>"],
+    ["a comment before the page", "<!-- cdn --><html><body>nope</body></html>"],
+    ["XHTML", '<?xml version="1.0"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"></html>'],
+    ["a JSON error", '{"error":"token expired"}'],
+    ["plain text", "Access denied"],
+    ["an empty body", ""],
+  ])("rejects %s where a video should be", async (_, body) => {
+    const url = "https://a.example.net/f.mp4";
+    const out = await probeCandidate(cand({ url, container: "mp4" }), FILM, server({ [url]: bin(body) }).fetch);
+    expect(out).toMatchObject({ verdict: "rejected", rejectReason: "html-body" });
+  });
+
+  it("rejects an HLS segment that is an error message, keeps disguised segments that are real media", async () => {
+    const routes = (seg: ProbeResponse) => ({ "https://a.example.net/x/master.m3u8": text(mediaOf([600])), "https://a.example.net/x/seg0.jpg": seg });
+    expect(await probeCandidate(cand(), FILM, server(routes(bin('{"error":"forbidden"}'))).fetch)).toMatchObject({ verdict: "rejected", rejectReason: "html-body" });
+    expect(await probeCandidate(cand(), FILM, server(routes(bin([0x47, 0x40, 0x11, 0x10]))).fetch)).toMatchObject({ verdict: "ok" }); // MPEG-TS
+    expect(await probeCandidate(cand(), FILM, server(routes(bin([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]))).fetch)).toMatchObject({ verdict: "ok" }); // PNG-wrapped
+  });
+
+  it("reads a namespaced MPD", async () => {
+    const mpd = `<?xml version="1.0"?><mpd:MPD xmlns:mpd="urn:mpeg:dash:schema:mpd:2011" mediaPresentationDuration="PT10M"></mpd:MPD>`;
+    const out = await probeCandidate(cand({ url: "https://a.example.net/m.mpd", container: "dash" }), FILM, server({ "https://a.example.net/m.mpd": text(mpd) }).fetch);
+    expect(out).toMatchObject({ verdict: "ok", container: "dash", durationSec: 600 });
+  });
+
+  it("stops fetching once its budget is over", async () => {
+    jest.useFakeTimers();
+    try {
+      let release!: () => void;
+      const { fetch, calls } = server({
+        "https://a.example.net/x/master.m3u8": () => new Promise<ProbeResponse>((r) => (release = () => r(text(MASTER)))),
+        "https://a.example.net/x/v/720.m3u8": text(mediaOf([600])),
+      });
+      const out = probeCandidate(cand(), FILM, fetch);
+      await jest.advanceTimersByTimeAsync(PROBE_BUDGET_MS);
+      await expect(out).resolves.toMatchObject({ verdict: "unverified" });
+      expect(calls[0].opts.alive?.()).toBe(false);
+      release();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(calls).toHaveLength(1); // the variant was never fetched after the budget ran out
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("running out of time leaves the candidate playable but unverified", async () => {
@@ -153,5 +204,51 @@ describe("probeCandidate", () => {
     const c = cand({ verdict: "rejected", rejectReason: "platform" });
     await expect(probeCandidate(c, FILM, fetch)).resolves.toBe(c);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("mergeProbe", () => {
+  it("keeps the current candidate's identity and takes only what the probe measured", () => {
+    const current = cand({ key: "new-key", label: "New label", languages: ["hi"], headers: { Cookie: "fresh" } });
+    const probed = cand({ key: "old-key", label: "Old label", languages: ["hi", "en"], verdict: "ok", durationSec: 600, container: "hls", quality: { label: "720p", height: 720 }, platforms: { ios: false, android: true } });
+    expect(mergeProbe(current, probed)).toMatchObject({
+      key: "new-key",
+      label: "New label",
+      headers: { Cookie: "fresh" },
+      languages: ["hi", "en"],
+      verdict: "ok",
+      durationSec: 600,
+      quality: { label: "720p", height: 720 },
+      platforms: { ios: false, android: true },
+    });
+  });
+});
+
+describe("ProbeCache", () => {
+  const FILM10 = { kind: "movie" as const, runtimeMin: 10 };
+
+  it("keeps conclusive results for 15 minutes, keyed by URL and title context, and applies them to the current candidate", () => {
+    const t = { now: 0 };
+    const cache = new ProbeCache(() => t.now);
+    const probed = cand({ verdict: "ok", durationSec: 600 });
+    cache.set(probed, FILM10);
+    expect(cache.get(cand({ label: "fresh" }), FILM10)).toMatchObject({ label: "fresh", verdict: "ok", durationSec: 600 });
+    expect(cache.get(cand(), { kind: "movie" })).toBeUndefined(); // no runtime then: the length was never checked
+    expect(cache.get(cand(), { kind: "tv", runtimeMin: 10 })).toBeUndefined();
+    t.now = 15 * 60_000 + 1;
+    expect(cache.get(cand(), FILM10)).toBeUndefined();
+  });
+
+  it("never keeps an inconclusive result", () => {
+    const cache = new ProbeCache(() => 0);
+    cache.set(cand({ verdict: "unverified" }), FILM10);
+    expect(cache.get(cand(), FILM10)).toBeUndefined();
+  });
+
+  it("holds at most 500 entries, oldest out first", () => {
+    const cache = new ProbeCache(() => 0);
+    for (let i = 0; i < 501; i++) cache.set(cand({ url: `https://a.example.net/${i}.m3u8`, verdict: "ok" }), FILM10);
+    expect(cache.get(cand({ url: "https://a.example.net/0.m3u8" }), FILM10)).toBeUndefined();
+    expect(cache.get(cand({ url: "https://a.example.net/500.m3u8" }), FILM10)).toMatchObject({ verdict: "ok" });
   });
 });

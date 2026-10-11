@@ -6,7 +6,21 @@
  */
 import { hasHeader } from "@/services/plugins/urlGuard";
 import type { PlaybackCandidate, RejectReason } from "./candidate";
-import { asciiHead, base64ToBytes, isHls, isMatroska, isMp4, looksLikeHtml, mp4Duration, parseDash, parseHlsMaster, parseHlsMedia } from "./manifests";
+import {
+  asciiHead,
+  base64ToBytes,
+  isDash,
+  isHls,
+  isMatroska,
+  isMediaBytes,
+  isMostlyText,
+  isMp4,
+  looksLikeHtml,
+  mp4Duration,
+  parseDash,
+  parseHlsMaster,
+  parseHlsMedia,
+} from "./manifests";
 
 export interface ProbeResponse {
   status: number;
@@ -19,7 +33,7 @@ export interface ProbeResponse {
 export type ProbeFetch = (
   url: string,
   headers: Record<string, string>,
-  opts: { maxBytes: number; responseType: "text" | "base64" },
+  opts: { maxBytes: number; responseType: "text" | "base64"; alive?: () => boolean },
 ) => Promise<ProbeResponse>;
 
 export interface ProbeContext {
@@ -33,6 +47,11 @@ const PLAYLIST_BYTES = 2 * 1024 * 1024;
 const HEAD_BYTES = 64 * 1024;
 const TOLERANCE_MIN = { movie: 8, tv: 3 } as const;
 
+/** Busy or failing servers say nothing about the stream: try again later rather than reject (only evidence rejects). */
+const transient = (status: number) => status === 408 || status === 429 || status >= 500;
+
+class Inconclusive extends Error {}
+
 const reject = (c: PlaybackCandidate, reason: RejectReason, extra: Partial<PlaybackCandidate> = {}): PlaybackCandidate => ({
   ...c,
   ...extra,
@@ -42,15 +61,47 @@ const reject = (c: PlaybackCandidate, reason: RejectReason, extra: Partial<Playb
 
 export async function probeCandidate(c: PlaybackCandidate, ctx: ProbeContext, fetch: ProbeFetch, budgetMs = PROBE_BUDGET_MS): Promise<PlaybackCandidate> {
   if (c.verdict === "rejected") return c;
+  let live = true;
+  const alive = () => live;
+  // Every request knows whether the probe still wants it: queued ones are dropped once the budget is spent.
+  const guarded: ProbeFetch = async (url, headers, opts) => {
+    if (!live) throw new Inconclusive("out of time");
+    const r = await fetch(url, headers, { ...opts, alive });
+    if (!live) throw new Inconclusive("out of time");
+    if (transient(r.status)) throw new Inconclusive(`HTTP ${r.status}`);
+    return r;
+  };
   let timer: ReturnType<typeof setTimeout> | undefined;
   const outOfTime = new Promise<PlaybackCandidate>((resolve) => {
     timer = setTimeout(() => resolve(c), budgetMs);
   });
   try {
-    return await Promise.race([inspect(c, ctx, fetch).catch(() => reject(c, "unreachable")), outOfTime]);
+    return await Promise.race([
+      inspect(c, ctx, guarded).catch((e: unknown) =>
+        (e as { code?: string })?.code === "blocked" ? reject(c, "unreachable") : c, // a refused address is evidence; anything else isn't
+      ),
+      outOfTime,
+    ]);
   } finally {
+    live = false;
     clearTimeout(timer);
   }
+}
+
+/** A cached probe result applied to a freshly resolved candidate: its identity stays, the measurements come over. */
+export function mergeProbe(current: PlaybackCandidate, probed: PlaybackCandidate): PlaybackCandidate {
+  const languages = [...current.languages];
+  for (const l of probed.languages) if (!languages.includes(l)) languages.push(l);
+  return {
+    ...current,
+    languages,
+    container: probed.container,
+    durationSec: probed.durationSec,
+    platforms: probed.platforms,
+    quality: probed.quality ?? current.quality,
+    verdict: probed.verdict,
+    rejectReason: probed.rejectReason,
+  };
 }
 
 async function inspect(c: PlaybackCandidate, ctx: ProbeContext, fetch: ProbeFetch): Promise<PlaybackCandidate> {
@@ -73,12 +124,12 @@ async function inspect(c: PlaybackCandidate, ctx: ProbeContext, fetch: ProbeFetc
   if (first.encoding === "base64") {
     const bytes = base64ToBytes(first.body);
     const head = asciiHead(bytes);
-    if (isHls(head) || /<MPD[\s>]/.test(head)) {
+    if (isHls(head) || isDash(head)) {
       // A playlist behind an extensionless URL: read it whole, as text.
       first = await fetch(c.url, c.headers, { maxBytes: PLAYLIST_BYTES, responseType: "text" });
       if (first.status >= 400) return reject(c, "unreachable");
-    } else if (looksLikeHtml(head)) {
-      return reject(c, "html-body");
+    } else if (looksLikeHtml(head) || isMostlyText(bytes)) {
+      return reject(c, "html-body"); // a page or an error message where a video should be
     } else if (isMatroska(bytes)) {
       return reject(c, "platform", { container: "unsupported", platforms: { ios: false, android: false } });
     } else {
@@ -111,8 +162,9 @@ async function inspect(c: PlaybackCandidate, ctx: ProbeContext, fetch: ProbeFetc
       if (m.firstSegment) {
         const seg = await fetch(m.firstSegment, { ...c.headers, Range: "bytes=0-2047" }, { maxBytes: 4096, responseType: "base64" });
         if (seg.status >= 400) return reject(c, "unreachable");
-        // Disguised segments (.jpg, .html, no extension) are fine; an actual HTML page is not.
-        if (looksLikeHtml(asciiHead(base64ToBytes(seg.body)))) return reject(c, "html-body");
+        // Disguised segments (.jpg, .html, no extension) are fine; a page or an error message is not.
+        const segBytes = base64ToBytes(seg.body);
+        if (!isMediaBytes(segBytes) && (looksLikeHtml(asciiHead(segBytes)) || isMostlyText(segBytes))) return reject(c, "html-body");
       }
     } else {
       const dash = parseDash(text);
@@ -136,4 +188,35 @@ async function inspect(c: PlaybackCandidate, ctx: ProbeContext, fetch: ProbeFetc
     quality: probedHeight ? { label: `${probedHeight}p`, height: probedHeight } : c.quality,
     verdict: durationSec != null ? "ok" : "unverified",
   };
+}
+
+const CACHE_MS = 15 * 60_000;
+const CACHE_MAX = 500;
+
+/**
+ * Conclusive probe results for 15 minutes (the plugin host's own cache window), keyed by URL and the title context
+ * that judged them. Inconclusive ones (timeouts, busy servers) are never kept, so a blip can't lock a stream out.
+ */
+export class ProbeCache {
+  private entries = new Map<string, { at: number; probed: PlaybackCandidate }>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  private key(c: PlaybackCandidate, ctx: ProbeContext): string {
+    return `${c.url}|${ctx.kind}|${ctx.runtimeMin ?? ""}`;
+  }
+
+  get(c: PlaybackCandidate, ctx: ProbeContext): PlaybackCandidate | undefined {
+    const hit = this.entries.get(this.key(c, ctx));
+    if (!hit || this.now() - hit.at >= CACHE_MS) return undefined;
+    return mergeProbe(c, hit.probed);
+  }
+
+  set(probed: PlaybackCandidate, ctx: ProbeContext): void {
+    if (probed.verdict === "unverified") return;
+    const key = this.key(probed, ctx);
+    this.entries.delete(key);
+    this.entries.set(key, { at: this.now(), probed });
+    if (this.entries.size > CACHE_MAX) this.entries.delete(this.entries.keys().next().value as string);
+  }
 }

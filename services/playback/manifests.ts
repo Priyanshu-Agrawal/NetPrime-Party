@@ -10,8 +10,14 @@ export function isHls(text: string): boolean {
   return /^\s*#EXTM3U/.test(text);
 }
 
+/** An HTML page anywhere near the start (after a BOM, an XML prolog or comments). Check playlists and MPDs first. */
 export function looksLikeHtml(text: string): boolean {
-  return /^\s*(<!doctype html|<html|<head|<body)/i.test(text);
+  return /<(!doctype\s+html|html|head|body|script)[\s>]/i.test(text.replace(/^\uFEFF/, "").slice(0, 1024));
+}
+
+/** A DASH manifest, with or without a namespace prefix (`<mpd:MPD>`). */
+export function isDash(text: string): boolean {
+  return /<(\w+:)?MPD[\s>]/.test(text);
 }
 
 function attr(attrs: string, name: string): string | undefined {
@@ -85,7 +91,7 @@ export function isoDuration(s: string): number | undefined {
 }
 
 export function parseDash(text: string): { durationSec?: number; audioLanguages: string[] } | null {
-  if (!/<MPD[\s>]/.test(text)) return null;
+  if (!isDash(text)) return null;
   const dur = /mediaPresentationDuration="([^"]+)"/.exec(text);
   const audioLanguages: string[] = [];
   for (const m of text.matchAll(/<AdaptationSet\b[^>]*>/g)) {
@@ -104,6 +110,32 @@ export function asciiHead(bytes: Uint8Array, n = 512): string {
 
 export function isMp4(b: Uint8Array): boolean {
   return b.length >= 8 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70; // "ftyp"
+}
+
+const BOXES = new Set(["ftyp", "styp", "moof", "moov", "sidx", "emsg", "mdat", "free"]);
+
+/** Bytes that start like video, audio or an image (disguised segments are often real images up front, or plain TS). */
+export function isMediaBytes(b: Uint8Array): boolean {
+  if (b.length >= 8 && BOXES.has(String.fromCharCode(b[4], b[5], b[6], b[7]))) return true; // MP4 / fMP4
+  if (b[0] === 0x47) return true; // MPEG-TS sync byte
+  if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) return true; // ID3 (packed audio)
+  if (b[0] === 0xff && (b[1] & 0xf6) === 0xf0) return true; // ADTS AAC
+  if (b[0] === 0xff && b[1] === 0xd8) return true; // JPEG
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return true; // PNG
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return true; // GIF
+  return isMatroska(b);
+}
+
+/** Empty, or (nearly) all printable text: an error message, not media. */
+export function isMostlyText(b: Uint8Array): boolean {
+  const n = Math.min(b.length, 512);
+  if (n === 0) return true;
+  let printable = 0;
+  for (let i = 0; i < n; i++) {
+    const c = b[i];
+    if (c === 0x09 || c === 0x0a || c === 0x0d || (c >= 0x20 && c <= 0x7e) || c >= 0xc2) printable++;
+  }
+  return printable / n >= 0.95;
 }
 
 export function isMatroska(b: Uint8Array): boolean {
