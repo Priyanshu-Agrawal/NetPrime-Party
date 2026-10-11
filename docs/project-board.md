@@ -433,4 +433,10 @@ vidnest 2, vixsrc 3, vidlink 4, then plain embeds; no script for mycineby, 111mo
 * Unhandled `party_set_playback: not host` rejection if the host role flips mid-press (silent in release).
 * Player controls have no accessibility labels.
 * Exiting fullscreen on the iOS simulator stays landscape (no tilt sensor) — confirm portrait returns on a phone.
+* **Network finding (2026-10-11 13:00, owner's new Wi-Fi, Jio + IPv6):** every provider binds but never starts —
+  their video servers (Cloudflare) refuse the manifests (VidLink `index_web.mpd` → `ERR_FAILED`/403 on both ISP and
+  1.1.1.1 DNS). The same titles played on the earlier network that morning. Jio DNS also blocks `api.themoviedb.org`
+  (app is unaffected: catalog goes through the worker proxy; posters load from `image.tmdb.org`, reachable on Jio).
+  To check: same test on Airtel mobile data. If Jio users can't stream, tell them up front (no workaround of a
+  provider's blocking).
 * After a host scrub a guest lands 2–3 s behind and catches up at 1.1× (~25 s on slow devices) — seek guests slightly ahead or allow a faster catch-up.
