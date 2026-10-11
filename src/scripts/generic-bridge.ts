@@ -55,7 +55,9 @@ export const GENERIC_BRIDGE: string = `
     GEV.forEach(function(t){ document.addEventListener(t, __g, true); });
   } catch(e){}
 
-  var CHROME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}video{visibility:visible!important}';
+  // The bound video is also forced opaque: some providers fade their own video out while their
+  // (now hidden) UI thinks it hasn't started — VidFast solo plays at opacity 0.
+  var CHROME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}video{visibility:visible!important}video[data-vl-bound]{opacity:1!important}';
   var FRAME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}iframe{visibility:visible!important}';
   var chromeOn = CFG.chromeOff === true;
   function styleEl(){
@@ -135,6 +137,7 @@ export const GENERIC_BRIDGE: string = `
   window.__soloKeepAlive = keepAlive;
   function bind(v){
     if (!v || v === vid) return;
+    try { if (vid) vid.removeAttribute('data-vl-bound'); v.setAttribute('data-vl-bound', ''); } catch(e){}
     vid = v; wasPlaying = !v.paused;
     if (!v.__vlBound){
       v.__vlBound = true;

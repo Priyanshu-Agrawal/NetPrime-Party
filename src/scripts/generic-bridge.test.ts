@@ -80,6 +80,18 @@ describe("generic bridge", () => {
     expect(css()).toBe("");
   });
 
+  it("keeps the bound video opaque when the provider fades it out (VidFast solo sets opacity 0)", () => {
+    load({ chromeOff: true });
+    const first = addVideo(30);
+    jest.advanceTimersByTime(700);
+    const feature = addVideo(8349);
+    jest.advanceTimersByTime(700);
+    const css = document.getElementById("__vlChromeStyle")?.textContent ?? "";
+    expect(css).toContain("video[data-vl-bound]{opacity:1!important}");
+    expect(feature.hasAttribute("data-vl-bound")).toBe(true);
+    expect(first.hasAttribute("data-vl-bound")).toBe(false);
+  });
+
   it("leaves the page alone without a config (older app builds turn chrome-off on after bind)", () => {
     (window as any).__vlCfg = undefined;
     posted = [];
