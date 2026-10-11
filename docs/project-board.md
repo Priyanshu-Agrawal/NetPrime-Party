@@ -714,3 +714,45 @@ Plan `docs/superpowers/plans/2026-10-11-phase2b2-native-lane.md` · branch `feat
   - A title handed to the web lane stays there for its next episodes.
   - Settings carry across a per-stream remount instead of an in-place swap, because expo-video 57 builds a new native player for any new source.
   - On iPhone, a back press in landscape closes without the "Stop watching?" confirm. BearAlert's Modal is portrait-only and off-limits to me; it needs the owner's OK for a one-line fix.
+
+## `[x]` Phase 2C — language before Play (2026-10-12)
+
+Plan `docs/superpowers/plans/2026-10-12-phase2c-title-language.md` · branch `feat/phase2c-title-language`. Spec §6.1.
+
+- **What the title page does now:** 600 ms after a title page opens, a probe-free preview asks the plugins which streams exist; no request reaches a stream host. Play then reads one of:
+  - **"Play in Hindi"**, with an **"Other languages"** chip that opens inline; a pick is remembered for the title, and the native player uses it;
+  - **"Play"** + "Hindi not available for this title", said only after every plugin answered and found other languages;
+  - **"Play"** + "Checking languages…" meanwhile.
+
+  Play is never blocked.
+- **Gates:** the `pluginHost` + `nativeLane` flags and BearoomFetch must be on. The preview doesn't run offline, with data saver on, or on a metered network unless **More → Playback & data → Check languages on mobile data** is on (default off; the row used to say "coming soon").
+- **Seeding Play:** the preview's streams sit in the plugin host's 15-minute cache. A second request for the same title now joins plugins already running, so Play pressed mid-preview doesn't run them twice.
+- **Gate — Nothing Phone 1:**
+  - The phone's Wi-Fi is metered to Android (a hotspot), so the preview correctly stayed off until the setting was turned on.
+  - Then Big Buck Bunny showed "Checking languages…" about 1 s after arriving, and "Hindi not available for this title" about 2.5 s later.
+  - **Play → first frame in 1.3 s** (`/report` ttff 1306 ms, against 6053 ms cold without the preview).
+  - Fight Club stays plain Play with no note.
+- **Gate — iOS 27 simulator:** Big Buck Bunny shows "Checking languages…" and then the note.
+- **Found on the devices:** the note's arrival pushed the page down a line. The row now keeps its line while the preview can still speak.
+- **Final review (Opus) → ready with fixes; all fixed test-first:**
+  - C1: a multi-audio stream counted only for its first language, so "Tamil + Hindi" made the page say Hindi wasn't available.
+  - I1: a failed plugin counted as having answered.
+  - I2: with more than 12 plugins, Play pressed mid-preview ran the queued ones twice.
+  - I3: the label could name a language Play wouldn't use. A pick followed a reused screen to the next title, and a language the player stored wasn't re-read.
+  - I4: browsing several titles stacked every page's plugin runs, and their timeouts marked sources down. Now:
+    - one preview runs at a time across the app;
+    - a page that has gone is skipped;
+    - preview failures don't count against a source;
+    - only the page in view previews.
+  - Graded up:
+    - coming back to the page no longer re-asks or flickers;
+    - NetInfo's first "unknown" no longer counts as unmetered;
+    - stale details from the previous title are ignored.
+  - Re-checked on the phone: the note stays put when you come back from the player.
+  - Minors are deferred in BACKLOG.
+- **Rulings:**
+  - No probing in the preview.
+  - No note without native candidates: web providers' languages are unknown.
+  - Inline chips rather than a sheet.
+  - Unlabelled streams don't silence the note, consistent with the player's own notice; the owner may want both changed.
+- **Phone setting:** "Check languages on mobile data" is back **off**. The owner's Wi-Fi is metered to Android, so on that network title pages won't check languages unless they turn it on.
