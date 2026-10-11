@@ -45,6 +45,8 @@ import {
   type MediaRef,
 } from "./providerRegistry";
 import { hijackCapabilities, isBindableOn, type BridgeCaps, type OS } from "./capabilities";
+import { WALL_WATCH_JS, relayInjectJs, relayListenerJs as buildRelayListenerJs, sessionNonces } from "./frameScripts";
+import { loadingCoverVisible } from "./loadingCover";
 import type {
   FatalError,
   MediaTrack,
@@ -106,43 +108,9 @@ const OS_NAME: OS = Platform.OS === "ios" ? "ios" : "android";
  *  (we DON'T unmount — the finder keeps polling, so a slow provider still binds). */
 const BIND_TIMEOUT_MS = 30000;
 
-// Relay fan-out snippet (shared by the injector + the per-frame listener). Posts a
-// payload to every CHILD browsing context via window.frames — which, unlike
-// document.querySelectorAll('iframe'), reaches frames nested inside a shadow root
-// (where videasy mounts its cross-origin <video> frame). Substitute the var name for
-// RELAY_MSG. window.frames is a strict superset of the light-DOM iframe list, so it is
-// used ALONE — fanning via both would double-deliver and blow up exponentially with
-// each frame's re-broadcast.
-const RELAY_FAN_JS =
-  "try{for(var _i=0;_i<window.frames.length;_i++){try{window.frames[_i].postMessage(RELAY_MSG,'*');}catch(_e){}}}catch(_e){}";
-
 // The injection bridge is no longer bundled in the binary — it is served OTA
 // (worker /scripts) and cached in MMKV. Source of truth: src/scripts/legacy-videasy.ts
 // (uploaded via scripts/upload-bridge.ts). Injected per-provider in the WebView below.
-
-// Not-found wall watcher — a SMALL, BUNDLED (non-OTA) scanner injected alongside the
-// bridge. Providers answer "no such title" with an HTTP-200 branded wall (e.g. videasy's
-// "We couldn't find that / We have searched through our providers…"), so no <video> ever
-// binds and no HTTP error fires — the player would otherwise just spin, then reveal that
-// raw wall. This polls the page text for the wall signature (ONLY while no <video>
-// exists, so it can't fire over a playing-but-unbound frame) and posts a nonce-stamped
-// `notFound`, letting the host show its OWN skinned overlay instead of the raw wall.
-// Injected into every frame (the wall may live in a provider sub-frame) and captures the
-// nonce synchronously BEFORE the bridge deletes window.__vlMsgNonce (bridge runs next).
-const WALL_WATCH_JS = `(function(){try{
-var N=window.__vlMsgNonce;
-if(window.__vlWall)return;window.__vlWall=1;
-var S=["couldn't find that","couldnt find that","could not find that","we couldn't find","we could not find","searched through"];
-var n=0;
-var iv=setInterval(function(){
-n++;
-try{if(document.getElementsByTagName('video').length){clearInterval(iv);return;}}catch(e){}
-var t='';try{t=((document.body&&(document.body.innerText||document.body.textContent))||'').toLowerCase();}catch(e){}
-for(var i=0;i<S.length;i++){if(t.indexOf(S[i])!==-1){clearInterval(iv);
-try{window.ReactNativeWebView.postMessage(JSON.stringify({event:'notFound',__n:N}));}catch(e){}return;}}
-if(n>=40)clearInterval(iv);
-},1000);
-}catch(e){}})();`;
 
 export const HijackPlayer = forwardRef<PlayerHandle, Props>(
   (
@@ -185,6 +153,8 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     const nonceStrictRef = useRef(false);
     const [bound, setBound] = useState(false);
     const [slow, setSlow] = useState(false);
+    // The page finished loading — lifts the cover over a plain embed (it never binds).
+    const [pageLoaded, setPageLoaded] = useState(false);
     // A provider "we couldn't find that" wall (detected by WALL_WATCH_JS) — no <video>
     // will ever bind, so we show our own skinned "no stream" overlay instead of leaving
     // the spinner up forever / revealing the raw provider wall.
@@ -296,6 +266,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // a stable callback so the WebView onLoad/onLoadStart stay lean.
     const handleLoadEnd = useCallback(() => {
       if (erroredThisLoadRef.current) return; // this load was an error page, not a recovery
+      setPageLoaded(true);
       setFatalError(null);
       if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
       stableTimerRef.current = setTimeout(() => {
@@ -346,36 +317,18 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
     // injectedJavaScriptBeforeContentLoadedForMainFrameOnly={false}) because on iOS
     // videasy renders its <video> in a cross-origin sub-frame. But injectJavaScript
     // only reaches the MAIN frame, so bridge COMMANDS must be relayed down to every
-    // descendant frame via postMessage. A per-mount nonce gates the relay so page/ad
-    // scripts can't drive the bridge (also mitigates the message-spoofing concern).
-    const relayNonce = useMemo(
-      () => Math.random().toString(36).slice(2) + Date.now().toString(36),
-      [],
-    );
-    // Appended to the injected bridge (runs in each frame): eval relayed code if the
-    // nonce matches, then re-broadcast to this frame's own children (handles nesting).
-    const relayListenerJs = useMemo(
-      () =>
-        `;(function(){try{if(window.__vlRelayI)return;window.__vlRelayI=1;` +
-        `window.addEventListener('message',function(e){var d=e&&e.data;` +
-        `if(d&&d.__vlEval&&d.__vlN===${JSON.stringify(relayNonce)}){` +
-        `try{(0,eval)(d.__vlEval);}catch(_){}` +
-        RELAY_FAN_JS.replace("RELAY_MSG", "d") +
-        `}});}catch(_){}})();`,
-      [relayNonce],
-    );
+    // descendant frame via postMessage. Two per-mount secrets: `relay` gates relayed code
+    // (frames take it only from their parent), `msg` authenticates bridge messages and is
+    // never sent over postMessage, so an ad frame that reads the relay can't spoof events.
+    const nonces = useMemo(sessionNonces, []);
+    // Appended to the injected bridge (runs in each frame) — see frameScripts.ts.
+    const relayListenerJs = useMemo(() => buildRelayListenerJs(nonces.relay), [nonces]);
     // Run `code` in the main frame AND fan it out to all descendant frames.
     const relayInject = useCallback(
       (code: string) => {
-        const payload = JSON.stringify({ __vlEval: code, __vlN: relayNonce });
-        webRef.current?.injectJavaScript(
-          `(function(){var P=${payload};` +
-            `try{(0,eval)(P.__vlEval);}catch(e){}` +
-            RELAY_FAN_JS.replace("RELAY_MSG", "P") +
-            `})();true;`,
-        );
+        webRef.current?.injectJavaScript(relayInjectJs(code, nonces.relay));
       },
-      [relayNonce],
+      [nonces],
     );
 
     const cmd = useCallback(
@@ -534,6 +487,9 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
       setSlow(false);
       setNoSource(false);
       setBannerRetired(false);
+      setPageLoaded(false);
+      // A plain embed never binds: no "still syncing" banner, no move-on (its own page is the player).
+      if (!bindable) return;
       const t = setTimeout(() => {
         if (!boundRef.current) {
           setSlow(true);
@@ -575,7 +531,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         // without it is an embed-page/ad script spoof and is dropped. Before the first
         // nonced message (older bridge, or startup) we stay permissive so playback
         // isn't broken by a not-yet-redeployed bridge.
-        if (e.__n === relayNonce) nonceStrictRef.current = true;
+        if (e.__n === nonces.msg) nonceStrictRef.current = true;
         else if (nonceStrictRef.current) return;
         // Provider not-found wall (WALL_WATCH_JS): no <video> will ever bind, so surface
         // our own skinned "no stream" overlay. Ignore once a real video has bound.
@@ -610,7 +566,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
         if (e.event === "subs" && e.subs) subsRef.current = e.subs;
         onPlayerEvent?.(e);
       },
-      [onPlayerEvent, onBound, relayNonce],
+      [onPlayerEvent, onBound, nonces],
     );
 
     if (!provider) {
@@ -653,7 +609,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             // H3 prologue FIRST: publish the per-session nonce so the bridge (next)
             // can capture + delete it at documentStart, before any page/ad script
             // runs. Then the cached bridge, then the command-relay listener.
-            `;window.__vlMsgNonce=${JSON.stringify(relayNonce)};` +
+            `;window.__vlMsgNonce=${JSON.stringify(nonces.msg)};` +
             bridgeCfgJs +
             WALL_WATCH_JS +
             bridgeScript +
@@ -705,7 +661,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             The blurred poster uses expo-image's STATIC blurRadius (a Glide/CoreImage
             transform, NOT a live backdrop capture) — safe over the player, and it
             unmounts before the video plays, so it never touches the stutter rule. */}
-        {!bound && !slow && !noSource && !fatalError && (
+        {loadingCoverVisible({ bindable, bound, slow, noSource, fatal: !!fatalError, pageLoaded }) && (
           // Cover lifts on BIND (the bridge found the <video> — the proven, reliable,
           // cross-platform signal), NOT on a fragile "first painted frame" signal that
           // could leave the video masked behind "Loading" forever. Also lifts once the

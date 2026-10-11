@@ -1,5 +1,13 @@
 import type { Provider } from "./providerRegistry";
-import { isStalledStart, nextBindableProvider, pickInitialProvider } from "./providerPick";
+import {
+  countsAsProgress,
+  decideMoveOn,
+  isFeatureAfterAd,
+  isStalledStart,
+  nextBindableProvider,
+  onBindAction,
+  pickInitialProvider,
+} from "./providerPick";
 
 const prov = (id: string, bind: "both" | "ios" | "none"): Provider => ({
   id,
@@ -64,5 +72,67 @@ describe("isStalledStart", () => {
   });
   it("gives a fresh play intent the full window", () => {
     expect(isStalledStart({ playIntentAt: 20_000, lastProgressAt: null, now: 30_000 })).toBe(false);
+  });
+});
+
+describe("decideMoveOn", () => {
+  const vf = list[1];
+  const live = { os: "android" as const, reason: "bind" as const, playbackStarted: false, focused: true };
+
+  it("moves to the next provider our skin can bind", () => {
+    expect(decideMoveOn(list, list[0], new Set(), live)).toEqual({ kind: "next", provider: vf });
+  });
+  it("never moves away from a plain embed (it can't bind, so the user sees its own page)", () => {
+    expect(decideMoveOn(list, list[3], new Set(), live)).toEqual({ kind: "stay" });
+  });
+  it("keeps a source that crashed after playback started, so it can be retried in place", () => {
+    expect(decideMoveOn(list, vf, new Set(), { ...live, reason: "fatal", playbackStarted: true })).toEqual({
+      kind: "stay",
+    });
+  });
+  it("moves on from a source that crashed before anything played", () => {
+    expect(decideMoveOn(list, list[0], new Set(), { ...live, reason: "fatal" })).toEqual({
+      kind: "next",
+      provider: vf,
+    });
+  });
+  it("does nothing while the player is hidden behind another screen", () => {
+    expect(decideMoveOn(list, list[0], new Set(), { ...live, focused: false })).toEqual({ kind: "stay" });
+  });
+  it("says so when no bindable provider is left", () => {
+    expect(decideMoveOn(list, vf, new Set(["dead"]), live)).toEqual({ kind: "exhausted" });
+  });
+});
+
+describe("countsAsProgress", () => {
+  const tick = (currentTime: number, paused = false) => ({ event: "tick" as const, currentTime, paused });
+  it("counts a playing video's ticks", () => {
+    expect(countsAsProgress(10, tick(11))).toBe(true);
+  });
+  it("ignores a position jump while paused (a provider's own resume, or ours)", () => {
+    expect(countsAsProgress(0, tick(2400, true))).toBe(false);
+  });
+  it("ignores a jump bigger than one tick (a seek, not playback)", () => {
+    expect(countsAsProgress(0, tick(2400))).toBe(false);
+  });
+  it("only counts ticks", () => {
+    expect(countsAsProgress(10, { event: "playing" as const, currentTime: 11, paused: false })).toBe(false);
+  });
+});
+
+describe("isFeatureAfterAd", () => {
+  it("is true when a much longer video replaces the bound one", () => {
+    expect(isFeatureAfterAd(30, 8349)).toBe(true);
+  });
+  it("is false for a same-length swap (quality change) or an unknown previous length", () => {
+    expect(isFeatureAfterAd(8349, 8349)).toBe(false);
+    expect(isFeatureAfterAd(0, 8349)).toBe(false);
+  });
+});
+
+describe("onBindAction", () => {
+  it("starts playback on bind only while the player is on screen", () => {
+    expect(onBindAction({ focused: true })).toBe("play");
+    expect(onBindAction({ focused: false })).toBe("pause");
   });
 });

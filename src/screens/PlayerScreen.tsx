@@ -34,9 +34,14 @@ import {
   recordProviderFailure,
 } from "@/utils/failureMemory";
 import {
+  countsAsProgress,
+  decideMoveOn,
+  isFeatureAfterAd,
   isStalledStart,
   nextBindableProvider,
+  onBindAction,
   pickInitialProvider as pickProvider,
+  type MoveOnReason,
 } from "@/components/player/providerPick";
 import type { BridgeCaps, OS } from "@/components/player/capabilities";
 import type { SubtitleTrack } from "@/components/player/types";
@@ -163,6 +168,8 @@ export const PlayerScreen: React.FC = () => {
   const triedRef = useRef<Set<string>>(new Set());
   const playIntentAtRef = useRef<number | null>(null);
   const progressAtRef = useRef<number | null>(null);
+  // Last known length of the bound <video>, to spot the feature replacing a pre-roll ad.
+  const boundDurationRef = useRef(0);
   const [autoplayNext, setAutoplayNextState] = useState(getAutoplayNext); // TV "autoplay next episode" pref
   const [fullscreen, setFullscreen] = useState(false);
   const { isLandscapeMobile } = useResponsive();
@@ -191,6 +198,7 @@ export const PlayerScreen: React.FC = () => {
     setSubtitles([]);
     playIntentAtRef.current = null;
     progressAtRef.current = null;
+    boundDurationRef.current = 0;
     sessionStarted.current = false;
     initialOutcomeRef.current = false; // new provider session → allow one initial report
     stallReportedRef.current = false; // ...and one independent mid-stream stall report
@@ -243,7 +251,7 @@ export const PlayerScreen: React.FC = () => {
         initialOutcomeRef.current = true;
         report("no_bind", { timeToFailMs: 25000 });
       }
-      if (!moveOn()) triggerFallback();
+      if (!moveOn("bind")) triggerFallback();
     }, 25000);
     return () => {
       clearTimeout(soft);
@@ -260,7 +268,7 @@ export const PlayerScreen: React.FC = () => {
       if (!focusedRef.current || progressAtRef.current != null) return;
       if (isStalledStart({ playIntentAt: playIntentAtRef.current, lastProgressAt: null, now: Date.now() })) {
         clearInterval(iv);
-        if (!moveOn()) setFallbackBanner(true);
+        if (!moveOn("stall")) setFallbackBanner(true);
       }
     }, 5000);
     return () => clearInterval(iv);
@@ -374,19 +382,29 @@ export const PlayerScreen: React.FC = () => {
   /**
    * Solo bind-or-move-on: a provider that won't bind (or binds but never starts) is
    * skipped silently — the loading cover stays up — while another bindable provider
-   * remains for this title. Returns false when none is left, so the caller can fall
-   * back to today's picker / provider page.
+   * remains for this title. Rules in providerPick.decideMoveOn (stays on a plain embed,
+   * after a crash mid-playback, and while hidden behind another screen). Returns false
+   * when none is left, so the caller can fall back to today's picker / provider page.
    */
-  const moveOn = useCallback((): boolean => {
-    if (!selected || triedRef.current.has(selected.id)) return false;
-    triedRef.current.add(selected.id);
-    recordProviderFailure(mediaKey(media), selected.id);
-    if (__DEV__) logBind(selected.id, false, mountTsRef.current);
-    const next = nextBindableProvider(providers, selected.id, triedRef.current, OS_NAME);
-    if (!next) return false;
-    setSelected(next);
-    return true;
-  }, [selected, media, providers]);
+  const moveOn = useCallback(
+    (reason: MoveOnReason): boolean => {
+      if (!selected || triedRef.current.has(selected.id)) return false;
+      const d = decideMoveOn(providers, selected, triedRef.current, {
+        os: OS_NAME,
+        reason,
+        playbackStarted: progressAtRef.current != null,
+        focused: focusedRef.current,
+      });
+      if (d.kind === "stay") return true;
+      triedRef.current.add(selected.id);
+      recordProviderFailure(mediaKey(media), selected.id);
+      if (__DEV__) logBind(selected.id, false, mountTsRef.current);
+      if (d.kind === "exhausted") return false;
+      setSelected(d.provider);
+      return true;
+    },
+    [selected, media, providers],
+  );
   const hasNextBindable = useMemo(
     () =>
       selected
@@ -423,9 +441,10 @@ export const PlayerScreen: React.FC = () => {
           timeToFailMs: Date.now() - mountTsRef.current,
         });
       }
-      // Solo: a provider whose page failed is skipped like one that won't bind; the
-      // error card (Retry · Try another source) shows only when none is left.
-      moveOn();
+      // Solo: a provider whose page failed before playback started is skipped like one
+      // that won't bind; the error card (Retry · Try another source) shows when none is
+      // left, or when it crashed mid-playback (retry that source in place).
+      moveOn("fatal");
     },
     [report, selected, media, moveOn],
   );
@@ -500,10 +519,17 @@ export const PlayerScreen: React.FC = () => {
         playerRef.current?.seek(rs.at);
       }
     }
+    // The feature replacing a pre-roll ad: the ad's progress doesn't count for the film.
+    const dur = Number(e.duration) || 0;
+    if (e.event === "ready" && isFeatureAfterAd(boundDurationRef.current, dur)) {
+      progressAtRef.current = null;
+      if (playIntentAtRef.current != null) playIntentAtRef.current = Date.now();
+    }
+    if (dur > 0) boundDurationRef.current = dur;
     // Track real playback progress for stall detection + play-intent.
     const t = Number(e.currentTime) || 0;
-    if (t > posRef.current + 0.25) {
-      lastProgressTsRef.current = Date.now();
+    if (t > posRef.current + 0.25) lastProgressTsRef.current = Date.now();
+    if (countsAsProgress(posRef.current, e)) {
       if (__DEV__ && progressAtRef.current == null && selected) logBind(selected.id, true, mountTsRef.current, "playing");
       progressAtRef.current = Date.now();
     }
@@ -693,15 +719,20 @@ export const PlayerScreen: React.FC = () => {
                 onPlayerEvent={onEvent}
                 onBound={() => {
                   setPlayerBound(true);
+                  if (__DEV__) logBind(selected.id, true, mountTsRef.current);
+                  // Bound behind another screen (a party pushed on top): stay paused.
+                  if (onBindAction({ focused: focusedRef.current }) === "pause") {
+                    playerRef.current?.pause();
+                    return;
+                  }
                   // The user pressed Play on the title: start as soon as we can drive the
                   // video (some providers bind paused, e.g. TV episodes). That makes binding
                   // the play intent — a bound provider that never advances is skipped.
                   playIntentAtRef.current ??= Date.now();
                   playerRef.current?.play();
-                  if (__DEV__) logBind(selected.id, true, mountTsRef.current);
                 }}
                 onBindFailed={() => {
-                  moveOn();
+                  moveOn("bind");
                 }}
                 revealProviderUiOnBindFail={!hasNextBindable}
                 onFatalError={onFatalError}

@@ -43,3 +43,52 @@ export function isStalledStart(
   if (s.now - s.playIntentAt < windowMs) return false;
   return s.lastProgressAt == null || s.now - s.lastProgressAt >= windowMs;
 }
+
+export type MoveOnReason = "bind" | "stall" | "fatal";
+export type MoveOnDecision = { kind: "stay" } | { kind: "next"; provider: Provider } | { kind: "exhausted" };
+
+/**
+ * What to do when the current provider didn't bind, never started, or its page failed.
+ * Stay put while the player is hidden behind another screen (a party pushed on top), on a
+ * plain embed (it can't bind, so its own page is what the user picked), and after a crash
+ * once playback had started (retry that source in place rather than restart elsewhere).
+ * Otherwise move to the next untried bindable provider, or report that none is left.
+ */
+export function decideMoveOn(
+  list: Provider[],
+  current: Provider,
+  tried: Set<string>,
+  o: { os: OS; reason: MoveOnReason; playbackStarted: boolean; focused: boolean },
+): MoveOnDecision {
+  if (!o.focused || !isBindableOn(current, o.os)) return { kind: "stay" };
+  if (o.reason === "fatal" && o.playbackStarted) return { kind: "stay" };
+  const next = nextBindableProvider(list, current.id, new Set([...tried, current.id]), o.os);
+  return next ? { kind: "next", provider: next } : { kind: "exhausted" };
+}
+
+/**
+ * Real playback progress, for the stalled-start rule: a tick of a playing video that
+ * advanced by about one tick. A jump while paused (a provider resuming its own saved
+ * position, or our resume seek) or a seek-sized jump says nothing about the stream.
+ */
+export function countsAsProgress(
+  prevTime: number,
+  e: { event: string; currentTime?: number; paused?: boolean },
+): boolean {
+  if (e.event !== "tick" || e.paused) return false;
+  const d = (Number(e.currentTime) || 0) - prevTime;
+  return d > 0.25 && d < 5;
+}
+
+/**
+ * A rebind to a much longer video means the feature replaced a pre-roll ad, so the ad's
+ * progress says nothing about the film and the stalled-start watch starts over.
+ */
+export function isFeatureAfterAd(prevDuration: number, nextDuration: number): boolean {
+  return prevDuration > 0 && nextDuration > prevDuration * 1.5;
+}
+
+/** Start playback when the video binds — unless the player is hidden behind another screen. */
+export function onBindAction(o: { focused: boolean }): "play" | "pause" {
+  return o.focused ? "play" : "pause";
+}
