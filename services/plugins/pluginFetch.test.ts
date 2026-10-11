@@ -159,6 +159,16 @@ describe("pluginFetch", () => {
     expect(seen).toHaveLength(0);
   });
 
+  it("lets the host (never a plugin) read just the start of a body", async () => {
+    const { seen, jar, deps } = setup({ "https://a.example.net/big": res({ truncated: true, body: "head" }) });
+    await expect(pluginFetch(jar, { url: "https://a.example.net/big", maxBytes: 4096, truncate: true }, deps)).resolves.toMatchObject({
+      body: "head",
+      truncated: true,
+    });
+    expect(seen[0].maxBytes).toBe(4096);
+    expect(toPluginFetchRequest({ url: "https://a.example.net/", maxBytes: 1, truncate: true })).not.toHaveProperty("truncate");
+  });
+
   it("refuses bodies over 20 MiB", async () => {
     const { jar, deps } = setup({ "https://a.example.net/big": res({ truncated: true }) });
     await expect(pluginFetch(jar, { url: "https://a.example.net/big" }, deps)).rejects.toMatchObject({ code: "too-large" });

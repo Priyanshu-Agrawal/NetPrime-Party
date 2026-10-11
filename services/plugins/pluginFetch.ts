@@ -15,6 +15,10 @@ export interface PluginFetchRequest {
   body?: string;
   redirect?: "follow" | "manual" | "error";
   responseType?: "text" | "base64";
+  /** Host-only (the probe): read at most this much. Never set from a worker — see toPluginFetchRequest. */
+  maxBytes?: number;
+  /** Host-only: hand back a cut-off body instead of failing. */
+  truncate?: boolean;
 }
 
 export interface PluginFetchResponse {
@@ -25,6 +29,7 @@ export interface PluginFetchResponse {
   body: string;
   encoding: "text" | "base64";
   sha256: string;
+  truncated: boolean;
 }
 
 export type PluginFetchErrorCode = "blocked" | "timeout" | "network" | "too-large" | "redirects" | "bad-request";
@@ -101,7 +106,7 @@ export async function pluginFetch(
           headers: send,
           body,
           timeoutMs: REQUEST_TIMEOUT_MS,
-          maxBytes: MAX_BODY_BYTES,
+          maxBytes: req.maxBytes ?? MAX_BODY_BYTES,
           responseType: req.responseType ?? "text",
         });
       if (alive && !alive()) throw new Error("cancelled");
@@ -110,12 +115,21 @@ export async function pluginFetch(
       if (e instanceof NativeFetchError) throw new PluginFetchError(NATIVE_TO_PLUGIN[e.code], e.message);
       throw new PluginFetchError("network", (e as Error)?.message ?? "fetch failed");
     }
-    if (res.truncated) throw new PluginFetchError("too-large", "Response over 20 MiB");
+    if (res.truncated && !req.truncate) throw new PluginFetchError("too-large", "Response over 20 MiB");
     jar.store(res.cookies);
     const location = res.headers.location;
     const isRedirect = res.status >= 300 && res.status < 400 && res.status !== 304 && !!location;
     if (!isRedirect || req.redirect === "manual") {
-      return { status: res.status, url: current, redirected: hop > 0, headers: res.headers, body: res.body, encoding: res.encoding, sha256: res.sha256 };
+      return {
+        status: res.status,
+        url: current,
+        redirected: hop > 0,
+        headers: res.headers,
+        body: res.body,
+        encoding: res.encoding,
+        sha256: res.sha256,
+        truncated: res.truncated,
+      };
     }
     if (req.redirect === "error") throw new PluginFetchError("redirects", "Redirect not allowed");
     const next = new URL(location, current).toString();
