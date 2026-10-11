@@ -84,6 +84,7 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 | Glass over video (Android) | DEFERRED → Phase 1B | Live blur over the native player once it renders into a `TextureView`; WebView backdrops are banned (36–50 % janky / black when scaled). |
 | Glass: low-end Android check | DEFERRED | Bar blur on a weak Android 12+ device (gate is already API 31+ and bars-only). |
 | Party playback jank | OPEN | 10–52 % janky frames (~33 fps drawn, p99 15–20 ms) with no blur over the video, 2026-10-11 — investigate separately. |
+| Details error state has no way back | OPEN | "fetch failed: Fetch request has been canceled" full-screen text with no back button (seen 2026-10-11 on a flaky network). |
 | Home scroll animation frames | OPEN | 50–67 ms frames inside main-thread animation callbacks while scrolling Home (pre-existing, not glass). |
 
 ## H. Atmospheric background
