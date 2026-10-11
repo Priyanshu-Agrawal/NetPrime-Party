@@ -14,6 +14,7 @@ enum PrefKey {
   Quality = "pref.quality",
   PersonalRecs = "pref.personalRecs",
   SubtitleSize = "pref.subtitleSize",
+  PreviewOnMetered = "pref.previewOnMetered",
 }
 
 export function hasOnboarded(): boolean {
@@ -37,6 +38,14 @@ export function getDataSaver(): boolean {
 }
 export function setDataSaver(v: boolean): void {
   storage.set(PrefKey.DataSaver, v);
+}
+
+/** Let title pages check a film's languages on mobile (metered) data too (default off — spec §6.1). */
+export function getPreviewOnMetered(): boolean {
+  return storage.getBoolean(PrefKey.PreviewOnMetered) ?? false;
+}
+export function setPreviewOnMetered(v: boolean): void {
+  storage.set(PrefKey.PreviewOnMetered, v);
 }
 
 /** Show the personalized "Because you've been watching" home rail (default on). */
