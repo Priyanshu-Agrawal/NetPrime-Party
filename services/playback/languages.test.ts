@@ -8,7 +8,13 @@ describe("textLanguages", () => {
     ["English, Hindi", ["en", "hi"]],
     ["HIN AAC 2.0", ["hi"]],
     ["Español Latino", ["es"]],
-    ["Japanese (jpn) + English subs", ["ja", "en"]],
+    ["Japanese (jpn) + English subs", ["ja"]],
+    ["Tamil + Hindi Subs", ["ta"]],
+    ["Korean • English Subtitles", ["ko"]],
+    ["Hindi ESub", ["hi"]],
+    ["ENG-SUB Korean", ["ko"]],
+    ["Subs: English | Hindi Dub", ["hi"]],
+    ["Hindi Soft Subs + Tamil", ["ta"]],
   ])("%s → %j", (text, want) => expect(textLanguages(text)).toEqual(want));
 
   it("reads native-script names", () => {
@@ -16,7 +22,7 @@ describe("textLanguages", () => {
     expect(textLanguages("தமிழ்")).toEqual(["ta"]);
   });
 
-  it.each(["this is fine", "Ben 10", "Multi Audio", "Dual Audio 1080p", "HD", "The Mallard"])("guesses nothing from %s", (text) => {
+  it.each(["this is fine", "Ben 10", "Multi Audio", "Dual Audio 1080p", "HD", "The Mallard", "The Spa", "Tai Chi Master", "Todo por amor", "Tha Carter"])("guesses nothing from %s", (text) => {
     expect(textLanguages(text)).toEqual([]);
   });
 
@@ -40,11 +46,19 @@ describe("languageOf", () => {
 
 describe("streamLanguages", () => {
   it("puts the plugin's declared language first", () => {
-    expect(streamLanguages({ language: "Hindi", name: "Vidrock", title: "English subs" }, {})).toEqual(["hi", "en"]);
+    expect(streamLanguages({ language: "Hindi", name: "Vidrock", title: "Also English" }, {})).toEqual(["hi", "en"]);
   });
 
-  it("ignores language words that are only the film's own title", () => {
+  it("ignores language words that are only the film's own title — dotted file names and the original title too", () => {
     expect(streamLanguages({ name: "Open • English Vinglish 1080p", title: "" }, { titleName: "English Vinglish" })).toEqual([]);
     expect(streamLanguages({ name: "English Vinglish • Hindi", title: "" }, { titleName: "English Vinglish" })).toEqual(["hi"]);
+    expect(streamLanguages({ name: "English.Vinglish.2012.1080p.WEB-DL", title: "" }, { titleName: "English Vinglish" })).toEqual([]);
+    expect(streamLanguages({ name: "English-Vinglish", title: "" }, { titleName: "English Vinglish" })).toEqual([]);
+    expect(streamLanguages({ name: "Hindi.Medium.2017.Tamil", title: "" }, { titleName: "Hindi Medium" })).toEqual(["ta"]);
+    expect(streamLanguages({ name: "Hindi Medium", title: "" }, { titleName: "Something Else", originalTitle: "Hindi Medium" })).toEqual([]);
+  });
+
+  it("removes the title only on word boundaries", () => {
+    expect(streamLanguages({ name: "Thailand Thai dub", title: "" }, { titleName: "Land" })).toEqual(["th"]);
   });
 });

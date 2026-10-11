@@ -17,6 +17,8 @@ export interface TitleRequest {
   episode?: number;
   /** The film or show name, so a language word in it isn't read as the stream's language. */
   titleName?: string;
+  /** TMDB original_title / original_name, stripped the same way. */
+  originalTitle?: string;
   /** TMDB runtime (minutes) for the length check. */
   runtimeMin?: number;
   /** TMDB original_language — what "Original audio" means. */
@@ -87,7 +89,7 @@ export async function resolvePlayback(req: TitleRequest, deps: ResolveDeps): Pro
     },
   );
 
-  const all = toCandidates(host.streams, { originalLanguage: req.originalLanguage, titleName: req.titleName });
+  const all = toCandidates(host.streams, { originalLanguage: req.originalLanguage, titleName: req.titleName, originalTitle: req.originalTitle });
   const ctx = { platform: deps.platform, languages: deps.languages, isDown: (id: string) => deps.health.isDown(id) };
   const shortlist = rankCandidates(all, ctx).slice(0, PROBE_TOP);
   const probeCtx: ProbeContext = { kind: req.type === "movie" ? "movie" : "tv", runtimeMin: req.runtimeMin };

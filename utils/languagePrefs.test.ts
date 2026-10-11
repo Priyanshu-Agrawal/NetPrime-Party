@@ -18,7 +18,23 @@ describe("languageOrder", () => {
   it("follows the audio language the user last picked", () => {
     expect(languageOrder("Tamil")).toEqual(["ta", "original"]);
     expect(languageOrder("Original")).toEqual(["original"]);
+    expect(languageOrder("Original audio (this source)")).toEqual(["original"]);
     expect(languageOrder("Klingon")).toEqual(["hi", "original"]);
+  });
+
+  it.each([
+    ["Bengali", "bn"],
+    ["Marathi", "mr"],
+    ["Gujarati", "gu"],
+    ["Chinese", "zh"],
+    ["Malayalam", "ml"],
+    ["Kannada", "kn"],
+    ["Punjabi", "pa"],
+    ["Urdu", "ur"],
+  ])("reads %s as %s (never a lookalike)", (label, code) => expect(languageOrder(label)).toEqual([code, "original"]));
+
+  it("doesn't read a non-language label as one", () => {
+    expect(languageOrder("Spatial Audio")).toEqual(["hi", "original"]);
   });
 });
 

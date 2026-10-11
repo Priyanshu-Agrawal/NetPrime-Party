@@ -95,7 +95,10 @@ export function candidateKey(sourceId: string, label: string, url: string): stri
   return `${sourceId}:${fnv1a(`${label.toLowerCase().replace(/\s+/g, " ").trim()}|${urlShape(url)}`)}`;
 }
 
-export function toCandidates(streams: PluginStream[], ctx: { originalLanguage?: string; titleName?: string }): PlaybackCandidate[] {
+export function toCandidates(
+  streams: PluginStream[],
+  ctx: { originalLanguage?: string; titleName?: string; originalTitle?: string },
+): PlaybackCandidate[] {
   const seenUrls = new Set<string>();
   const seenKeys = new Map<string, number>();
   const out: PlaybackCandidate[] = [];

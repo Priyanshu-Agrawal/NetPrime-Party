@@ -4,10 +4,10 @@
  * Default: Hindi, then original.
  */
 import { normalizeLanguage } from "@/components/player/native/languages";
+import { languageOf } from "@/services/playback/languages";
 import { universalStorage } from "@/services/storage/universalStorage";
 import type { UniversalStorage } from "@/services/storage/universalStorage.types";
 import { getPreferredAudio } from "@/utils/prefs";
-import { canonLang } from "@/utils/trackMatch";
 
 export const ORIGINAL = "original";
 export const DEFAULT_ORDER = ["hi", ORIGINAL];
@@ -17,9 +17,11 @@ const MAX_TITLES = 300;
 type Store = Pick<UniversalStorage, "getString" | "set">;
 
 export function languageOrder(preferredAudioLabel: string | null = getPreferredAudio()): string[] {
-  const code = preferredAudioLabel ? canonLang(preferredAudioLabel) : null;
-  if (!code) return DEFAULT_ORDER;
-  return code === ORIGINAL ? [ORIGINAL] : [code, ORIGINAL];
+  if (!preferredAudioLabel) return DEFAULT_ORDER;
+  if (/\borig(inal)?\b/i.test(preferredAudioLabel)) return [ORIGINAL];
+  // Strict: a full language name or code, never a lookalike ("Bengali" is not English, "Marathi" is not Arabic).
+  const code = languageOf(preferredAudioLabel);
+  return code ? [code, ORIGINAL] : DEFAULT_ORDER;
 }
 
 export function resolveOrder(order: string[], originalLanguage?: string, titleChoice?: string | null): string[] {

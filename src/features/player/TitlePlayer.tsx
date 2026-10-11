@@ -118,7 +118,8 @@ export function TitlePlayer({ tmdbId, type, season, episode, title, posterUrl, s
 
   const resolve = useCallback(async () => {
     const wanted = resolveOrder(languageOrder(), details?.original_language, getTitleLanguage(titleKey));
-    const runtime: number | undefined = type === "movie" ? details?.runtime : details?.episode_run_time?.[0];
+    // Films: TMDB runtime. Episodes: unchecked — the show-level runtime would wrongly reject long pilots at ±3 min.
+    const runtime: number | undefined = type === "movie" ? details?.runtime : undefined;
     const r = await resolveTitle(
       {
         tmdbId,
@@ -126,6 +127,7 @@ export function TitlePlayer({ tmdbId, type, season, episode, title, posterUrl, s
         season,
         episode,
         titleName: details?.title ?? details?.name ?? title,
+        originalTitle: details?.original_title ?? details?.original_name,
         runtimeMin: runtime || undefined,
         originalLanguage: details?.original_language,
       },

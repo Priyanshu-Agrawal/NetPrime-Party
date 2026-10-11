@@ -149,6 +149,13 @@ describe("TitlePlayer", () => {
     }
   });
 
+  it("passes the original title so a language word in it isn't read as the stream's language", async () => {
+    mockDetails = { runtime: 134, original_language: "hi", title: "Hindi Medium", original_title: "हिंदी मीडियम" };
+    mockResolve.mockResolvedValue(result());
+    await mount();
+    expect(mockResolve.mock.calls[0][0]).toMatchObject({ titleName: "Hindi Medium", originalTitle: "हिंदी मीडियम", runtimeMin: 134 });
+  });
+
   it("says when the wanted language isn't available (spec §6.3)", async () => {
     mockResolve.mockResolvedValue(result(cand("en1", ["en"])));
     await mount();
@@ -252,6 +259,8 @@ describe("TitlePlayer", () => {
     mockResolve.mockResolvedValue(result(cand("e", ["en"])));
     const onEpisode = jest.fn();
     await mount({ type: "tv", season: 1, episode: 3, onEpisode });
+    // A show-level runtime would wrongly reject long pilots at ±3 min: episodes go unchecked until we know their own.
+    expect(mockResolve.mock.calls[0][0]).toMatchObject({ type: "tv", season: 1, episode: 3, runtimeMin: undefined });
     expect(mockViewProps.subtitle).toBe("S1 · E3");
     act(() => mockViewProps.onNextEpisode());
     expect(onEpisode).toHaveBeenCalledWith(1, 4);

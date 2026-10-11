@@ -68,7 +68,7 @@ export default function PluginLabScreen() {
     pluginHost.clearCache();
     const started = Date.now();
     const details = await fetchDetails(type, tmdbId.trim()).catch(() => null);
-    const runtimeMin = type === "movie" ? details?.runtime : details?.episode_run_time?.[0];
+    const runtimeMin = type === "movie" ? details?.runtime : undefined; // episodes: no show-level runtime check
     const wanted = resolveOrder(languageOrder(), details?.original_language);
     const r = await resolveTitle(
       {
@@ -77,6 +77,7 @@ export default function PluginLabScreen() {
         season: type === "tv" ? 1 : undefined,
         episode: type === "tv" ? 1 : undefined,
         titleName: details?.title ?? details?.name,
+        originalTitle: details?.original_title ?? details?.original_name,
         runtimeMin: runtimeMin || undefined,
         originalLanguage: details?.original_language,
       },

@@ -33,20 +33,37 @@ const NAMES: [RegExp, string][] = [
   [/\bindonesian\b/, "id"],
 ];
 
-// ISO-639-2 codes that are not also everyday words (no "ben", "mal", "kan", "pan", "mar", "ind", "urd").
-const CODES = new Set(["hin", "eng", "tam", "tel", "jpn", "kor", "spa", "fre", "fra", "ger", "deu", "ita", "rus", "ara", "chi", "zho", "por", "tur", "tha"]);
+// ISO-639-2 codes that are not also everyday words ("ben", "mal", "kan", "pan", "mar", "ind", "urd", "spa", "por",
+// "chi", "tha", "tur" all are).
+const CODES = new Set(["hin", "eng", "tam", "tel", "jpn", "kor", "fre", "fra", "ger", "deu", "ita", "rus", "ara", "zho"]);
+
+const SEP = "[\\s._\\-+()\\[\\]{}|/,:;•·]";
+// "Hindi Subs", "English (soft) subtitles", "ENG-SUB": a subtitle language, not an audio one.
+const SUB_AFTER = new RegExp(`^${SEP}*(?:(?:soft|hard|forced|full|cc|sdh)${SEP}+)?(?:sub|subs|subtitle|subtitles|subbed)\\b`);
+// "Subs: English", "Subtitles - Hindi" (a colon or dash, so "ENG-SUB Korean" still reads Korean audio).
+const SUB_BEFORE = /(?:sub|subs|subtitle|subtitles)\s*[:\-–]\s*$/;
+
+function aboutSubtitles(lower: string, at: number, len: number): boolean {
+  return SUB_AFTER.test(lower.slice(at + len)) || SUB_BEFORE.test(lower.slice(0, at));
+}
 
 export function textLanguages(text: string, originalLanguage?: string): string[] {
   const lower = text.toLowerCase();
   const hits: [number, string][] = [];
   for (const [re, code] of NAMES) {
-    const at = lower.search(re);
-    if (at >= 0) hits.push([at, code]);
+    for (const m of lower.matchAll(new RegExp(re.source, "g"))) {
+      const at = m.index ?? 0;
+      if (!aboutSubtitles(lower, at, m[0].length)) {
+        hits.push([at, code]);
+        break;
+      }
+    }
   }
   for (const m of lower.matchAll(/[a-z]+/g)) {
-    if (CODES.has(m[0])) {
+    const at = m.index ?? 0;
+    if (CODES.has(m[0]) && !aboutSubtitles(lower, at, m[0].length)) {
       const code = normalizeLanguage(m[0]);
-      if (code) hits.push([m.index ?? 0, code]);
+      if (code) hits.push([at, code]);
     }
   }
   const orig = lower.search(/\borig(inal)?\b/);
@@ -66,19 +83,34 @@ export function languageOf(value: string | undefined): string | undefined {
   return textLanguages(value)[0];
 }
 
-function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const TOKEN_SEP = /[\s._\-+()[\]{}|/,:;•·'"!?]+/;
+
+/** The text minus every whole-word run of a title's words ("English.Vinglish.2012" loses "English Vinglish"). */
+function withoutTitles(text: string, titles: (string | undefined)[]): string {
+  let words = text.toLowerCase().split(TOKEN_SEP).filter(Boolean);
+  for (const title of titles) {
+    const t = title?.toLowerCase().split(TOKEN_SEP).filter(Boolean) ?? [];
+    if (!t.length) continue;
+    const kept: string[] = [];
+    for (let i = 0; i < words.length; ) {
+      if (t.every((w, k) => words[i + k] === w)) {
+        kept.push("·");
+        i += t.length;
+      } else kept.push(words[i++]);
+    }
+    words = kept;
+  }
+  return words.join(" ");
 }
 
 export function streamLanguages(
   s: { language?: string; name: string; title: string },
-  ctx: { originalLanguage?: string; titleName?: string },
+  ctx: { originalLanguage?: string; titleName?: string; originalTitle?: string },
 ): string[] {
-  let text = `${s.name} ${s.title}`;
-  if (ctx.titleName?.trim()) text = text.replace(new RegExp(escapeRe(ctx.titleName.trim()), "gi"), " ");
   const out: string[] = [];
   const declared = languageOf(s.language);
   if (declared) out.push(declared);
+  const text = withoutTitles(`${s.name} ${s.title}`, [ctx.titleName, ctx.originalTitle]);
   for (const code of textLanguages(text, ctx.originalLanguage)) if (!out.includes(code)) out.push(code);
   return out;
 }
