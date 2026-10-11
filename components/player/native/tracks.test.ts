@@ -1,5 +1,6 @@
 import {
   AUTO,
+  activeAudio,
   audioLevels,
   capFor,
   inStreamSubtitles,
@@ -113,5 +114,14 @@ describe("nativeCapabilities", () => {
     expect(caps.qualitySelect).toBe(false);
     expect(caps.audioTracks).toBe(false);
     expect(caps.subtitles).toBe(true);
+  });
+});
+
+describe("activeAudio", () => {
+  it("with no explicit pick, the DEFAULT rendition is the one playing (Android reports none until the user picks)", () => {
+    const def = { id: "a0", language: "en", label: "stream_5", isDefault: true };
+    expect(activeAudio([def, DE], null)).toBe(def);
+    expect(activeAudio([def, DE], DE)).toBe(DE);
+    expect(activeAudio([DE], null)).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ export interface NAudio {
   language: string;
   label: string;
   name?: string;
+  isDefault?: boolean;
 }
 export type NText = NAudio;
 export interface NVideo {
@@ -60,6 +61,14 @@ export function sameTrack(a: NAudio | null | undefined, b: NAudio | null | undef
   if (!a || !b) return false;
   if (a.id && b.id) return a.id === b.id;
   return a.language === b.language && a.label === b.label;
+}
+
+/**
+ * The audio track that is playing. On Android expo-video reports no current track until one is picked (or a language
+ * preference is set), while ExoPlayer plays the rendition flagged DEFAULT — so that one counts as active.
+ */
+export function activeAudio(audio: NAudio[], selected: NAudio | null): NAudio | null {
+  return selected ?? audio.find((t) => t.isDefault) ?? null;
 }
 
 export function audioLevels(audio: NAudio[], selected: NAudio | null): QualityLevel[] {

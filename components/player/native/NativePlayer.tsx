@@ -14,6 +14,7 @@ import { trackLabels } from "./languages";
 import { NativeEventMachine, SEEK_TIMEOUT_MS, type NativeStatus } from "./nativeEvents";
 import {
   AUTO,
+  activeAudio,
   audioLevels,
   capFor,
   inStreamSubtitles,
@@ -124,8 +125,9 @@ export const NativePlayer = forwardRef<PlayerHandle, NativePlayerProps>(function
   const publishTracks = useCallback(() => {
     const t = tracks.current;
     const base = { currentTime: machine.position, duration: player.duration || 0, paused: machine.paused };
-    emit({ ...base, event: "tracks", tracks: mediaTracks(t.audio, t.audioSel, t.text, t.textSel) });
-    emit({ ...base, event: "audio", audios: audioLevels(t.audio, t.audioSel) });
+    const audioNow = activeAudio(t.audio, t.audioSel);
+    emit({ ...base, event: "tracks", tracks: mediaTracks(t.audio, audioNow, t.text, t.textSel) });
+    emit({ ...base, event: "audio", audios: audioLevels(t.audio, audioNow) });
     emit({ ...base, event: "quality", qualities: qualityCapAvailable ? qualityLevels(t.video, cap.current?.tier ?? null) : [] });
     emit({ ...base, event: "subs", subs: subtitleRows() });
     latest.current.onQualitySummary?.(qualitySummary(cap.current?.tier ?? null, t.videoSel));
@@ -260,7 +262,7 @@ export const NativePlayer = forwardRef<PlayerHandle, NativePlayerProps>(function
       getCapabilities: () => nativeCapabilities(tracks.current, sidecarSubtitles.length, qualityCapAvailable),
       getTracks: () => {
         const t = tracks.current;
-        return mediaTracks(t.audio, t.audioSel, t.text, t.textSel);
+        return mediaTracks(t.audio, activeAudio(t.audio, t.audioSel), t.text, t.textSel);
       },
     }),
     [machine, player, publishTracks, sidecarSubtitles.length, tickClock, videoSource],
