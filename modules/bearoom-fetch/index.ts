@@ -61,6 +61,13 @@ const native = requireOptionalNativeModule<NativeBearoomFetch>("BearoomFetch");
 /** True when this binary carries the module (the plugin host runs only then). */
 export const nativeFetchAvailable = !!native;
 
+// Expo prefixes native rejections with "Call to function 'X' has been rejected.\n→ Caused by: "; plugins get the reason.
+const EXPO_WRAPPER = /^Call to function '[^']*' has been rejected\.\s*(?:→\s*)?Caused by:\s*/;
+
+function plainReason(message: string): string {
+  return message.replace(EXPO_WRAPPER, "");
+}
+
 export async function fetchOnce(req: NativeRequest): Promise<NativeResponse> {
   if (!native) throw new NativeFetchError("ERR_NETWORK", "BearoomFetch is not in this build");
   try {
@@ -68,6 +75,6 @@ export async function fetchOnce(req: NativeRequest): Promise<NativeResponse> {
   } catch (e) {
     const code = (e as { code?: unknown }).code;
     const known = CODES.find((c) => c === code);
-    throw new NativeFetchError(known ?? "ERR_NETWORK", (e as Error)?.message ?? "fetch failed");
+    throw new NativeFetchError(known ?? "ERR_NETWORK", plainReason((e as Error)?.message ?? "fetch failed"));
   }
 }

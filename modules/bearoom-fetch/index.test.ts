@@ -38,6 +38,13 @@ describe("fetchOnce", () => {
     await expect(fetchOnce(REQ)).rejects.toMatchObject({ name: "NativeFetchError", code });
   });
 
+  it("gives the plain native reason, without Expo's rejection wrapper", async () => {
+    const wrapped = "Call to function 'BearoomFetch.fetchOnce' has been rejected.\n→ Caused by: Blocked non-public address";
+    mockNative = { fetchOnce: jest.fn().mockRejectedValue(Object.assign(new Error(wrapped), { code: "ERR_BLOCKED_ADDRESS" })) };
+    const { fetchOnce } = load();
+    await expect(fetchOnce(REQ)).rejects.toMatchObject({ code: "ERR_BLOCKED_ADDRESS", message: "Blocked non-public address" });
+  });
+
   it("reports any other failure as a network error", async () => {
     mockNative = { fetchOnce: jest.fn().mockRejectedValue(new Error("weird")) };
     const { fetchOnce } = load();
