@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { useConnectivity } from "@/hooks/useConnectivity";
-import { tmdbApi, useHeroQuery } from "@/src/store/services/tmdbApi";
+import { TMDB_TAG, tmdbApi, useHeroQuery } from "@/src/store/services/tmdbApi";
 import { workerApi } from "@/src/store/services/workerApi";
 
 /**
@@ -13,9 +13,11 @@ import { workerApi } from "@/src/store/services/workerApi";
  * absent while offline ⇒ nothing to show ⇒ the caller renders a full
  * `OfflineState` page instead of a wall of broken rails.
  *
- * `reload` clears the TMDB cache (hero + every self-fetching rail re-pulls) and
- * re-fetches the worker config — the single action behind pull-to-refresh and
- * the offline page's "Try again".
+ * `reload` re-pulls every TMDB query on screen (hero + every self-fetching rail)
+ * and the worker config — the single action behind pull-to-refresh and the
+ * offline page's "Try again". It invalidates instead of clearing the cache, so
+ * rails keep their items while they refetch: clearing swapped every rail to its
+ * skeleton at once (~1,800 native views torn down in one frame, then rebuilt).
  */
 export function useBrowseOfflineGate() {
   const dispatch = useDispatch();
@@ -24,7 +26,7 @@ export function useBrowseOfflineGate() {
   const hasContent = (hero?.length ?? 0) > 0;
 
   const reload = useCallback(() => {
-    dispatch(tmdbApi.util.resetApiState());
+    dispatch(tmdbApi.util.invalidateTags([TMDB_TAG]));
     dispatch(workerApi.util.invalidateTags(["Config"]));
   }, [dispatch]);
 

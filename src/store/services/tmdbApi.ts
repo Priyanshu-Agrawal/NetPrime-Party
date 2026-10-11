@@ -42,6 +42,9 @@ const raw = async (path: string): Promise<any> => {
     return res.json();
 };
 
+export const TMDB_TAG = "Tmdb" as const;
+const TMDB_TAGS = [TMDB_TAG] as const;
+
 export const tmdbApi = createApi({
     reducerPath: "tmdbApi",
     baseQuery: fakeBaseQuery<string>(),
@@ -49,6 +52,9 @@ export const tmdbApi = createApi({
     // NetInfo → onOnline bridge (src/store/index.ts) dispatches the reconnect
     // action; this opts every endpoint here into refetching on it.
     refetchOnReconnect: true,
+    // Every endpoint provides TMDB_TAG so pull-to-refresh can invalidate it: subscribed
+    // queries refetch while keeping their data on screen (see useBrowseOfflineGate).
+    tagTypes: [TMDB_TAG],
     endpoints: (build) => {
         const wrapQuery = (pathFn: (arg: any) => string | Promise<string>) => async (arg: any) => {
             try {
@@ -64,6 +70,7 @@ export const tmdbApi = createApi({
                     try { return { data: await fetchList(path) }; }
                     catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             hero: build.query<MediaItem[], void>({
@@ -73,6 +80,7 @@ export const tmdbApi = createApi({
                         return { data: r.filter((m) => m.backdrop_path).slice(0, 8) };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             listPage: build.query<ListPageResult, { path: string; page: number }>({
@@ -80,6 +88,7 @@ export const tmdbApi = createApi({
                     try { return { data: await fetchListPage(path, page) }; }
                     catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 300,
             }),
             details: build.query<any, { type: "movie" | "tv"; id: string | number }>({
@@ -87,6 +96,7 @@ export const tmdbApi = createApi({
                     try { return { data: await fetchDetails(type, String(id)) }; }
                     catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             // Recommendations only (light) — falls back to `similar` when empty.
@@ -104,34 +114,42 @@ export const tmdbApi = createApi({
                         return { data: results };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             season: build.query<any, { id: number | string; season: number }>({
                 queryFn: wrapQuery(({ id, season }) => `tv/${id}/season/${season}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             personDetails: build.query<any, number | string>({
                 queryFn: wrapQuery((id) => `person/${id}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             personCredits: build.query<any, number | string>({
                 queryFn: wrapQuery((id) => `person/${id}/combined_credits`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             searchMulti: build.query<any, { query: string; page: number }>({
                 queryFn: wrapQuery(({ query, page }) => `search/multi?query=${encodeURIComponent(query)}&page=${page}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             searchMovie: build.query<any, { query: string; page: number; year?: number | null }>({
                 queryFn: wrapQuery(({ query, page, year }) => `search/movie?query=${encodeURIComponent(query)}&page=${page}${year ? `&primary_release_year=${year}` : ""}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             searchTv: build.query<any, { query: string; page: number; year?: number | null }>({
                 queryFn: wrapQuery(({ query, page, year }) => `search/tv?query=${encodeURIComponent(query)}&page=${page}${year ? `&first_air_date_year=${year}` : ""}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             searchPerson: build.query<any, { query: string; page: number }>({
                 queryFn: wrapQuery(({ query, page }) => `search/person?query=${encodeURIComponent(query)}&page=${page}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             discoverByProvider: build.query<
@@ -148,6 +166,7 @@ export const tmdbApi = createApi({
                         return { data: { tv, movie } };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             // D4: catalog browse — discover with optional genre + provider + a sort
@@ -173,10 +192,12 @@ export const tmdbApi = createApi({
                         return { data: { tv, movie } };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             trendingAllDay: build.query<any, { page: number }>({
                 queryFn: wrapQuery(({ page }) => `trending/all/day?page=${page}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
 
@@ -184,6 +205,7 @@ export const tmdbApi = createApi({
             // Full collection incl. `parts[]` — powers the Collection screen.
             collection: build.query<any, number | string>({
                 queryFn: wrapQuery((id) => `collection/${id}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             // Light batch: fetch several collections in parallel, keep only the
@@ -206,10 +228,12 @@ export const tmdbApi = createApi({
                         return { data: cards };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             searchCollection: build.query<any, { query: string; page: number }>({
                 queryFn: wrapQuery(({ query, page }) => `search/collection?query=${encodeURIComponent(query)}&page=${page}`),
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 120,
             }),
             // --- Genres (D3) ------------------------------------------------
@@ -223,6 +247,7 @@ export const tmdbApi = createApi({
                         return { data: (r?.genres ?? []) as { id: number; name: string }[] };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 86400,
             }),
             // "Popular in your region" (local content) — a MIXED movie+TV rail:
@@ -250,6 +275,7 @@ export const tmdbApi = createApi({
                         return { data: merged };
                     } catch (e: any) { return { error: e.message }; }
                 },
+                providesTags: TMDB_TAGS,
                 keepUnusedDataFor: 600,
             }),
             // NOTE: the TMDB-popular franchise harvest (discovery source "A") moved
