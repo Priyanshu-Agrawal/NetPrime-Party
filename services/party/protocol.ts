@@ -194,6 +194,72 @@ export interface QueueRefYoutube {
 
 export type QueueRef = QueueRefTmdb | QueueRefPlugin | QueueRefDirect | QueueRefYoutube;
 
+/**
+ * The host's resolved stream for the room's current plugin item (spec §6.4), sent ONLY as an ephemeral broadcast on
+ * the private `party:<code>` channel — never stored in the queue/Postgres, never in route params, never logged.
+ */
+export interface StreamHandoff {
+  /** The queue item it belongs to (a handoff for an older item is ignored). */
+  itemId: string;
+  key: string;
+  sourceId: string;
+  url: string;
+  headers: Record<string, string>;
+  durationSec?: number;
+  language?: string;
+}
+
+const HANDOFF_MAX_URL = 4096;
+const HANDOFF_MAX_HEADERS = 32;
+const HANDOFF_MAX_HEADER_BYTES = 8192;
+
+/** A handoff from the wire, or null: https only, a small string header map, a sane length. */
+export function parseStreamHandoff(raw: unknown): StreamHandoff | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const str = (v: unknown, max = 512) => (typeof v === "string" && v.length > 0 && v.length <= max ? v : null);
+  const itemId = str(o.itemId);
+  const key = str(o.key);
+  const sourceId = str(o.sourceId);
+  const url = str(o.url, HANDOFF_MAX_URL);
+  if (!itemId || !key || !sourceId || !url) return null;
+  try {
+    if (new URL(url).protocol !== "https:") return null;
+  } catch {
+    return null;
+  }
+  if (!o.headers || typeof o.headers !== "object" || Array.isArray(o.headers)) return null;
+  const entries = Object.entries(o.headers as Record<string, unknown>);
+  if (entries.length > HANDOFF_MAX_HEADERS || entries.some(([, v]) => typeof v !== "string")) return null;
+  const headers = Object.fromEntries(entries) as Record<string, string>;
+  if (JSON.stringify(headers).length > HANDOFF_MAX_HEADER_BYTES) return null;
+  const out: StreamHandoff = { itemId, key, sourceId, url, headers };
+  if (o.durationSec != null) {
+    if (typeof o.durationSec !== "number" || !Number.isFinite(o.durationSec) || o.durationSec <= 0) return null;
+    out.durationSec = o.durationSec;
+  }
+  const language = str(o.language, 16);
+  if (language) out.language = language;
+  return out;
+}
+
+/** The room's queue ref for a native candidate: source + stable key + language — never a URL. */
+export function pluginRefFor(
+  c: { sourceId: string; key: string; languages: string[] },
+  title: { tmdbId: string; type: "movie" | "tv"; season?: number; episode?: number },
+): QueueRefPlugin {
+  return {
+    source: "plugin",
+    tmdbId: title.tmdbId,
+    type: title.type,
+    ...(title.season != null ? { season: title.season } : {}),
+    ...(title.episode != null ? { episode: title.episode } : {}),
+    pluginId: c.sourceId,
+    streamId: c.key,
+    ...(c.languages[0] ? { language: c.languages[0] } : {}),
+  };
+}
+
 export type QueueItemStatus = "queued" | "done" | "failed";
 
 /** One queue entry. Server-stamped: id, addedByUserId, addedAt, status. */
@@ -222,6 +288,10 @@ export interface QueueItemInput {
   posterPath?: string;
   runtimeMs?: number;
   syncable?: boolean;
+}
+
+export function isPluginItem(item?: QueueItem | null): item is QueueItem & { ref: QueueRefPlugin } {
+  return item?.ref?.source === "plugin";
 }
 
 export const QUEUE_MAX_ITEMS = 100;
