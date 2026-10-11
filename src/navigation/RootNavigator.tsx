@@ -8,6 +8,7 @@ import OnboardingScreen from "../screens/OnboardingScreen";
 import PartyScreen from "../screens/PartyScreen";
 import HomePrefsScreen from "../screens/HomePrefsScreen";
 import TrendingShowsScreen from "../screens/TrendingShowsScreen";
+import TestStreamsScreen from "../screens/TestStreamsScreen";
 import WatchHistoryScreen from "../screens/WatchHistoryScreen";
 import MainTabsNavigator from "./MainTabsNavigator";
 import PlayerNavigator from "./PlayerNavigator";
@@ -38,6 +39,7 @@ export default function RootNavigator() {
       <RootStack.Screen name="WatchHistory" component={WatchHistoryScreen} />
       <RootStack.Screen name="TrendingShows" component={TrendingShowsScreen} />
       <RootStack.Screen name="HomePrefs" component={HomePrefsScreen} />
+      <RootStack.Screen name="TestStreams" component={TestStreamsScreen} />
     </RootStack.Navigator>
   );
 }

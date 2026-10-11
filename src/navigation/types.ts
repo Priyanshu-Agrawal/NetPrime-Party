@@ -18,6 +18,8 @@ export type PlayerStackParamList = {
      *  Sources pick). Falls back to the top provider when absent. */
     providerId?: string;
   };
+  /** Native lane (expo-video). Phase 1B: dev test streams only. */
+  NativePlayer: { streamId: string; startedAt?: number };
 };
 
 export type MainTabParamList = {
@@ -45,6 +47,7 @@ export type RootStackParamList = {
   WatchHistory: undefined;
   TrendingShows: undefined;
   HomePrefs: undefined;
+  TestStreams: undefined;
 };
 
 declare global {

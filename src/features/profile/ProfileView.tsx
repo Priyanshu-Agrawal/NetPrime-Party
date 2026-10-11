@@ -19,7 +19,8 @@ import {
   openAppSettings,
   requestNotificationPermission,
 } from "@/services/permissions/notifications";
-import { openJoinParty, openLibrary, openHomePrefs, openPartyHost } from "@/src/navigation/actions";
+import { openJoinParty, openLibrary, openHomePrefs, openPartyHost, openTestStreams } from "@/src/navigation/actions";
+import { useTestStreamsEnabled } from "@/src/features/dev/testStreamsGate";
 import { genRoomCode } from "@/utils/roomCode";
 import { Appear, Text } from "@/src/ui";
 import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
@@ -48,6 +49,7 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
+  const testStreams = useTestStreamsEnabled();
   const [name, setName] = useState(() => getDisplayName() ?? "Guest");
   const [avatarConfig, setAvatarConfigState] = useState<BearAvatarConfig>(() => getAvatarConfig());
   const [customizerVisible, setCustomizerVisible] = useState(false);
@@ -263,6 +265,7 @@ export default function MoreScreen() {
               <Row icon="color-palette-outline" label="Appearance" onPress={() => comingSoon("Appearance")} />
               <Row icon="trash-outline" label="Clear watch history" onPress={confirmClearHistory} />
               <Row icon="refresh-outline" label="Clear cache" onPress={confirmClearCache} />
+              {testStreams ? <Row icon="flask-outline" label="Test streams (dev)" onPress={openTestStreams} /> : null}
               <Row icon="help-circle-outline" label="Help & about" onPress={() => setAboutVisible(true)} last />
             </Card>
           </Appear>

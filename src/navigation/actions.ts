@@ -36,6 +36,14 @@ export function openPlayer(params: PlayerStackParamList["Player"]) {
   navigate("PlayerStack", { screen: "Player", params });
 }
 
+export function openNativePlayer(params: PlayerStackParamList["NativePlayer"]) {
+  navigate("PlayerStack", { screen: "NativePlayer", params });
+}
+
+export function openTestStreams() {
+  navigate("TestStreams");
+}
+
 export function openSeeAll(title: string, path: string, kind: "movie" | "tv") {
   navigate("PlayerStack", { screen: "RailSeeAll", params: { title, path, kind } });
 }
