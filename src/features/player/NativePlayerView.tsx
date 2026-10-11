@@ -23,7 +23,7 @@ import { getSubtitleSize, setSubtitleSize } from "@/utils/prefs";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export interface NativePlayerViewProps {
@@ -370,7 +370,9 @@ export function NativePlayerView({
                 fullscreen={immersive}
                 embedded={!immersive}
                 title={title}
-                onBack={() => (fullscreen ? toggleFullscreen() : requestClose())}
+                // iOS can't present the "Stop watching?" alert over a sideways screen (BearAlert's Modal is
+                // portrait-only), so a landscape back there closes directly.
+                onBack={() => (fullscreen ? toggleFullscreen() : Platform.OS === "ios" && immersive ? onClose() : requestClose())}
                 onOpenSettings={() => setSettingsOpen(true)}
                 chips={chips}
                 onVisibilityChange={setControlsShown}

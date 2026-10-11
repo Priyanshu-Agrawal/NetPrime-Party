@@ -1,5 +1,6 @@
 import type { PlaybackCandidate } from "@/services/playback/candidate";
 import React from "react";
+import { Modal } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { CandidateSheet } from "./CandidateSheet";
 
@@ -43,6 +44,11 @@ function render(props: Partial<React.ComponentProps<typeof CandidateSheet>> = {}
 }
 
 describe("CandidateSheet", () => {
+  it("can open over a landscape player (iOS aborts the app if the sheet only allows portrait)", () => {
+    const { r } = render();
+    expect(r.root.findByType(Modal).props.supportedOrientations).toEqual(expect.arrayContaining(["portrait", "landscape-left", "landscape-right"]));
+  });
+
   it("lists every native source with its language and quality, and the web player last", () => {
     const { r } = render();
     expect(texts(r)).toEqual([

@@ -9,6 +9,7 @@ import { colors, font, ms, radius } from "@/theme/bearoom";
 import React from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PLAYER_SHEET_ORIENTATIONS } from "@/components/player/sheetOrientations";
 
 export interface CandidateSheetProps {
   visible: boolean;
@@ -34,7 +35,14 @@ function details(c: PlaybackCandidate): string {
 export function CandidateSheet({ visible, candidates, currentKey, onPick, onUseWeb, onClose }: CandidateSheetProps) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      supportedOrientations={PLAYER_SHEET_ORIENTATIONS}
+    >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.wrap} onPress={() => {}}>
           <GlassCard blur={false} rounded={radius.xxl} bordered style={styles.sheet}>

@@ -10,6 +10,7 @@ import { colors, font, ms, radius } from "@/theme/bearoom";
 import React from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PLAYER_SHEET_ORIENTATIONS } from "@/components/player/sheetOrientations";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
@@ -102,7 +103,14 @@ export default function PlayerSettingsSheet({
   const selectedSub = subtitles.find((t) => t.selected);
   const adjustable = !!subtitleAdjust && !!selectedSub?.id.startsWith("side:");
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      supportedOrientations={PLAYER_SHEET_ORIENTATIONS}
+    >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.wrap} onPress={() => {}}>
           {/* Solid, not a live blur: blurring the playing video behind the sheet stutters it on the GPU

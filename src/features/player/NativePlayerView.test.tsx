@@ -54,8 +54,10 @@ jest.mock("@/components/player/PlayerLoadingCard", () => {
   return { PlayerLoadingCard: ({ status }: { status: string }) => <Text>{status}</Text> };
 });
 jest.mock("@/hooks/useConnectivity", () => ({ useConnectivity: () => mockOffline }));
-jest.mock("@/hooks/useMediaCloseGuard", () => ({ useMediaCloseGuard: () => ({ requestClose: jest.fn() }) }));
-jest.mock("@/hooks/useResponsive", () => ({ useResponsive: () => ({ isLandscapeMobile: false }) }));
+const mockRequestClose = jest.fn();
+jest.mock("@/hooks/useMediaCloseGuard", () => ({ useMediaCloseGuard: () => ({ requestClose: mockRequestClose }) }));
+let mockLandscape = false;
+jest.mock("@/hooks/useResponsive", () => ({ useResponsive: () => ({ isLandscapeMobile: mockLandscape }) }));
 jest.mock("@/utils/prefs", () => ({ getSubtitleSize: () => "m", setSubtitleSize: jest.fn() }));
 const mockUnlock = jest.fn(async () => {});
 jest.mock("expo-screen-orientation", () => ({
@@ -91,6 +93,8 @@ function view(extra: Partial<React.ComponentProps<typeof NativePlayerView>> = {}
 beforeEach(() => {
   jest.useFakeTimers();
   mockOffline = false;
+  mockLandscape = false;
+  mockRequestClose.mockClear();
   Object.values(mockHandle).forEach((f) => (f as jest.Mock).mockClear?.());
 });
 afterEach(() => jest.useRealTimers());
@@ -237,5 +241,26 @@ describe("NativePlayerView", () => {
     expect(texts(r)).toContain("Hindi isn't available for this title — playing original audio");
     expect(mockControlsProps.subtitle).toBe("S1 · E3");
     expect(mockControlsProps.onNextEpisode).toBe(onNextEpisode);
+  });
+  it("on iPhone in landscape, back closes without the confirm (iOS can't present that alert sideways)", () => {
+    const { Platform } = jest.requireActual("react-native");
+    jest.replaceProperty(Platform, "OS", "ios");
+    mockLandscape = true;
+    const onClose = jest.fn();
+    act(() => {
+      create(view({ onClose }));
+    });
+    act(() => mockControlsProps.onBack());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(mockRequestClose).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it("in portrait, back asks first", () => {
+    act(() => {
+      create(view());
+    });
+    act(() => mockControlsProps.onBack());
+    expect(mockRequestClose).toHaveBeenCalledTimes(1);
   });
 });

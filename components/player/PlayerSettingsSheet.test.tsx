@@ -1,5 +1,6 @@
 // components/player/PlayerSettingsSheet.test.tsx
 import React from "react";
+import { Modal } from "react-native";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import PlayerSettingsSheet from "./PlayerSettingsSheet";
 
@@ -25,6 +26,14 @@ const texts = (r: ReactTestRenderer) =>
   r.root.findAll((n) => typeof n.props.children === "string").map((n) => n.props.children as string);
 
 describe("PlayerSettingsSheet", () => {
+  it("can open over a landscape player (iOS aborts the app if the sheet only allows portrait)", () => {
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<PlayerSettingsSheet {...base} />);
+    });
+    expect(r.root.findByType(Modal).props.supportedOrientations).toEqual(expect.arrayContaining(["portrait", "landscape-left", "landscape-right"]));
+  });
+
   it("hides Audio and Quality when the source can't switch them", () => {
     let r!: ReactTestRenderer;
     act(() => {
