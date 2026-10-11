@@ -46,6 +46,7 @@ import {
 import { settingsRows, type BridgeCaps, type OS } from "@/components/player/capabilities";
 import { controlChips } from "@/components/player/chips";
 import { nextEpisode } from "@/components/player/nextEpisode";
+import { stageFor } from "@/components/player/reportFields";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import type { SubtitleTrack } from "@/components/player/types";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
@@ -172,6 +173,8 @@ export const PlayerScreen: React.FC = () => {
   const triedRef = useRef<Set<string>>(new Set());
   const playIntentAtRef = useRef<number | null>(null);
   const progressAtRef = useRef<number | null>(null);
+  // First real progress of this provider session — the success report's TTFF.
+  const firstProgressAtRef = useRef<number | null>(null);
   // Last known length of the bound <video>, to spot the feature replacing a pre-roll ad.
   const boundDurationRef = useRef(0);
   const [autoplayNext, setAutoplayNextState] = useState(getAutoplayNext); // TV "autoplay next episode" pref
@@ -202,6 +205,7 @@ export const PlayerScreen: React.FC = () => {
     setSubtitles([]);
     playIntentAtRef.current = null;
     progressAtRef.current = null;
+    firstProgressAtRef.current = null;
     boundDurationRef.current = 0;
     sessionStarted.current = false;
     initialOutcomeRef.current = false; // new provider session → allow one initial report
@@ -373,6 +377,8 @@ export const PlayerScreen: React.FC = () => {
         scriptVersion: getCachedVersion(selected.id) ?? selected.scriptVersion ?? undefined, // the bridge actually injected
         platform: Platform.OS as ReportArgs["platform"],
         appVersion: Constants.expoConfig?.version,
+        lane: "embed",
+        stage: stageFor(outcome),
         ...extra,
       });
     },
@@ -546,6 +552,7 @@ export const PlayerScreen: React.FC = () => {
     if (countsAsProgress(posRef.current, e)) {
       if (__DEV__ && progressAtRef.current == null && selected) logBind(selected.id, true, mountTsRef.current, "playing");
       progressAtRef.current = Date.now();
+      firstProgressAtRef.current ??= progressAtRef.current;
     }
     if ((e.event === "play" || e.event === "playing") && playIntentAtRef.current == null) {
       playIntentAtRef.current = Date.now();
@@ -557,7 +564,10 @@ export const PlayerScreen: React.FC = () => {
     // the denominator that makes provider_health a failure RATE, not a raw count.
     if (!initialOutcomeRef.current && (Number(e.currentTime) || 0) >= 30) {
       initialOutcomeRef.current = true;
-      report("success");
+      report(
+        "success",
+        firstProgressAtRef.current != null ? { ttffMs: firstProgressAtRef.current - mountTsRef.current } : undefined,
+      );
       if (selected) clearProviderFailure(mediaKey(media), selected.id); // works now — forget it
     }
     controlsRef.current?.setPlayback({

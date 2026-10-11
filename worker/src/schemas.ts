@@ -301,6 +301,12 @@ export const ReportRequestSchema = z
     appVersion: z.string().optional().openapi({ example: "2.1.0" }),
     /** Untrusted free text — capped, stored as-is, never rendered or executed. */
     errorMessage: z.string().max(300).optional(),
+    /** Which lane played (spec §5.7). */
+    lane: z.enum(["native", "embed"]).optional(),
+    /** Where it got to / failed. */
+    stage: z.enum(["load", "bind", "first_frame", "playing"]).optional(),
+    /** Play → first progress, ms. */
+    ttffMs: z.number().int().nonnegative().max(600000).optional(),
   })
   .openapi("ReportRequest");
 // NOTE: country + client id are DERIVED server-side (CF geo + hashed IP) and are

@@ -109,6 +109,8 @@ export type ReportOutcome =
     | "manual_switch";
 
 /** Client args for `POST /report`. `country` + client id are derived server-side. */
+export type ReportStage = "load" | "bind" | "first_frame" | "playing";
+
 export interface ReportArgs {
     providerId: string;
     tmdbId: string;
@@ -119,4 +121,10 @@ export interface ReportArgs {
     platform: "ios" | "android" | "web";
     appVersion?: string;
     errorMessage?: string;
+    /** Which lane played (spec §5.7). */
+    lane?: "native" | "embed";
+    /** Where it got to / failed. */
+    stage?: ReportStage;
+    /** Play → first progress, on success. */
+    ttffMs?: number;
 }

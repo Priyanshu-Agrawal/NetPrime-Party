@@ -34,6 +34,7 @@ import {
 } from "./supabase";
 import { getFranchiseCollections } from "./franchises";
 import { FLAGS_KEY, parseFlags, resolveFlags } from "./flags";
+import { reportRow } from "./reportRow";
 import {
   AppConfigSchema,
   ErrorSchema,
@@ -384,19 +385,7 @@ app.openapi(reportRoute, async (c) => {
   // Best-effort write; telemetry must never break the client, so a failed insert
   // still returns 202.
   c.executionCtx.waitUntil(
-    insertReport(c.env, {
-      provider_id: body.providerId,
-      tmdb_id: body.tmdbId,
-      media_type: body.mediaType,
-      outcome: body.outcome,
-      time_to_fail_ms: body.timeToFailMs ?? null,
-      script_version: body.scriptVersion ?? null,
-      platform: body.platform,
-      app_version: body.appVersion ?? null,
-      error_message: body.errorMessage ?? null,
-      country,
-      client_hash: clientHash,
-    }).then(() => undefined),
+    insertReport(c.env, reportRow(body, country, clientHash)).then(() => undefined),
   );
 
   return c.json({ accepted: true }, 202);
