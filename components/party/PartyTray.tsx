@@ -37,7 +37,7 @@ import { enterParty } from "@/src/navigation/actions";
 import { colors, font, ms, radius, type } from "@/theme/bearoom";
 import { duration, easing } from "@/theme/motion";
 import { Ionicons } from "@expo/vector-icons";
-import { Frost } from "@/src/ui/Frost";
+import { Glass } from "@/src/ui/glass";
 import { Image } from "expo-image";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
@@ -209,7 +209,7 @@ function PeekBar({
   media: TrayMedia;
   memberIds: string;
   onOpen: () => void;
-  /** False while faded out (e.g. over the party screen) — no live blur then. */
+  /** False while faded out (e.g. over the party screen). */
   shown: boolean;
 }) {
   const { data: details } = useDetailsQuery(
@@ -240,11 +240,8 @@ function PeekBar({
       {/* Same frosted surface as FloatingTabBar, so the bar and the tab bar it
           rides on read as one navigation object rather than a card floating over
           the content. Quiet controls, rich content. */}
-      {/* Live blur only while the tray shows: Android's blur re-blurs the whole window
-          every frame, and hidden over the party screen it ate most of the main thread. */}
-      <Frost intensity={70} style={StyleSheet.absoluteFill} active={shown} />
-      <View style={[StyleSheet.absoluteFill, styles.peekTint]} />
-      <View style={[StyleSheet.absoluteFill, styles.peekLift]} />
+      {/* Hidden over the party screen: Liquid Glass must not sit faded to 0. */}
+      <Glass material="bar" visible={shown} radius={radius.lg} />
 
       <Pressable
         style={styles.peekBody}
@@ -451,9 +448,7 @@ function TraySheet({
 
   return (
     <View style={[styles.sheet, { height: Math.round(winH * 0.8), paddingBottom: bottomInset }]}>
-      <Frost intensity={90} style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, styles.sheetTint]} />
-      <View style={[StyleSheet.absoluteFill, styles.sheetLift]} />
+      <Glass material="sheet" backdrop="none" />
 
       <GestureDetector gesture={pan}>
         <Pressable
@@ -630,13 +625,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  /* Warm tint over the blur — enough body that title/meta stay legible on top of
-     a bright poster grid, still transparent enough to read as glass. */
-  /* Two layers over the blur: a lighter charcoal scrim than before (0.62 -> 0.38)
-     so the artwork behind stays legible as texture, plus a warm-white lift that
-     keeps title contrast up. Stronger blur does the rest of the legibility work. */
-  peekTint: { backgroundColor: "rgba(22,18,13,0.38)" },
-  peekLift: { backgroundColor: "rgba(246,239,227,0.07)" },
   peekBody: {
     flex: 1,
     flexDirection: "row",
@@ -720,13 +708,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  /* The SHEET stays dark and near-opaque — it is a panel you read against, and a
-     busy poster grid showing through a full-height surface is noise, not depth.
-     The glass here is the heavy blur plus the warm lift at the edges, not
-     transparency. (The mini-player is the opposite case: it is a thin strip, so
-     it stays light and lets the artwork through.) */
-  sheetTint: { backgroundColor: "rgba(16,13,10,0.84)" },
-  sheetLift: { backgroundColor: "rgba(246,239,227,0.03)" },
   grabberHit: { alignItems: "center", paddingTop: ms(9), paddingBottom: ms(7) },
   grabber: {
     width: ms(42),

@@ -13,7 +13,7 @@ import { gradients } from "@/theme/styles/gradients";
 import { pressedStyle } from "@/theme/styles/interaction";
 import { normalizeManifest } from "@/utils/normalizeManifest";
 import { Ionicons } from "@expo/vector-icons";
-import { Frost } from "@/src/ui/Frost";
+import { Glass, GlassBackdrop } from "@/src/ui/glass";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useState } from "react";
@@ -63,71 +63,73 @@ export default React.memo(function HomePage() {
     <View style={styles.root}>
       <StatusBar style="light" />
 
-      <Animated.ScrollView
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: ms(108) }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.honey}
-            colors={[colors.honey]}
-            progressViewOffset={insets.top + ms(8)}
-          />
-        }
-      >
-        <HeroCarousel />
+      <GlassBackdrop style={styles.backdrop}>
+        <Animated.ScrollView
+          style={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: ms(108) }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.honey}
+              colors={[colors.honey]}
+              progressViewOffset={insets.top + ms(8)}
+            />
+          }
+        >
+          <HeroCarousel />
 
-        {/* Inviting someone already in a room to "start a watch party" is the same
-            mistake the header pill used to make — it would mint a second room and
-            orphan the first. In session, the tray IS the party. */}
-        {inSession ? null : (
-        <Appear variant="rise" style={styles.ctaWrap}>
-          <GlassCard
-            blur={false}
-            rounded={radius.lg}
-            padded={spacing.sm + 2}
-            style={styles.cta}
-          >
-            <View style={styles.ctaRow}>
-              <View style={styles.ctaIcon}>
-                <Ionicons name="people" size={ms(16)} color={colors.honey} />
+          {/* Inviting someone already in a room to "start a watch party" is the same
+              mistake the header pill used to make — it would mint a second room and
+              orphan the first. In session, the tray IS the party. */}
+          {inSession ? null : (
+          <Appear variant="rise" style={styles.ctaWrap}>
+            <GlassCard
+              blur={false}
+              rounded={radius.lg}
+              padded={spacing.sm + 2}
+              style={styles.cta}
+            >
+              <View style={styles.ctaRow}>
+                <View style={styles.ctaIcon}>
+                  <Ionicons name="people" size={ms(16)} color={colors.honey} />
+                </View>
+                <View style={styles.ctaText}>
+                  <Text variant="label" style={styles.ctaTitle}>
+                    Start a watch party
+                  </Text>
+                  <Text variant="caption" style={styles.ctaSub}>
+                    Watch in sync with your pack, anywhere.
+                  </Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.ctaBtn, pressed && pressedStyle]}
+                  onPress={openJoinParty}
+                  hitSlop={6}
+                >
+                  <Text variant="caption" honey style={styles.ctaBtnText}>
+                    Join now
+                  </Text>
+                </Pressable>
               </View>
-              <View style={styles.ctaText}>
-                <Text variant="label" style={styles.ctaTitle}>
-                  Start a watch party
-                </Text>
-                <Text variant="caption" style={styles.ctaSub}>
-                  Watch in sync with your pack, anywhere.
-                </Text>
-              </View>
-              <Pressable
-                style={({ pressed }) => [styles.ctaBtn, pressed && pressedStyle]}
-                onPress={openJoinParty}
-                hitSlop={6}
-              >
-                <Text variant="caption" honey style={styles.ctaBtnText}>
-                  Join now
-                </Text>
-              </Pressable>
-            </View>
-          </GlassCard>
-        </Appear>
-        )}
-
-        {feed.sections.map((s, i) => (
-          <Appear key={s.id} index={i + 1}>
-            <FeedSection section={s} />
+            </GlassCard>
           </Appear>
-        ))}
-      </Animated.ScrollView>
+          )}
+
+          {feed.sections.map((s, i) => (
+            <Appear key={s.id} index={i + 1}>
+              <FeedSection section={s} />
+            </Appear>
+          ))}
+        </Animated.ScrollView>
+      </GlassBackdrop>
 
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <Frost intensity={40} style={StyleSheet.absoluteFill} />
+          <Glass material="chrome" />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <LinearGradient
@@ -142,6 +144,7 @@ export default React.memo(function HomePage() {
 });
 
 const styles = StyleSheet.create({
+  backdrop: { flex: 1 },
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
 

@@ -35,7 +35,7 @@ import {
   topCast,
 } from "@/utils/tmdbDetails";
 import { Ionicons } from "@expo/vector-icons";
-import { Frost } from "@/src/ui/Frost";
+import { Glass, GlassBackdrop } from "@/src/ui/glass";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
@@ -192,7 +192,7 @@ const MovieDetailsScreen: React.FC = () => {
       {/* Sticky header — always visible; bg + title fade in on scroll (like Home) */}
       <View style={[styles.header, { height: headerH }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBgStyle]}>
-          <Frost intensity={40} style={StyleSheet.absoluteFill} />
+          <Glass material="chrome" />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>
@@ -208,256 +208,259 @@ const MovieDetailsScreen: React.FC = () => {
         </View>
       </View>
 
-      <Animated.ScrollView
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: 48 + insets.bottom }}
-      >
-        {/* Hero */}
-        <View style={styles.hero}>
-          {backdrop ? (
-            <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
-          ) : null}
-          <LinearGradient
-            colors={["transparent", "transparent", colors.bg]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.heroContent}>
-            <Text style={styles.title}>{d.title}</Text>
-            <MetaBar
-              rating={d.vote_average}
-              votes={d.vote_count}
-              year={d.release_date?.slice(0, 4)}
-              runtime={runtimeStr(d.runtime)}
-              certification={derived!.cert}
-              genres={(d.genres ?? []).map((g: any) => g.name)}
+      <GlassBackdrop style={styles.backdrop}>
+        <Animated.ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: 48 + insets.bottom }}
+        >
+          {/* Hero */}
+          <View style={styles.hero}>
+            {backdrop ? (
+              <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
+            ) : null}
+            <LinearGradient
+              colors={["transparent", "transparent", colors.bg]}
+              style={StyleSheet.absoluteFill}
             />
-          </View>
-        </View>
-
-        {/* Primary actions */}
-        <Appear index={0}>
-        <View style={styles.actions}>
-          {released ? (
-            <>
-              <Button
-                label="Play"
-                icon="play"
-                variant="honey"
-                size="sm"
-                onPress={handlePlay}
-                style={styles.flexBtn}
+            <View style={styles.heroContent}>
+              <Text style={styles.title}>{d.title}</Text>
+              <MetaBar
+                rating={d.vote_average}
+                votes={d.vote_count}
+                year={d.release_date?.slice(0, 4)}
+                runtime={runtimeStr(d.runtime)}
+                certification={derived!.cert}
+                genres={(d.genres ?? []).map((g: any) => g.name)}
               />
+            </View>
+          </View>
+
+          {/* Primary actions */}
+          <Appear index={0}>
+          <View style={styles.actions}>
+            {released ? (
+              <>
+                <Button
+                  label="Play"
+                  icon="play"
+                  variant="honey"
+                  size="sm"
+                  onPress={handlePlay}
+                  style={styles.flexBtn}
+                />
+                <Button
+                  label="Watch together"
+                  icon="paw"
+                  variant="glass"
+                  size="sm"
+                  onPress={handleWatchTogether}
+                  style={styles.flexBtn}
+                />
+              </>
+            ) : (
               <Button
-                label="Watch together"
-                icon="paw"
+                label={releaseLabel(d, "movie")}
+                icon="time-outline"
                 variant="glass"
                 size="sm"
-                onPress={handleWatchTogether}
+                disabled
+                onPress={() => {}}
                 style={styles.flexBtn}
               />
-            </>
-          ) : (
-            <Button
-              label={releaseLabel(d, "movie")}
-              icon="time-outline"
-              variant="glass"
-              size="sm"
-              disabled
-              onPress={() => {}}
-              style={styles.flexBtn}
-            />
-          )}
-        </View>
-        </Appear>
-
-        {/* Quick actions */}
-        <Appear index={1}>
-        <View style={styles.quickRow}>
-          <Pressable style={styles.quick} onPress={toggleSave}>
-            <View style={styles.quickIcon}>
-              <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
-            </View>
-            <Text style={styles.quickLabel}>My List</Text>
-          </Pressable>
-          <Pressable style={styles.quick} onPress={() => openTrailer(derived!.trailer?.key)} disabled={!derived!.trailer}>
-            <View style={styles.quickIcon}>
-              <Ionicons name="film-outline" size={22} color={derived!.trailer ? colors.textDim : colors.textFaint} />
-            </View>
-            <Text style={styles.quickLabel}>Trailer</Text>
-          </Pressable>
-          <Pressable style={styles.quick} onPress={handleShare}>
-            <View style={styles.quickIcon}>
-              <Ionicons name="share-social-outline" size={22} color={colors.textDim} />
-            </View>
-            <Text style={styles.quickLabel}>Share</Text>
-          </Pressable>
-        </View>
-        </Appear>
-
-        {d.overview ? (
-          <Appear index={2}>
-          <View style={styles.overviewWrap}>
-            <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
-              {d.overview}
-            </Text>
-            {d.overview.length > 140 ? (
-              <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={6}>
-                <Text style={styles.moreLink}>{expanded ? "less" : "more"}</Text>
-              </Pressable>
-            ) : null}
+            )}
           </View>
           </Appear>
-        ) : null}
 
-        {d.belongs_to_collection ? (
-          <Pressable
-            style={({ pressed }) => [styles.collectionChip, pressed && styles.collectionChipPressed]}
-            onPress={() => openCollection(d.belongs_to_collection.id)}
-            hitSlop={6}
-          >
-            <Ionicons name="albums-outline" size={ms(15)} color={colors.honey} />
-            <Text style={styles.collectionChipText} numberOfLines={1}>
-              Part of {d.belongs_to_collection.name}
-            </Text>
-            <Ionicons name="chevron-forward" size={ms(14)} color={colors.textDim} />
-          </Pressable>
-        ) : null}
-
-        {derived!.cast.length ? (
-          <Appear index={3}>
-          <Section title="Cast">
-            <PeopleRow people={derived!.cast} />
-          </Section>
+          {/* Quick actions */}
+          <Appear index={1}>
+          <View style={styles.quickRow}>
+            <Pressable style={styles.quick} onPress={toggleSave}>
+              <View style={styles.quickIcon}>
+                <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
+              </View>
+              <Text style={styles.quickLabel}>My List</Text>
+            </Pressable>
+            <Pressable style={styles.quick} onPress={() => openTrailer(derived!.trailer?.key)} disabled={!derived!.trailer}>
+              <View style={styles.quickIcon}>
+                <Ionicons name="film-outline" size={22} color={derived!.trailer ? colors.textDim : colors.textFaint} />
+              </View>
+              <Text style={styles.quickLabel}>Trailer</Text>
+            </Pressable>
+            <Pressable style={styles.quick} onPress={handleShare}>
+              <View style={styles.quickIcon}>
+                <Ionicons name="share-social-outline" size={22} color={colors.textDim} />
+              </View>
+              <Text style={styles.quickLabel}>Share</Text>
+            </Pressable>
+          </View>
           </Appear>
-        ) : null}
 
-        {derived!.clips.length ? (
-          <Appear index={4}>
-          <Section title="Trailers & Clips">
-            <FlatList
-              data={derived!.clips}
-              horizontal
-              keyExtractor={(v: any) => v.id}
-              showsHorizontalScrollIndicator={false}
-              {...RAIL_LIST_PROPS}
-              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-              renderItem={({ item }: any) => (
-                <Pressable style={styles.clip} onPress={() => openTrailer(item.key)}>
-                  <Image
-                    source={{ uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg` }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                  <View style={styles.clipScrim} />
-                  <View style={styles.clipPlay}>
-                    <Ionicons name="play" size={18} color={colors.text} />
-                  </View>
-                  <View style={styles.clipTag}>
-                    <Text style={styles.clipTagText} numberOfLines={1}>{item.type}</Text>
-                  </View>
+          {d.overview ? (
+            <Appear index={2}>
+            <View style={styles.overviewWrap}>
+              <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
+                {d.overview}
+              </Text>
+              {d.overview.length > 140 ? (
+                <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={6}>
+                  <Text style={styles.moreLink}>{expanded ? "less" : "more"}</Text>
                 </Pressable>
-              )}
-            />
-          </Section>
-          </Appear>
-        ) : null}
+              ) : null}
+            </View>
+            </Appear>
+          ) : null}
 
-        {derived!.crew.length ? (
-          <Appear index={5}>
-          <Section title="Crew">
-            <PeopleRow people={derived!.crew} />
-          </Section>
-          </Appear>
-        ) : null}
+          {d.belongs_to_collection ? (
+            <Pressable
+              style={({ pressed }) => [styles.collectionChip, pressed && styles.collectionChipPressed]}
+              onPress={() => openCollection(d.belongs_to_collection.id)}
+              hitSlop={6}
+            >
+              <Ionicons name="albums-outline" size={ms(15)} color={colors.honey} />
+              <Text style={styles.collectionChipText} numberOfLines={1}>
+                Part of {d.belongs_to_collection.name}
+              </Text>
+              <Ionicons name="chevron-forward" size={ms(14)} color={colors.textDim} />
+            </Pressable>
+          ) : null}
 
-        {derived!.providers ? (
-          <Appear index={6}>
-          <Section title="Where to Watch">
-            <ProvidersRow providers={derived!.providers} />
-          </Section>
-          </Appear>
-        ) : null}
+          {derived!.cast.length ? (
+            <Appear index={3}>
+            <Section title="Cast">
+              <PeopleRow people={derived!.cast} />
+            </Section>
+            </Appear>
+          ) : null}
 
-        <Appear index={7}>
-        <Section title="Details">
-          <FactGrid facts={derived!.facts} />
-        </Section>
-        </Appear>
-
-        {derived!.keywords.length ? (
-          <Appear index={8}>
-          <Section title="Keywords">
-            <Pills items={derived!.keywords} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {d.reviews?.results?.length ? (
-          <Appear index={9}>
-          <Section title="Reviews">
-            <Reviews reviews={d.reviews.results} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.links.length ? (
-          <Appear index={10}>
-          <Section title="Links">
-            <LinksRow links={derived!.links} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.recs.length ? (
-          <Appear index={11}>
-          <Section title="More Like This">
-            <FlatList
-              data={derived!.recs}
-              horizontal
-              keyExtractor={(m: any) => String(m.id)}
-              showsHorizontalScrollIndicator={false}
-              {...RAIL_LIST_PROPS}
-              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-              renderItem={({ item }: any) => (
-                <Pressable
-                  style={styles.recCard}
-                  onPress={() =>
-                    openDetails({ id: item.id, media_type: "movie" }, "movie")
-                  }
-                >
-                  <View style={styles.recImgWrap}>
+          {derived!.clips.length ? (
+            <Appear index={4}>
+            <Section title="Trailers & Clips">
+              <FlatList
+                data={derived!.clips}
+                horizontal
+                keyExtractor={(v: any) => v.id}
+                showsHorizontalScrollIndicator={false}
+                {...RAIL_LIST_PROPS}
+                ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+                renderItem={({ item }: any) => (
+                  <Pressable style={styles.clip} onPress={() => openTrailer(item.key)}>
                     <Image
-                      source={{ uri: img(item.poster_path, "w342") || undefined }}
-                      style={styles.recImg}
+                      source={{ uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg` }}
+                      style={StyleSheet.absoluteFill}
                       contentFit="cover"
                       transition={200}
                     />
-                    {item.vote_average ? (
-                      <View style={styles.recBadge}>
-                        <Ionicons name="star" size={9} color={colors.honey} />
-                        <Text style={styles.recBadgeText}>{item.vote_average.toFixed(1)}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.recTitle} numberOfLines={1}>
-                    {item.title || item.name}
-                  </Text>
-                </Pressable>
-              )}
-            />
+                    <View style={styles.clipScrim} />
+                    <View style={styles.clipPlay}>
+                      <Ionicons name="play" size={18} color={colors.text} />
+                    </View>
+                    <View style={styles.clipTag}>
+                      <Text style={styles.clipTagText} numberOfLines={1}>{item.type}</Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.crew.length ? (
+            <Appear index={5}>
+            <Section title="Crew">
+              <PeopleRow people={derived!.crew} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.providers ? (
+            <Appear index={6}>
+            <Section title="Where to Watch">
+              <ProvidersRow providers={derived!.providers} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          <Appear index={7}>
+          <Section title="Details">
+            <FactGrid facts={derived!.facts} />
           </Section>
           </Appear>
-        ) : null}
-      </Animated.ScrollView>
+
+          {derived!.keywords.length ? (
+            <Appear index={8}>
+            <Section title="Keywords">
+              <Pills items={derived!.keywords} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {d.reviews?.results?.length ? (
+            <Appear index={9}>
+            <Section title="Reviews">
+              <Reviews reviews={d.reviews.results} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.links.length ? (
+            <Appear index={10}>
+            <Section title="Links">
+              <LinksRow links={derived!.links} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.recs.length ? (
+            <Appear index={11}>
+            <Section title="More Like This">
+              <FlatList
+                data={derived!.recs}
+                horizontal
+                keyExtractor={(m: any) => String(m.id)}
+                showsHorizontalScrollIndicator={false}
+                {...RAIL_LIST_PROPS}
+                ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+                renderItem={({ item }: any) => (
+                  <Pressable
+                    style={styles.recCard}
+                    onPress={() =>
+                      openDetails({ id: item.id, media_type: "movie" }, "movie")
+                    }
+                  >
+                    <View style={styles.recImgWrap}>
+                      <Image
+                        source={{ uri: img(item.poster_path, "w342") || undefined }}
+                        style={styles.recImg}
+                        contentFit="cover"
+                        transition={200}
+                      />
+                      {item.vote_average ? (
+                        <View style={styles.recBadge}>
+                          <Ionicons name="star" size={9} color={colors.honey} />
+                          <Text style={styles.recBadgeText}>{item.vote_average.toFixed(1)}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.recTitle} numberOfLines={1}>
+                      {item.title || item.name}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </Section>
+            </Appear>
+          ) : null}
+        </Animated.ScrollView>
+      </GlassBackdrop>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  backdrop: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   errText: { color: colors.danger, fontFamily: font.body, fontSize: ms(15) },

@@ -28,7 +28,7 @@ import { checkGithubRelease } from "@/utils/checkGithubRelease";
 import { clearAppCache, clearWatchHistory, getWatchHistory } from "@/utils/history";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { Frost } from "@/src/ui/Frost";
+import { Glass, GlassBackdrop } from "@/src/ui/glass";
 import React, { useCallback, useState } from "react";
 import {
   Linking,
@@ -168,116 +168,118 @@ export default function MoreScreen() {
 
   return (
     <View style={styles.root}>
-      <Animated.ScrollView
-        showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + ms(56) }]}
-      >
-        {/* Identity */}
-        <Appear index={0} variant="drop">
-          <View style={styles.identity}>
-            <Pressable style={styles.avatarWrap} onPress={openEdit}>
-              <BearAvatar config={avatarConfig} size={ms(96)} showGlow />
-              <View style={styles.editBadge}>
-                <Ionicons name="pencil" size={ms(13)} color={colors.onHoney} />
-              </View>
-            </Pressable>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.handle}>{handle}</Text>
-          </View>
-        </Appear>
-
-        {/* Stats (real, from local history) */}
-        <Appear index={1}>
-          <View style={styles.statStrip}>
-            <Stat value={stats.watched} label="Watched" />
-            <View style={styles.statDivider} />
-            <Stat value={stats.hours} label="Hours" />
-            <View style={styles.statDivider} />
-            <Stat value={stats.inProgress} label="In progress" />
-          </View>
-        </Appear>
-
-        {/* Your pack */}
-        <Appear index={2}>
-          <View style={styles.packCard}>
-            <Text style={styles.overline}>YOUR PACK</Text>
-            <View style={styles.packRow}>
-              <View style={styles.packHint}>
-                <View style={styles.packIcon}>
-                  <Ionicons name="people" size={ms(18)} color={colors.honey} />
+      <GlassBackdrop style={styles.glassBackdrop}>
+        <Animated.ScrollView
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + ms(56) }]}
+        >
+          {/* Identity */}
+          <Appear index={0} variant="drop">
+            <View style={styles.identity}>
+              <Pressable style={styles.avatarWrap} onPress={openEdit}>
+                <BearAvatar config={avatarConfig} size={ms(96)} showGlow />
+                <View style={styles.editBadge}>
+                  <Ionicons name="pencil" size={ms(13)} color={colors.onHoney} />
                 </View>
-                <Text style={styles.packText}>Invite friends to watch together</Text>
-              </View>
-              <Pressable style={styles.inviteBtn} onPress={invite} hitSlop={6}>
-                <Ionicons name="person-add" size={ms(14)} color={colors.honey} />
-                <Text style={styles.inviteText}>Invite</Text>
               </Pressable>
+              <Text style={styles.name}>{name}</Text>
+              <Text style={styles.handle}>{handle}</Text>
             </View>
-          </View>
-        </Appear>
+          </Appear>
 
-        {/* Watch party — a room no longer needs a title to exist: host an empty
-            one, then browse and queue things up while everyone waits inside. */}
-        <Appear index={3}>
-          <Card>
-            <Row
-              icon="videocam-outline"
-              label="Host a watch party"
-              onPress={() => openPartyHost({ role: "host", room: genRoomCode() })}
-            />
-            <Row icon="enter-outline" label="Join with a code" onPress={openJoinParty} last />
-          </Card>
-        </Appear>
+          {/* Stats (real, from local history) */}
+          <Appear index={1}>
+            <View style={styles.statStrip}>
+              <Stat value={stats.watched} label="Watched" />
+              <View style={styles.statDivider} />
+              <Stat value={stats.hours} label="Hours" />
+              <View style={styles.statDivider} />
+              <Stat value={stats.inProgress} label="In progress" />
+            </View>
+          </Appear>
 
-        {/* Library */}
-        <Appear index={4}>
-          <Card>
-            <Row icon="time-outline" label="Watch history" onPress={() => openLibrary("WatchHistory")} />
-            <Row icon="bookmark-outline" label="My list" onPress={() => openLibrary("MyList")} />
-            <Row icon="download-outline" label="Downloads" onPress={() => comingSoon("Downloads")} last />
-          </Card>
-        </Appear>
+          {/* Your pack */}
+          <Appear index={2}>
+            <View style={styles.packCard}>
+              <Text style={styles.overline}>YOUR PACK</Text>
+              <View style={styles.packRow}>
+                <View style={styles.packHint}>
+                  <View style={styles.packIcon}>
+                    <Ionicons name="people" size={ms(18)} color={colors.honey} />
+                  </View>
+                  <Text style={styles.packText}>Invite friends to watch together</Text>
+                </View>
+                <Pressable style={styles.inviteBtn} onPress={invite} hitSlop={6}>
+                  <Ionicons name="person-add" size={ms(14)} color={colors.honey} />
+                  <Text style={styles.inviteText}>Invite</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Appear>
 
-        {/* Preferences */}
-        <Appear index={5}>
-          <Card>
-            <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
-            <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
-            <Row icon="sparkles-outline" label="Home" onPress={openHomePrefs} />
-            <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
-          </Card>
-        </Appear>
+          {/* Watch party — a room no longer needs a title to exist: host an empty
+              one, then browse and queue things up while everyone waits inside. */}
+          <Appear index={3}>
+            <Card>
+              <Row
+                icon="videocam-outline"
+                label="Host a watch party"
+                onPress={() => openPartyHost({ role: "host", room: genRoomCode() })}
+              />
+              <Row icon="enter-outline" label="Join with a code" onPress={openJoinParty} last />
+            </Card>
+          </Appear>
 
-        <Appear index={6}>
-          <Card>
-            <Row icon="chatbubble-ellipses-outline" label="Chat & reactions" onPress={() => comingSoon("Chat & reactions")} last />
-          </Card>
-        </Appear>
+          {/* Library */}
+          <Appear index={4}>
+            <Card>
+              <Row icon="time-outline" label="Watch history" onPress={() => openLibrary("WatchHistory")} />
+              <Row icon="bookmark-outline" label="My list" onPress={() => openLibrary("MyList")} />
+              <Row icon="download-outline" label="Downloads" onPress={() => comingSoon("Downloads")} last />
+            </Card>
+          </Appear>
 
-        {/* Maintenance / about */}
-        <Appear index={7}>
-          <Card>
-            <Row icon="color-palette-outline" label="Appearance" onPress={() => comingSoon("Appearance")} />
-            <Row icon="trash-outline" label="Clear watch history" onPress={confirmClearHistory} />
-            <Row icon="refresh-outline" label="Clear cache" onPress={confirmClearCache} />
-            <Row icon="help-circle-outline" label="Help & about" onPress={() => setAboutVisible(true)} last />
-          </Card>
-        </Appear>
+          {/* Preferences */}
+          <Appear index={5}>
+            <Card>
+              <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
+              <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
+              <Row icon="sparkles-outline" label="Home" onPress={openHomePrefs} />
+              <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
+            </Card>
+          </Appear>
 
-        <Appear index={8}>
-          <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
-            <Text style={styles.signOutText}>Sign out</Text>
-          </TouchableOpacity>
-        </Appear>
-      </Animated.ScrollView>
+          <Appear index={6}>
+            <Card>
+              <Row icon="chatbubble-ellipses-outline" label="Chat & reactions" onPress={() => comingSoon("Chat & reactions")} last />
+            </Card>
+          </Appear>
+
+          {/* Maintenance / about */}
+          <Appear index={7}>
+            <Card>
+              <Row icon="color-palette-outline" label="Appearance" onPress={() => comingSoon("Appearance")} />
+              <Row icon="trash-outline" label="Clear watch history" onPress={confirmClearHistory} />
+              <Row icon="refresh-outline" label="Clear cache" onPress={confirmClearCache} />
+              <Row icon="help-circle-outline" label="Help & about" onPress={() => setAboutVisible(true)} last />
+            </Card>
+          </Appear>
+
+          <Appear index={8}>
+            <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
+              <Text style={styles.signOutText}>Sign out</Text>
+            </TouchableOpacity>
+          </Appear>
+        </Animated.ScrollView>
+      </GlassBackdrop>
 
       {/* Persistent brand header — gains a frosted-glass background once content
           scrolls under it, matching Home. */}
       <View style={[styles.topBarBg, { paddingTop: insets.top }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBlurStyle]}>
-          <Frost intensity={40} style={StyleSheet.absoluteFill} />
+          <Glass material="chrome" />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <AppHeader showSearch={false} />
@@ -362,6 +364,7 @@ function Row({
 }
 
 const styles = StyleSheet.create({
+  glassBackdrop: { flex: 1 },
   root: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: ms(16), paddingBottom: ms(180) },
   topBarBg: { position: "absolute", top: 0, left: 0, right: 0, overflow: "hidden" },

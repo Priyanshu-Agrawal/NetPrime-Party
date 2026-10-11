@@ -24,7 +24,7 @@ import { colors, font, glow, ms, radius, spacing } from "@/theme/bearoom";
 import { gradients } from "@/theme/styles/gradients";
 import { setOnboarded } from "@/utils/prefs";
 import { Ionicons } from "@expo/vector-icons";
-import { Frost } from "@/src/ui/Frost";
+import { Glass, GlassBackdrop } from "@/src/ui/glass";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useRef, useState } from "react";
@@ -149,136 +149,137 @@ export default function OnboardingView() {
       <LinearGradient colors={gradients.onboardingGlow} style={styles.topGlow} pointerEvents="none" />
 
       <Pressable style={[styles.skip, { top: insets.top + ms(6) }]} onPress={finish} hitSlop={10}>
-        <Frost intensity={40} style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, styles.skipTint]} />
+        <Glass material="control" radius={radius.pill} />
         <Text variant="label">Skip</Text>
       </Pressable>
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        style={styles.pager}
-      >
-        {SLIDES.map((s, i) => (
-          <View key={s.key} style={[styles.slide, { width }]}>
-            {s.key === "name" ? (
-              <View style={styles.avatarSlideWrap}>
-                {/* Bear Avatar Ring with Shuffle */}
-                <View style={styles.avatarHeroWrap}>
-                  <BearAvatar config={avatarConfig} size={ms(108)} showGlow />
+      <GlassBackdrop style={styles.backdrop}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          style={styles.pager}
+        >
+          {SLIDES.map((s, i) => (
+            <View key={s.key} style={[styles.slide, { width }]}>
+              {s.key === "name" ? (
+                <View style={styles.avatarSlideWrap}>
+                  {/* Bear Avatar Ring with Shuffle */}
+                  <View style={styles.avatarHeroWrap}>
+                    <BearAvatar config={avatarConfig} size={ms(108)} showGlow />
 
-                  <TouchableOpacity style={styles.shuffleFloatingBtn} onPress={handleShuffleAvatar} activeOpacity={0.8}>
-                    <Ionicons name="dice-outline" size={ms(16)} color={colors.onHoney} />
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.customizeHintBtn}
-                  onPress={() => setCustomizerVisible(true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="color-palette-outline" size={ms(14)} color={colors.honey} />
-                  <Text style={styles.customizeHintText}>Customize details</Text>
-                </TouchableOpacity>
-
-                <Text variant="display" style={[styles.title, { marginTop: ms(12) }]}>
-                  {s.title}
-                </Text>
-
-                <Text variant="bodyDim" style={[styles.body, { marginTop: ms(6), marginBottom: ms(16) }]}>
-                  {s.body}
-                </Text>
-
-                {/* Gender Selector */}
-                <View style={styles.genderRow}>
-                  {GENDERS.map((g) => {
-                    const active = g.id === gender;
-                    return (
-                      <Pressable
-                        key={g.id}
-                        style={[styles.genderPill, active && styles.genderPillActive]}
-                        onPress={() => handleGenderSelect(g.id)}
-                      >
-                        <Ionicons
-                          name={g.icon}
-                          size={ms(14)}
-                          color={active ? colors.onHoney : colors.textDim}
-                          style={{ marginRight: ms(4) }}
-                        />
-                        <Text style={[styles.genderText, active && styles.genderTextActive]}>{g.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {/* Display Name Input */}
-                <View style={styles.nameField}>
-                  <Ionicons name="happy-outline" size={ms(18)} color={colors.textDim} />
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Your display name"
-                    placeholderTextColor={colors.textFaint}
-                    style={styles.nameInput}
-                    selectionColor={colors.honey}
-                    maxLength={32}
-                    returnKeyType="done"
-                    onSubmitEditing={finish}
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.slideContent}>
-                {/* Only the first (mount-visible) slide animates its entrance;
-                    later slides are revealed by the paging swipe itself, so their
-                    entrance wouldn't be seen (it would fire off-screen at mount). */}
-                <Appear index={0} disabled={i !== 0}>
-                  <View style={styles.heroWrap}>
-                    {s.key === "welcome" ? (
-                      <Image
-                        source={require("../../../assets/images/brandmark.png")}
-                        style={styles.heroMark}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <>
-                        <View style={styles.heroGlow} />
-                        <View style={styles.heroRing}>
-                          {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
-                        </View>
-                      </>
-                    )}
+                    <TouchableOpacity style={styles.shuffleFloatingBtn} onPress={handleShuffleAvatar} activeOpacity={0.8}>
+                      <Ionicons name="dice-outline" size={ms(16)} color={colors.onHoney} />
+                    </TouchableOpacity>
                   </View>
-                </Appear>
 
-                <Appear index={1} disabled={i !== 0}>
-                  {s.titleAccent ? (
-                    <Text variant="display" style={styles.title}>
-                      {s.titleTop}
-                      {"\n"}
-                      <Text honey>{s.titleAccent}</Text>
-                    </Text>
-                  ) : (
-                    <Text variant="display" style={styles.title}>
-                      {s.title}
-                    </Text>
-                  )}
-                </Appear>
+                  <TouchableOpacity
+                    style={styles.customizeHintBtn}
+                    onPress={() => setCustomizerVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="color-palette-outline" size={ms(14)} color={colors.honey} />
+                    <Text style={styles.customizeHintText}>Customize details</Text>
+                  </TouchableOpacity>
 
-                <Appear index={2} disabled={i !== 0}>
-                  <Text variant="bodyDim" style={styles.body}>
+                  <Text variant="display" style={[styles.title, { marginTop: ms(12) }]}>
+                    {s.title}
+                  </Text>
+
+                  <Text variant="bodyDim" style={[styles.body, { marginTop: ms(6), marginBottom: ms(16) }]}>
                     {s.body}
                   </Text>
-                </Appear>
-              </View>
-            )}
-          </View>
-        ))}
-      </ScrollView>
+
+                  {/* Gender Selector */}
+                  <View style={styles.genderRow}>
+                    {GENDERS.map((g) => {
+                      const active = g.id === gender;
+                      return (
+                        <Pressable
+                          key={g.id}
+                          style={[styles.genderPill, active && styles.genderPillActive]}
+                          onPress={() => handleGenderSelect(g.id)}
+                        >
+                          <Ionicons
+                            name={g.icon}
+                            size={ms(14)}
+                            color={active ? colors.onHoney : colors.textDim}
+                            style={{ marginRight: ms(4) }}
+                          />
+                          <Text style={[styles.genderText, active && styles.genderTextActive]}>{g.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Display Name Input */}
+                  <View style={styles.nameField}>
+                    <Ionicons name="happy-outline" size={ms(18)} color={colors.textDim} />
+                    <TextInput
+                      value={name}
+                      onChangeText={setName}
+                      placeholder="Your display name"
+                      placeholderTextColor={colors.textFaint}
+                      style={styles.nameInput}
+                      selectionColor={colors.honey}
+                      maxLength={32}
+                      returnKeyType="done"
+                      onSubmitEditing={finish}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.slideContent}>
+                  {/* Only the first (mount-visible) slide animates its entrance;
+                      later slides are revealed by the paging swipe itself, so their
+                      entrance wouldn't be seen (it would fire off-screen at mount). */}
+                  <Appear index={0} disabled={i !== 0}>
+                    <View style={styles.heroWrap}>
+                      {s.key === "welcome" ? (
+                        <Image
+                          source={require("../../../assets/images/brandmark.png")}
+                          style={styles.heroMark}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <>
+                          <View style={styles.heroGlow} />
+                          <View style={styles.heroRing}>
+                            {s.icon && <Ionicons name={s.icon} size={ms(44)} color={colors.honey} />}
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  </Appear>
+
+                  <Appear index={1} disabled={i !== 0}>
+                    {s.titleAccent ? (
+                      <Text variant="display" style={styles.title}>
+                        {s.titleTop}
+                        {"\n"}
+                        <Text honey>{s.titleAccent}</Text>
+                      </Text>
+                    ) : (
+                      <Text variant="display" style={styles.title}>
+                        {s.title}
+                      </Text>
+                    )}
+                  </Appear>
+
+                  <Appear index={2} disabled={i !== 0}>
+                    <Text variant="bodyDim" style={styles.body}>
+                      {s.body}
+                    </Text>
+                  </Appear>
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      </GlassBackdrop>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + ms(16) }]}>
         <Appear index={3}>
@@ -320,6 +321,7 @@ export default function OnboardingView() {
 }
 
 const styles = StyleSheet.create({
+  backdrop: { flex: 1 },
   root: { flex: 1, backgroundColor: colors.bg },
   topGlow: { position: "absolute", top: 0, left: 0, right: 0, height: ms(300) },
   skip: {
@@ -335,7 +337,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  skipTint: { backgroundColor: colors.overlay },
 
   pager: { flex: 1 },
   slide: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xxxl - 8 },

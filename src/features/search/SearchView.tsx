@@ -31,6 +31,7 @@ const YEAR_OPTIONS: { value: number | null; label: string }[] = [
 ];
 
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
+import { GlassBackdrop } from "@/src/ui/glass";
 
 // We need an array of dummy skeleton objects for the initial loading empty state
 const SKELETON_DATA = Array.from({ length: 12 }, (_, i) => ({
@@ -275,7 +276,7 @@ const SearchView: React.FC = () => {
         filterActive={filtersActive}
       />
 
-      <View style={styles.flex1}>
+      <GlassBackdrop style={styles.flex1}>
         <FlashList
           ref={listRef}
           data={listData}
@@ -298,7 +299,7 @@ const SearchView: React.FC = () => {
           onEndReached={loadMore}
           onEndReachedThreshold={0.75}
         />
-      </View>
+      </GlassBackdrop>
     </View>
   );
 };

@@ -34,7 +34,7 @@ import {
 } from "@/utils/tmdbDetails";
 import { useFadeInStyle, useCollapsingHeader } from "@/components/ui/useCollapsingHeader";
 import { Ionicons } from "@expo/vector-icons";
-import { Frost } from "@/src/ui/Frost";
+import { Glass, GlassBackdrop } from "@/src/ui/glass";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { goBack, openDetails, openPartyHost, openPlayer } from "@/src/navigation/actions";
@@ -203,7 +203,7 @@ const TvDetailsScreen: React.FC = () => {
       {/* Sticky header — always visible; bg + title fade in on scroll (like Home) */}
       <View style={[styles.header, { height: headerH }]} pointerEvents="box-none">
         <Animated.View style={[StyleSheet.absoluteFill, headerBgStyle]}>
-          <Frost intensity={40} style={StyleSheet.absoluteFill} />
+          <Glass material="chrome" />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>
@@ -223,305 +223,308 @@ const TvDetailsScreen: React.FC = () => {
         </View>
       </View>
 
-      <Animated.ScrollView
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: 48 + insets.bottom }}
-      >
-        {/* Hero */}
-        <View style={styles.hero}>
-          {backdrop ? (
-            <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
-          ) : null}
-          <LinearGradient
-            colors={["transparent", "transparent", colors.bg]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.heroContent}>
-            <Text style={styles.title}>{d.name}</Text>
-            {d.number_of_seasons || d.number_of_episodes ? (
-              <Text style={styles.seasonsLine}>
-                {d.number_of_seasons ?? 0} Season{d.number_of_seasons === 1 ? "" : "s"} ·{" "}
-                {d.number_of_episodes ?? 0} Episodes
-              </Text>
+      <GlassBackdrop style={styles.backdrop}>
+        <Animated.ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: 48 + insets.bottom }}
+        >
+          {/* Hero */}
+          <View style={styles.hero}>
+            {backdrop ? (
+              <Image source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
             ) : null}
-            <MetaBar
-              rating={d.vote_average}
-              votes={d.vote_count}
-              year={d.first_air_date?.slice(0, 4)}
-              runtime={runtimeStr(d.episode_run_time?.[0])}
-              certification={derived!.cert}
-              genres={(d.genres ?? []).map((g: any) => g.name)}
+            <LinearGradient
+              colors={["transparent", "transparent", colors.bg]}
+              style={StyleSheet.absoluteFill}
             />
-          </View>
-        </View>
-
-        {/* Primary actions */}
-        <Appear index={0}>
-        <View style={styles.actions}>
-          {released ? (
-            <>
-              <Button
-                label="Play"
-                icon="play"
-                variant="honey"
-                size="sm"
-                onPress={handlePlay}
-                style={styles.flexBtn}
+            <View style={styles.heroContent}>
+              <Text style={styles.title}>{d.name}</Text>
+              {d.number_of_seasons || d.number_of_episodes ? (
+                <Text style={styles.seasonsLine}>
+                  {d.number_of_seasons ?? 0} Season{d.number_of_seasons === 1 ? "" : "s"} ·{" "}
+                  {d.number_of_episodes ?? 0} Episodes
+                </Text>
+              ) : null}
+              <MetaBar
+                rating={d.vote_average}
+                votes={d.vote_count}
+                year={d.first_air_date?.slice(0, 4)}
+                runtime={runtimeStr(d.episode_run_time?.[0])}
+                certification={derived!.cert}
+                genres={(d.genres ?? []).map((g: any) => g.name)}
               />
+            </View>
+          </View>
+
+          {/* Primary actions */}
+          <Appear index={0}>
+          <View style={styles.actions}>
+            {released ? (
+              <>
+                <Button
+                  label="Play"
+                  icon="play"
+                  variant="honey"
+                  size="sm"
+                  onPress={handlePlay}
+                  style={styles.flexBtn}
+                />
+                <Button
+                  label="Watch together"
+                  icon="paw"
+                  variant="glass"
+                  size="sm"
+                  onPress={handleWatchTogether}
+                  style={styles.flexBtn}
+                />
+              </>
+            ) : (
               <Button
-                label="Watch together"
-                icon="paw"
+                label={releaseLabel(d, "tv")}
+                icon="time-outline"
                 variant="glass"
                 size="sm"
-                onPress={handleWatchTogether}
+                disabled
+                onPress={() => {}}
                 style={styles.flexBtn}
               />
-            </>
-          ) : (
-            <Button
-              label={releaseLabel(d, "tv")}
-              icon="time-outline"
-              variant="glass"
-              size="sm"
-              disabled
-              onPress={() => {}}
-              style={styles.flexBtn}
-            />
-          )}
-        </View>
-        </Appear>
-
-        {/* Quick actions */}
-        <Appear index={1}>
-        <View style={styles.quickRow}>
-          <Pressable
-            style={styles.quick}
-            onPress={() =>
-              setSaved(toggleWatchlist({ id: id!, type: "tv", title: d.name, poster_path: d.poster_path }))
-            }
-          >
-            <View style={styles.quickIcon}>
-              <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
-            </View>
-            <Text style={styles.quickLabel}>My List</Text>
-          </Pressable>
-          <Pressable style={styles.quick} onPress={() => openTrailer(derived!.trailer?.key)} disabled={!derived!.trailer}>
-            <View style={styles.quickIcon}>
-              <Ionicons name="film-outline" size={22} color={derived!.trailer ? colors.textDim : colors.textFaint} />
-            </View>
-            <Text style={styles.quickLabel}>Trailer</Text>
-          </Pressable>
-          <Pressable style={styles.quick} onPress={handleShare}>
-            <View style={styles.quickIcon}>
-              <Ionicons name="share-social-outline" size={22} color={colors.textDim} />
-            </View>
-            <Text style={styles.quickLabel}>Share</Text>
-          </Pressable>
-        </View>
-        </Appear>
-
-        {next ? (
-          <Appear index={2}>
-          <View style={styles.nextBanner}>
-            <Ionicons name="calendar-outline" size={14} color={colors.honey} />
-            <Text style={styles.nextText}>
-              Next: S{next.season_number}E{next.episode_number} “{next.name}” · {next.air_date}
-            </Text>
+            )}
           </View>
           </Appear>
-        ) : null}
 
-        {d.overview ? (
-          <Appear index={3}>
-          <View style={styles.overviewWrap}>
-            <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
-              {d.overview}
-            </Text>
-            {d.overview.length > 140 ? (
-              <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={6}>
-                <Text style={styles.moreLink}>{expanded ? "less" : "more"}</Text>
-              </Pressable>
-            ) : null}
+          {/* Quick actions */}
+          <Appear index={1}>
+          <View style={styles.quickRow}>
+            <Pressable
+              style={styles.quick}
+              onPress={() =>
+                setSaved(toggleWatchlist({ id: id!, type: "tv", title: d.name, poster_path: d.poster_path }))
+              }
+            >
+              <View style={styles.quickIcon}>
+                <Ionicons name={saved ? "checkmark" : "add"} size={22} color={saved ? colors.honey : colors.textDim} />
+              </View>
+              <Text style={styles.quickLabel}>My List</Text>
+            </Pressable>
+            <Pressable style={styles.quick} onPress={() => openTrailer(derived!.trailer?.key)} disabled={!derived!.trailer}>
+              <View style={styles.quickIcon}>
+                <Ionicons name="film-outline" size={22} color={derived!.trailer ? colors.textDim : colors.textFaint} />
+              </View>
+              <Text style={styles.quickLabel}>Trailer</Text>
+            </Pressable>
+            <Pressable style={styles.quick} onPress={handleShare}>
+              <View style={styles.quickIcon}>
+                <Ionicons name="share-social-outline" size={22} color={colors.textDim} />
+              </View>
+              <Text style={styles.quickLabel}>Share</Text>
+            </Pressable>
           </View>
           </Appear>
-        ) : null}
 
-        {/* Seasons + Episodes */}
-        {seasons.length ? (
-          <Appear index={4}>
-          <Section title="Episodes">
-            <FlatList
-              data={seasons}
-              horizontal
-              keyExtractor={(s: any) => String(s.id)}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
-              renderItem={({ item }: any) => {
-                const active = item.season_number === season;
-                return (
+          {next ? (
+            <Appear index={2}>
+            <View style={styles.nextBanner}>
+              <Ionicons name="calendar-outline" size={14} color={colors.honey} />
+              <Text style={styles.nextText}>
+                Next: S{next.season_number}E{next.episode_number} “{next.name}” · {next.air_date}
+              </Text>
+            </View>
+            </Appear>
+          ) : null}
+
+          {d.overview ? (
+            <Appear index={3}>
+            <View style={styles.overviewWrap}>
+              <Text style={styles.overview} numberOfLines={expanded ? undefined : 3}>
+                {d.overview}
+              </Text>
+              {d.overview.length > 140 ? (
+                <Pressable onPress={() => setExpanded((e) => !e)} hitSlop={6}>
+                  <Text style={styles.moreLink}>{expanded ? "less" : "more"}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            </Appear>
+          ) : null}
+
+          {/* Seasons + Episodes */}
+          {seasons.length ? (
+            <Appear index={4}>
+            <Section title="Episodes">
+              <FlatList
+                data={seasons}
+                horizontal
+                keyExtractor={(s: any) => String(s.id)}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
+                renderItem={({ item }: any) => {
+                  const active = item.season_number === season;
+                  return (
+                    <Pressable
+                      style={[styles.seasonChip, active && styles.seasonChipActive]}
+                      onPress={() => setSeason(item.season_number)}
+                    >
+                      <Text style={[styles.seasonChipText, active && styles.seasonChipTextActive]}>
+                        {item.season_number === 0 ? "Specials" : `Season ${item.season_number}`}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+              {seasonData ? (
+                (seasonData.episodes ?? []).map((ep: any) => {
+                  const aired = isReleased({ first_air_date: ep.air_date }, "tv");
+                  return (
                   <Pressable
-                    style={[styles.seasonChip, active && styles.seasonChipActive]}
-                    onPress={() => setSeason(item.season_number)}
+                    key={ep.id}
+                    style={[styles.episode, !aired && { opacity: 0.5 }]}
+                    disabled={!aired}
+                    onPress={() => playEpisode(ep.episode_number)}
                   >
-                    <Text style={[styles.seasonChipText, active && styles.seasonChipTextActive]}>
-                      {item.season_number === 0 ? "Specials" : `Season ${item.season_number}`}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
-            {seasonData ? (
-              (seasonData.episodes ?? []).map((ep: any) => {
-                const aired = isReleased({ first_air_date: ep.air_date }, "tv");
-                return (
-                <Pressable
-                  key={ep.id}
-                  style={[styles.episode, !aired && { opacity: 0.5 }]}
-                  disabled={!aired}
-                  onPress={() => playEpisode(ep.episode_number)}
-                >
-                  <View style={styles.epStillWrap}>
-                    {ep.still_path ? (
-                      <Image source={{ uri: img(ep.still_path, "w300") || undefined }} style={styles.epStill} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.epStill, styles.epNoStill]}>
-                        <Ionicons name="tv-outline" size={20} color={colors.textFaint} />
+                    <View style={styles.epStillWrap}>
+                      {ep.still_path ? (
+                        <Image source={{ uri: img(ep.still_path, "w300") || undefined }} style={styles.epStill} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.epStill, styles.epNoStill]}>
+                          <Ionicons name="tv-outline" size={20} color={colors.textFaint} />
+                        </View>
+                      )}
+                      <View style={styles.epPlay}>
+                        <Ionicons
+                          name={aired ? "play" : "time-outline"}
+                          size={18}
+                          color={aired ? colors.text : colors.textDim}
+                        />
                       </View>
-                    )}
-                    <View style={styles.epPlay}>
-                      <Ionicons
-                        name={aired ? "play" : "time-outline"}
-                        size={18}
-                        color={aired ? colors.text : colors.textDim}
-                      />
                     </View>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.epTitle} numberOfLines={1}>
-                      {ep.episode_number}. {ep.name}
-                    </Text>
-                    <View style={styles.epMeta}>
-                      {ep.runtime ? <Text style={styles.epMetaText}>{runtimeStr(ep.runtime)}</Text> : null}
-                      {ep.air_date ? <Text style={styles.epMetaText}>{ep.air_date}</Text> : null}
-                      {ep.vote_average ? (
-                        <View style={styles.epRating}>
-                          <Ionicons name="star" size={10} color={colors.honey} />
-                          <Text style={styles.epMetaText}>{ep.vote_average.toFixed(1)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.epTitle} numberOfLines={1}>
+                        {ep.episode_number}. {ep.name}
+                      </Text>
+                      <View style={styles.epMeta}>
+                        {ep.runtime ? <Text style={styles.epMetaText}>{runtimeStr(ep.runtime)}</Text> : null}
+                        {ep.air_date ? <Text style={styles.epMetaText}>{ep.air_date}</Text> : null}
+                        {ep.vote_average ? (
+                          <View style={styles.epRating}>
+                            <Ionicons name="star" size={10} color={colors.honey} />
+                            <Text style={styles.epMetaText}>{ep.vote_average.toFixed(1)}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {ep.overview ? (
+                        <Text style={styles.epOverview} numberOfLines={2}>
+                          {ep.overview}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                  );
+                })
+              ) : (
+                <EpisodeRowSkeleton />
+              )}
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.cast.length ? (
+            <Appear index={5}>
+            <Section title="Cast">
+              <PeopleRow people={derived!.cast} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.crew.length ? (
+            <Appear index={6}>
+            <Section title="Creators & Crew">
+              <PeopleRow people={derived!.crew} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.providers ? (
+            <Appear index={7}>
+            <Section title="Where to Watch">
+              <ProvidersRow providers={derived!.providers} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          <Appear index={8}>
+          <Section title="Details">
+            <FactGrid facts={derived!.facts} />
+          </Section>
+          </Appear>
+
+          {derived!.keywords.length ? (
+            <Appear index={9}>
+            <Section title="Keywords">
+              <Pills items={derived!.keywords} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {d.reviews?.results?.length ? (
+            <Appear index={10}>
+            <Section title="Reviews">
+              <Reviews reviews={d.reviews.results} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.links.length ? (
+            <Appear index={11}>
+            <Section title="Links">
+              <LinksRow links={derived!.links} />
+            </Section>
+            </Appear>
+          ) : null}
+
+          {derived!.recs.length ? (
+            <Appear index={12}>
+            <Section title="More Like This">
+              <FlatList
+                data={derived!.recs}
+                horizontal
+                keyExtractor={(m: any) => String(m.id)}
+                showsHorizontalScrollIndicator={false}
+                {...RAIL_LIST_PROPS}
+                ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+                renderItem={({ item }: any) => (
+                  <Pressable
+                    style={styles.recCard}
+                    onPress={() => openDetails({ id: item.id, media_type: "tv" }, "tv")}
+                  >
+                    <View style={styles.recImgWrap}>
+                      <Image source={{ uri: img(item.poster_path, "w342") || undefined }} style={styles.recImg} contentFit="cover" transition={200} />
+                      {item.vote_average ? (
+                        <View style={styles.recBadge}>
+                          <Ionicons name="star" size={9} color={colors.honey} />
+                          <Text style={styles.recBadgeText}>{item.vote_average.toFixed(1)}</Text>
                         </View>
                       ) : null}
                     </View>
-                    {ep.overview ? (
-                      <Text style={styles.epOverview} numberOfLines={2}>
-                        {ep.overview}
-                      </Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-                );
-              })
-            ) : (
-              <EpisodeRowSkeleton />
-            )}
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.cast.length ? (
-          <Appear index={5}>
-          <Section title="Cast">
-            <PeopleRow people={derived!.cast} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.crew.length ? (
-          <Appear index={6}>
-          <Section title="Creators & Crew">
-            <PeopleRow people={derived!.crew} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.providers ? (
-          <Appear index={7}>
-          <Section title="Where to Watch">
-            <ProvidersRow providers={derived!.providers} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        <Appear index={8}>
-        <Section title="Details">
-          <FactGrid facts={derived!.facts} />
-        </Section>
-        </Appear>
-
-        {derived!.keywords.length ? (
-          <Appear index={9}>
-          <Section title="Keywords">
-            <Pills items={derived!.keywords} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {d.reviews?.results?.length ? (
-          <Appear index={10}>
-          <Section title="Reviews">
-            <Reviews reviews={d.reviews.results} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.links.length ? (
-          <Appear index={11}>
-          <Section title="Links">
-            <LinksRow links={derived!.links} />
-          </Section>
-          </Appear>
-        ) : null}
-
-        {derived!.recs.length ? (
-          <Appear index={12}>
-          <Section title="More Like This">
-            <FlatList
-              data={derived!.recs}
-              horizontal
-              keyExtractor={(m: any) => String(m.id)}
-              showsHorizontalScrollIndicator={false}
-              {...RAIL_LIST_PROPS}
-              ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
-              renderItem={({ item }: any) => (
-                <Pressable
-                  style={styles.recCard}
-                  onPress={() => openDetails({ id: item.id, media_type: "tv" }, "tv")}
-                >
-                  <View style={styles.recImgWrap}>
-                    <Image source={{ uri: img(item.poster_path, "w342") || undefined }} style={styles.recImg} contentFit="cover" transition={200} />
-                    {item.vote_average ? (
-                      <View style={styles.recBadge}>
-                        <Ionicons name="star" size={9} color={colors.honey} />
-                        <Text style={styles.recBadgeText}>{item.vote_average.toFixed(1)}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.recTitle} numberOfLines={1}>
-                    {item.name || item.title}
-                  </Text>
-                </Pressable>
-              )}
-            />
-          </Section>
-          </Appear>
-        ) : null}
-      </Animated.ScrollView>
+                    <Text style={styles.recTitle} numberOfLines={1}>
+                      {item.name || item.title}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </Section>
+            </Appear>
+          ) : null}
+        </Animated.ScrollView>
+      </GlassBackdrop>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  backdrop: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   errText: { color: colors.danger, fontFamily: font.body, fontSize: ms(15) },

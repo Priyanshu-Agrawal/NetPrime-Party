@@ -1,6 +1,6 @@
 import { Appear, Badge, PosterCard, PosterSkeleton, Screen, Text, useCollapsingHeader, useFadeInStyle } from "@/src/ui";
 import { GlassIconButton } from "@/src/ui/IconButton";
-import { Frost } from "@/src/ui/Frost";
+import { Glass, GlassBackdrop } from "@/src/ui/glass";
 import { colors, ms, spacing, font } from "@/theme/bearoom";
 import { gridColumnWidth } from "@/theme/styles/layout";
 import { img } from "@/utils/tmdbDetails";
@@ -101,7 +101,7 @@ export default function PersonDetailsScreen({ route }: Props) {
       {/* Sticky Glass Header */}
       <View style={styles.header}>
         <Animated.View style={[StyleSheet.absoluteFill, headerBgStyle]}>
-          <Frost intensity={40} style={StyleSheet.absoluteFill} />
+          <Glass material="chrome" />
           <View style={styles.headerBgLine} />
         </Animated.View>
         <View style={[styles.headerRow, { marginTop: insets.top }]}>
@@ -116,111 +116,114 @@ export default function PersonDetailsScreen({ route }: Props) {
         </View>
       </View>
 
-      <Animated.ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: ms(120) }}
-        bounces={true}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-      >
-        {/* Header Profile Image with Parallax */}
-        <View style={styles.headerHero}>
-          {profileUrl ? (
-            <Animated.View style={[StyleSheet.absoluteFill, heroImgStyle]}>
-              <Image source={{ uri: profileUrl }} style={styles.headerImage} contentFit="cover" />
-            </Animated.View>
-          ) : (
-            <View style={[styles.headerImage, styles.placeholderBg]} />
-          )}
+      <GlassBackdrop style={styles.backdrop}>
+        <Animated.ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: ms(120) }}
+          bounces={true}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+        >
+          {/* Header Profile Image with Parallax */}
+          <View style={styles.headerHero}>
+            {profileUrl ? (
+              <Animated.View style={[StyleSheet.absoluteFill, heroImgStyle]}>
+                <Image source={{ uri: profileUrl }} style={styles.headerImage} contentFit="cover" />
+              </Animated.View>
+            ) : (
+              <View style={[styles.headerImage, styles.placeholderBg]} />
+            )}
           
-          <LinearGradient
-            colors={["transparent", "rgba(16,13,10,0.8)", colors.bg]}
-            locations={[0, 0.5, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          
-          {/* Name & Basic Info */}
-          <View style={styles.heroContent}>
-            <Text style={styles.nameText} numberOfLines={2}>
-              {details.name}
-            </Text>
-            <View style={styles.tagsRow}>
-              {details.known_for_department ? (
-                <Badge label={details.known_for_department} />
-              ) : null}
-              {details.birthday && (
-                <Text style={styles.subText}>{details.birthday}</Text>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Biography */}
-        {details.biography ? (
-          <Appear index={0}>
-          <Animated.View>
-            <Pressable onPress={() => setBioExpanded(!bioExpanded)} style={styles.bioContainer}>
-              <Text style={styles.sectionTitle}>Biography</Text>
-              <Text
-                style={styles.bioText}
-                numberOfLines={bioExpanded ? undefined : 6}
-              >
-                {details.biography}
-              </Text>
-              {!bioExpanded && details.biography.length > 250 && (
-                <Text style={styles.moreText}>more</Text>
-              )}
-            </Pressable>
-          </Animated.View>
-          </Appear>
-        ) : null}
-
-        {/* Known For */}
-        {loadingCredits ? (
-          <View style={styles.creditsContainer}>
-            <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.lg }]}>
-              Known For
-            </Text>
-            <View style={styles.creditsList}>
-              <PosterSkeleton />
-              <PosterSkeleton />
-              <PosterSkeleton />
-            </View>
-          </View>
-        ) : knownFor.length > 0 ? (
-          <Appear index={1}>
-          <View style={styles.creditsContainer}>
-            <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.lg }]}>
-              Known For
-            </Text>
-            <FlatList
-              horizontal
-              data={knownFor}
-              keyExtractor={(item) => String(item.id)}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.creditsList}
-              renderItem={({ item }: { item: any }) => (
-                <View style={styles.creditCard}>
-                  <PosterCard 
-                    poster={img(item.poster_path, "w342") || undefined}
-                    title={item.title || item.name}
-                    rating={item.vote_average}
-                    kind={item.media_type as "movie" | "tv"}
-                    width={gridColumnWidth(3)} 
-                    onPress={() => openDetails(item, item.media_type || "movie")}
-                  />
-                </View>
-              )}
+            <LinearGradient
+              colors={["transparent", "rgba(16,13,10,0.8)", colors.bg]}
+              locations={[0, 0.5, 1]}
+              style={StyleSheet.absoluteFill}
             />
+          
+            {/* Name & Basic Info */}
+            <View style={styles.heroContent}>
+              <Text style={styles.nameText} numberOfLines={2}>
+                {details.name}
+              </Text>
+              <View style={styles.tagsRow}>
+                {details.known_for_department ? (
+                  <Badge label={details.known_for_department} />
+                ) : null}
+                {details.birthday && (
+                  <Text style={styles.subText}>{details.birthday}</Text>
+                )}
+              </View>
+            </View>
           </View>
-          </Appear>
-        ) : null}
-      </Animated.ScrollView>
+
+          {/* Biography */}
+          {details.biography ? (
+            <Appear index={0}>
+            <Animated.View>
+              <Pressable onPress={() => setBioExpanded(!bioExpanded)} style={styles.bioContainer}>
+                <Text style={styles.sectionTitle}>Biography</Text>
+                <Text
+                  style={styles.bioText}
+                  numberOfLines={bioExpanded ? undefined : 6}
+                >
+                  {details.biography}
+                </Text>
+                {!bioExpanded && details.biography.length > 250 && (
+                  <Text style={styles.moreText}>more</Text>
+                )}
+              </Pressable>
+            </Animated.View>
+            </Appear>
+          ) : null}
+
+          {/* Known For */}
+          {loadingCredits ? (
+            <View style={styles.creditsContainer}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.lg }]}>
+                Known For
+              </Text>
+              <View style={styles.creditsList}>
+                <PosterSkeleton />
+                <PosterSkeleton />
+                <PosterSkeleton />
+              </View>
+            </View>
+          ) : knownFor.length > 0 ? (
+            <Appear index={1}>
+            <View style={styles.creditsContainer}>
+              <Text style={[styles.sectionTitle, { paddingHorizontal: spacing.lg }]}>
+                Known For
+              </Text>
+              <FlatList
+                horizontal
+                data={knownFor}
+                keyExtractor={(item) => String(item.id)}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.creditsList}
+                renderItem={({ item }: { item: any }) => (
+                  <View style={styles.creditCard}>
+                    <PosterCard 
+                      poster={img(item.poster_path, "w342") || undefined}
+                      title={item.title || item.name}
+                      rating={item.vote_average}
+                      kind={item.media_type as "movie" | "tv"}
+                      width={gridColumnWidth(3)} 
+                      onPress={() => openDetails(item, item.media_type || "movie")}
+                    />
+                  </View>
+                )}
+              />
+            </View>
+            </Appear>
+          ) : null}
+        </Animated.ScrollView>
+      </GlassBackdrop>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: { flex: 1 },
   header: {
     position: "absolute",
     top: 0,
