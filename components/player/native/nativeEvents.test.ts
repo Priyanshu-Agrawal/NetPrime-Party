@@ -106,6 +106,38 @@ describe("NativeEventMachine", () => {
     expect(events[events.length - 1]).toMatchObject({ event: "tick", currentTime: 10, bufferedAheadSec: 24 });
   });
 
+  it("a pause from outside (a call, an app switch) shows as paused", () => {
+    const { m, events } = setup();
+    m.onStatus("readyToPlay", 600);
+    m.setIntent(true);
+    m.onPlaying(true);
+    m.onPlaying(false);
+    expect(events[events.length - 1]).toMatchObject({ event: "pause", paused: true });
+    expect(m.paused).toBe(true);
+  });
+
+  it("a play from outside (lock screen) shows as playing", () => {
+    const { m, events } = setup();
+    m.onStatus("readyToPlay", 600);
+    m.onPlaying(true);
+    expect(m.paused).toBe(false);
+    expect(events.some((e) => e.event === "play" && !e.paused)).toBe(true);
+  });
+
+  it("isPlaying=false during a stall or a seek is not a pause", () => {
+    const { m } = setup();
+    m.onStatus("readyToPlay", 600);
+    m.setIntent(true);
+    m.onPlaying(true);
+    m.onStatus("loading");
+    m.onPlaying(false);
+    expect(m.paused).toBe(false);
+    m.onStatus("readyToPlay");
+    void m.beginSeek(100);
+    m.onPlaying(false);
+    expect(m.paused).toBe(false);
+  });
+
   it("ends paused", () => {
     const { m, events } = setup();
     m.setIntent(true);

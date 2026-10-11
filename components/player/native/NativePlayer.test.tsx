@@ -184,6 +184,14 @@ describe("NativePlayer", () => {
     expect(renders).toBeLessThan(10);
   });
 
+  it("pauses the player at the end, so seeking back doesn't play behind a paused UI", () => {
+    const { player, fire } = setup();
+    fire("statusChange", { status: "readyToPlay" });
+    player.pause.mockClear();
+    fire("playToEnd");
+    expect(player.pause).toHaveBeenCalled();
+  });
+
   it("forwards the first frame", () => {
     const { r, onFirstFrame } = setup();
     act(() => r.root.find((n) => n.props?.testID === "video-view").props.onFirstFrameRender());

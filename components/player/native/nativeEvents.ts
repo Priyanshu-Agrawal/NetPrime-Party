@@ -28,6 +28,7 @@ export class NativeEventMachine {
   private ready = false;
   private stalled = false;
   private atEnd = false;
+  private playingNow = false;
   private seek: PendingSeek | null = null;
 
   constructor(
@@ -74,8 +75,20 @@ export class NativeEventMachine {
     if (Number.isFinite(duration) && duration > 0) this.duration = duration;
   }
 
+  /**
+   * The player actually started or stopped. A start we didn't ask for (lock screen, notification) shows as playing; a
+   * stop while ready and not seeking or ending is a pause from outside (a call, an app switch, audio focus) — a stall
+   * or a seek arrives as status "loading" first and is not one.
+   */
   onPlaying(isPlaying: boolean): void {
-    if (isPlaying) this.out("playing");
+    const was = this.playingNow;
+    this.playingNow = isPlaying;
+    if (isPlaying) {
+      if (!this.wantPlaying) this.setIntent(true);
+      this.out("playing");
+      return;
+    }
+    if (was && this.wantPlaying && this.status === "readyToPlay" && !this.seek && !this.atEnd) this.setIntent(false);
   }
 
   onTime(currentTime: number, bufferedPosition: number): void {

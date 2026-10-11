@@ -162,7 +162,11 @@ export const NativePlayer = forwardRef<PlayerHandle, NativePlayerProps>(function
         machine.onTime(currentTime, bufferedPosition);
         tickClock(currentTime);
       }),
-      player.addListener("playToEnd", () => machine.onEnded()),
+      player.addListener("playToEnd", () => {
+        machine.onEnded();
+        // ExoPlayer keeps playWhenReady at the end; pause so a seek back doesn't play behind a paused UI.
+        player.pause();
+      }),
       player.addListener("sourceLoad", (e) => {
         machine.onDuration(e.duration);
         tracks.current = {
