@@ -46,6 +46,8 @@ export interface PlayerSettingsSheetProps {
   subtitleAdjust?: SubtitleAdjust;
   /** The source in use, with a way to pick another. */
   source?: { label: string; onOpen: () => void };
+  /** iOS: the sheet has finished closing (another sheet may present now). */
+  onDismissed?: () => void;
   /** "Autoplay next episode" pref (TV only) — applies to the NEXT stream load. */
   showAutoplay?: boolean;
   autoplayNext?: boolean;
@@ -95,6 +97,7 @@ export default function PlayerSettingsSheet({
   onSetSubtitle,
   subtitleAdjust,
   source,
+  onDismissed,
   showAutoplay,
   autoplayNext,
   onToggleAutoplayNext,
@@ -110,6 +113,7 @@ export default function PlayerSettingsSheet({
       onRequestClose={onClose}
       statusBarTranslucent
       supportedOrientations={PLAYER_SHEET_ORIENTATIONS}
+      onDismiss={onDismissed}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.wrap} onPress={() => {}}>

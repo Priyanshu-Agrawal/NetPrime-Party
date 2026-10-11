@@ -263,4 +263,33 @@ describe("NativePlayerView", () => {
     act(() => mockControlsProps.onBack());
     expect(mockRequestClose).toHaveBeenCalledTimes(1);
   });
+  it("Change source closes settings first; on iPhone the source sheet waits until settings has gone (one sheet at a time)", () => {
+    const { Platform } = jest.requireActual("react-native");
+    const onOpenSource = jest.fn();
+    act(() => {
+      create(view({ onOpenSource }));
+    });
+    act(() => mockControlsProps.onOpenSettings());
+    expect(mockSheetProps.visible).toBe(true);
+    jest.replaceProperty(Platform, "OS", "ios");
+    act(() => mockSheetProps.source.onOpen());
+    expect(mockSheetProps.visible).toBe(false);
+    expect(onOpenSource).not.toHaveBeenCalled();
+    act(() => mockSheetProps.onDismissed());
+    expect(onOpenSource).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
+
+  it("on Android, Change source opens the source sheet straight away", () => {
+    jest.replaceProperty(jest.requireActual("react-native").Platform, "OS", "android");
+    const onOpenSource = jest.fn();
+    act(() => {
+      create(view({ onOpenSource }));
+    });
+    act(() => mockControlsProps.onOpenSettings());
+    act(() => mockSheetProps.source.onOpen());
+    expect(mockSheetProps.visible).toBe(false);
+    expect(onOpenSource).toHaveBeenCalledTimes(1);
+    jest.restoreAllMocks();
+  });
 });

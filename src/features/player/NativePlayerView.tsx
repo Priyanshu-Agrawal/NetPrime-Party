@@ -320,6 +320,15 @@ export function NativePlayerView({
     beforeClose: () => beforeClose.current(),
   });
 
+  // One sheet at a time: settings closes before the source sheet opens. iOS can't present a Modal while another is up
+  // (or still sliding away), so there the source sheet waits for the settings sheet's onDismiss.
+  const sourceAfterSettings = useRef(false);
+  const openSourceFromSettings = useCallback(() => {
+    setSettingsOpen(false);
+    if (Platform.OS === "ios") sourceAfterSettings.current = true;
+    else onOpenSource();
+  }, [onOpenSource]);
+
   // Sibling streams stand in for audio tracks when the stream itself has at most one (spec §6.2 Language row).
   const siblingAudio = !!audioChoices && audios.length <= 1;
   const audioRows = siblingAudio && audioChoices ? audioChoices.options : audios;
@@ -453,7 +462,12 @@ export function NativePlayerView({
               }
             : undefined
         }
-        source={{ label: sourceLabel, onOpen: onOpenSource }}
+        source={{ label: sourceLabel, onOpen: openSourceFromSettings }}
+        onDismissed={() => {
+          if (!sourceAfterSettings.current) return;
+          sourceAfterSettings.current = false;
+          onOpenSource();
+        }}
       />
     </>
   );
