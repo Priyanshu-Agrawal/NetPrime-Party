@@ -114,45 +114,57 @@ function sized(r: ReactTestRenderer) {
 describe("PlayerControls gestures", () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it("double-tapping the right third seeks +10 s per tap and leaves the controls as they were", () => {
+  it("a double-tap streak seeks from where it started: +10 s, then +20 s, even before the player catches up", () => {
+    const onSeekTo = jest.fn();
     const onSeekBy = jest.fn();
     const now = jest.spyOn(Date, "now");
-    const r = render(<PlayerControls {...base} onSeekBy={onSeekBy} onBack={() => {}} />);
+    const ref = React.createRef<PlayerControlsHandle>();
+    const r = render(<PlayerControls ref={ref} {...base} onSeekTo={onSeekTo} onSeekBy={onSeekBy} onBack={() => {}} />);
     sized(r);
+    act(() => ref.current!.setPlayback({ currentTime: 100, duration: 600, paused: true }));
     now.mockReturnValue(1000);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 280 } }));
     now.mockReturnValue(1200);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 280 } }));
-    expect(onSeekBy).toHaveBeenCalledTimes(1);
-    expect(onSeekBy).toHaveBeenLastCalledWith(10);
+    expect(onSeekTo).toHaveBeenLastCalledWith(110);
     expect(glassShown(r)).toBe(true);
+    // The player hasn't reported the first seek yet (still 100) when the third tap lands.
+    act(() => ref.current!.setPlayback({ currentTime: 100, duration: 600, paused: true }));
     now.mockReturnValue(1600);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 280 } }));
-    expect(onSeekBy).toHaveBeenCalledTimes(2);
+    expect(onSeekTo).toHaveBeenLastCalledWith(120);
+    expect(onSeekBy).not.toHaveBeenCalled();
     expect(texts(r)).toContain("20 s");
   });
 
-  it("double-tapping the left third seeks back", () => {
-    const onSeekBy = jest.fn();
+  it("double-tapping the left third seeks back, never before the start", () => {
+    const onSeekTo = jest.fn();
     const now = jest.spyOn(Date, "now");
-    const r = render(<PlayerControls {...base} onSeekBy={onSeekBy} />);
+    const ref = React.createRef<PlayerControlsHandle>();
+    const r = render(<PlayerControls ref={ref} {...base} onSeekTo={onSeekTo} />);
     sized(r);
+    act(() => ref.current!.setPlayback({ currentTime: 15, duration: 600, paused: true }));
     now.mockReturnValue(1000);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 20 } }));
     now.mockReturnValue(1100);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 20 } }));
-    expect(onSeekBy).toHaveBeenCalledWith(-10);
+    expect(onSeekTo).toHaveBeenLastCalledWith(5);
+    now.mockReturnValue(1400);
+    act(() => surface(r).props.onPress({ nativeEvent: { locationX: 20 } }));
+    expect(onSeekTo).toHaveBeenLastCalledWith(0);
   });
 
   it("a guest's double tap only toggles", () => {
+    const onSeekTo = jest.fn();
     const onSeekBy = jest.fn();
     const now = jest.spyOn(Date, "now");
-    const r = render(<PlayerControls {...base} canControl={false} onSeekBy={onSeekBy} />);
+    const r = render(<PlayerControls {...base} canControl={false} onSeekTo={onSeekTo} onSeekBy={onSeekBy} />);
     sized(r);
     now.mockReturnValue(1000);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 280 } }));
     now.mockReturnValue(1100);
     act(() => surface(r).props.onPress({ nativeEvent: { locationX: 280 } }));
+    expect(onSeekTo).not.toHaveBeenCalled();
     expect(onSeekBy).not.toHaveBeenCalled();
   });
 

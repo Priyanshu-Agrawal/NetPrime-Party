@@ -181,6 +181,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const surfaceWidth = useRef(0);
     const taps = useRef<TapState>(NO_TAPS);
+    // Latest reported position and length, and where the current double-tap streak started.
+    const liveTime = useRef(0);
+    const durationRef = useRef(0);
+    const streakBase = useRef(0);
     const visibleBeforeTap = useRef(true);
     const [ripple, setRipple] = useState<{ zone: "left" | "right"; sec: number } | null>(null);
     const [rippleFade] = useState(() => new Animated.Value(0));
@@ -198,7 +202,11 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       () => ({
         setPlayback: (s) => {
           setPaused(s.paused);
-          if (Number.isFinite(s.duration)) setDuration(s.duration);
+          if (Number.isFinite(s.duration)) {
+            setDuration(s.duration);
+            durationRef.current = s.duration;
+          }
+          if (Number.isFinite(s.currentTime)) liveTime.current = s.currentTime;
           if (typeof s.bufferedTime === "number" && Number.isFinite(s.bufferedTime)) setBufferedTime(s.bufferedTime);
           // A stall while meant to be playing shows the spinner after a short delay, so a brief dip (just after a
           // seek) doesn't flash it.
@@ -303,13 +311,21 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
           return;
         }
         if (action.undoToggle) setVisible(visibleBeforeTap.current);
-        onSeekBy(action.zone === "left" ? -SEEK_STEP_SEC : SEEK_STEP_SEC);
+        // A streak seeks from where it started (or from a seek still on its way), so "+20 s" moves 20 s even before
+        // the player reports the first jump.
+        if (action.streak === 1) streakBase.current = seekTargetRef.current ?? liveTime.current;
+        const step = (action.zone === "left" ? -1 : 1) * action.streak * SEEK_STEP_SEC;
+        const end = durationRef.current > 0 ? durationRef.current : Infinity;
+        const target = Math.min(end, Math.max(0, streakBase.current + step));
+        seekTargetRef.current = target;
+        setDisplayTime(target);
+        onSeekTo(target);
         setRipple({ zone: action.zone, sec: action.streak * SEEK_STEP_SEC });
         rippleFade.stopAnimation();
         rippleFade.setValue(1);
         Animated.timing(rippleFade, { toValue: 0, duration: 250, delay: STREAK_MS, useNativeDriver: true }).start();
       },
-      [canControl, onSeekBy, revealUnlock, rippleFade],
+      [canControl, onSeekTo, revealUnlock, rippleFade],
     );
 
     const secForX = useCallback(
