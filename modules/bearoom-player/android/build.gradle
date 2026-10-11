@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.bearoomplayer'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.bearoomplayer"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // expo-video's player class and the ExoPlayer it wraps; both ship in the app already.
+  compileOnly project(':expo-video')
+  compileOnly "androidx.media3:media3-exoplayer:${androidxMedia3Version}"
+}
