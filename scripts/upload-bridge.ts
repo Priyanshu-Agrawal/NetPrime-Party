@@ -27,8 +27,12 @@ import { LEGACY_VIDEASY_BRIDGE, LEGACY_VIDEASY_ID } from "../src/scripts/legacy-
  * split stays in the repo as the future refactor target — when a provider is
  * ported, its entry becomes `UNIVERSAL_CORE + "\\n" + <delta>`.
  */
-/** Providers served the generic bridge (Phase 1A, spec §6.2.4); videasy keeps its legacy one. */
-const GENERIC_PROVIDERS = ["vidfast", "vidlink", "vidnest", "vidcore", "vidphantom", "mycineby", "vixsrc", "111movies"];
+/**
+ * Providers served the generic bridge (Phase 1A, spec §6.2.4); videasy keeps its legacy one.
+ * Only those measured to bind AND play on device (2026-10-11 gate). Left out: mycineby and
+ * 111movies (dead), vidcore and vidphantom (cross-origin frame on Android, too slow on iOS).
+ */
+const GENERIC_PROVIDERS = ["vidfast", "vidnest", "vixsrc", "vidlink"];
 
 const SCRIPTS: Record<string, string> = {
   [LEGACY_VIDEASY_ID]: LEGACY_VIDEASY_BRIDGE,
