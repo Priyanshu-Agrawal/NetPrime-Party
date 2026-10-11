@@ -167,6 +167,7 @@ export function PartyTray() {
           media={media}
           memberIds={memberIds}
           onOpen={() => setOpen(true)}
+          shown={!hidden}
         />
       </Animated.View>
 
@@ -202,11 +203,14 @@ function PeekBar({
   media,
   memberIds,
   onOpen,
+  shown,
 }: {
   code: string;
   media: TrayMedia;
   memberIds: string;
   onOpen: () => void;
+  /** False while faded out (e.g. over the party screen) — no live blur then. */
+  shown: boolean;
 }) {
   const { data: details } = useDetailsQuery(
     media ? { type: media.type, id: media.tmdbId } : skipToken,
@@ -236,7 +240,9 @@ function PeekBar({
       {/* Same frosted surface as FloatingTabBar, so the bar and the tab bar it
           rides on read as one navigation object rather than a card floating over
           the content. Quiet controls, rich content. */}
-      <Frost intensity={70} style={StyleSheet.absoluteFill} />
+      {/* Live blur only while the tray shows: Android's blur re-blurs the whole window
+          every frame, and hidden over the party screen it ate most of the main thread. */}
+      <Frost intensity={70} style={StyleSheet.absoluteFill} active={shown} />
       <View style={[StyleSheet.absoluteFill, styles.peekTint]} />
       <View style={[StyleSheet.absoluteFill, styles.peekLift]} />
 

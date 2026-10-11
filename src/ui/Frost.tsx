@@ -26,11 +26,13 @@ interface Props {
   intensity?: number;
   tint?: "dark" | "light";
   style?: StyleProp<ViewStyle>;
+  /** False while the surface is hidden (e.g. an overlay faded to 0 but still mounted). */
+  active?: boolean;
 }
 
-export function Frost({ intensity = 40, tint = "dark", style }: Props) {
+export function Frost({ intensity = 40, tint = "dark", style, active = true }: Props) {
   const onScreen = useScreenFocused();
-  if (!onScreen) {
+  if (!onScreen || !active) {
     const backgroundColor = tint === "dark" ? colors.glassChipBg : colors.surfaceStrong;
     return <View pointerEvents="none" style={[style ?? StyleSheet.absoluteFill, { backgroundColor }]} />;
   }

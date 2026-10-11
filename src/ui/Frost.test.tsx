@@ -34,3 +34,15 @@ describe("Frost", () => {
     expect(hasBlur(render(false))).toBe(false);
   });
 });
+
+describe("Frost outside any screen", () => {
+  it("drops the native blur while its overlay is hidden (the party tray faded out over the party screen)", () => {
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(<Frost active={false} />);
+    });
+    expect(hasBlur(r)).toBe(false);
+    act(() => r.update(<Frost active />));
+    expect(hasBlur(r)).toBe(true);
+  });
+});
