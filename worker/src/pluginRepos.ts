@@ -45,6 +45,15 @@ export function toPluginRepo(row: PluginRepoRow): PluginRepo | null {
   };
 }
 
+const SOURCE_ID = /^([a-z0-9][a-z0-9-]{1,40})\/([A-Za-z0-9._-]{1,80})$/;
+
+/** `repoId/pluginId` of a repo the operator lists (not down) that allows that plugin. */
+export function isPluginSourceId(id: string, repos: PluginRepo[]): boolean {
+  const m = SOURCE_ID.exec(id);
+  if (!m || m[2].includes("..")) return false;
+  return repos.some((r) => r.id === m[1] && !r.down && (r.allowPlugins == null || r.allowPlugins.includes(m[2])));
+}
+
 export const PLUGIN_REPOS_LKG_KEY = "pluginRepos:lkg:v1";
 const CACHE_KEY = new Request("https://internal.cache/plugin-repos");
 

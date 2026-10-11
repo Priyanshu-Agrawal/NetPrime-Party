@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toPluginRepo } from "./pluginRepos";
+import { isPluginSourceId, toPluginRepo } from "./pluginRepos";
 
 const SHA = "a".repeat(64);
 const good = {
@@ -43,4 +43,21 @@ describe("toPluginRepo", () => {
   ])("drops a row with %s", (_, patch) => {
     expect(toPluginRepo({ ...good, ...patch } as never)).toBeNull();
   });
+});
+
+describe("isPluginSourceId", () => {
+  const repos = [
+    { id: "open-movies", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: false, allowPlugins: null },
+    { id: "narrow", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: false, allowPlugins: ["ok"] },
+    { id: "gone", manifestUrl: "https://h/m.json", version: 1, files: [], enabled: true, down: true, allowPlugins: null },
+  ];
+  it.each([
+    ["open-movies/open-movies", true],
+    ["narrow/ok", true],
+    ["narrow/other", false],
+    ["gone/x", false],
+    ["made-up/x", false],
+    ["videasy", false],
+    ["open-movies/../x", false],
+  ])("%s → %s", (id, want) => expect(isPluginSourceId(id, repos)).toBe(want));
 });

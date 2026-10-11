@@ -49,7 +49,7 @@ import {
   type ScrapeResult,
 } from "./schemas";
 import { z } from "@hono/zod-openapi";
-import { getPluginRepos } from "./pluginRepos";
+import { getPluginRepos, isPluginSourceId } from "./pluginRepos";
 
 /**
  * Client-facing app version. Keep in sync with `app.json` -> expo.version.
@@ -378,8 +378,12 @@ app.openapi(reportRoute, async (c) => {
   // (202) without an insert — telemetry is fire-and-forget and we don't hand an
   // attacker a probe for which ids are live. (getProviders is edge-cached, shared
   // with /config, so this adds no per-request Supabase load in the common case.)
+  // Plugin sources are accepted on the native lane only: `repoId/pluginId` of a repo the operator lists.
   const providers = await getProviders(c.env, c.executionCtx);
-  if (!providers.some((p) => p.id === body.providerId)) {
+  const known =
+    providers.some((p) => p.id === body.providerId) ||
+    (body.lane === "native" && isPluginSourceId(body.providerId, await getPluginRepos(c.env, c.executionCtx)));
+  if (!known) {
     return c.json({ accepted: true }, 202);
   }
 
