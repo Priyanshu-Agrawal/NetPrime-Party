@@ -1,11 +1,11 @@
 import React from "react";
 import { AccessibilityInfo } from "react-native";
 import { act, create } from "react-test-renderer";
+import { useReduceTransparency } from "./useReduceTransparency";
 
 it("reports iOS Reduce Transparency (glass then draws its solid look)", async () => {
   jest.spyOn(AccessibilityInfo, "isReduceTransparencyEnabled").mockResolvedValue(true);
   jest.spyOn(AccessibilityInfo, "addEventListener").mockReturnValue({ remove: () => {} } as never);
-  const { useReduceTransparency } = require("./useReduceTransparency") as typeof import("./useReduceTransparency");
   const seen: boolean[] = [];
   function Probe() {
     seen.push(useReduceTransparency());

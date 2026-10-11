@@ -14,6 +14,10 @@ jest.mock("@/components/ui/GlassCard", () => {
   const { View } = jest.requireActual("react-native");
   return { __esModule: true, default: ({ children }: { children: React.ReactNode }) => <View>{children}</View> };
 });
+jest.mock("@/src/ui/glass", () => {
+  const { View } = jest.requireActual("react-native");
+  return { Glass: (p: object) => <View testID="glass" {...p} /> };
+});
 
 const base = {
   canControl: true,
@@ -56,5 +60,18 @@ describe("PlayerControls header", () => {
   it("clears the status bar when the player is full-bleed", () => {
     const r = render(<PlayerControls {...base} title="Fight Club" />);
     expect(headerTop(r, "Fight Club")).toBe(STATUS_BAR);
+  });
+});
+
+describe("PlayerControls glass", () => {
+  it("puts glass behind the transport and hides it with the controls (Liquid Glass must not sit at alpha 0)", () => {
+    const r = render(<PlayerControls {...base} onBack={() => {}} />);
+    const glass = () => r.root.findAll((n) => n.props?.testID === "glass");
+    expect(glass().length).toBeGreaterThanOrEqual(3); // back button, −10, +10
+    expect(glass().every((g) => g.props.visible === true)).toBe(true);
+    // A tap on the video hides the controls (they start paused, so they never auto-hide here).
+    const overlay = r.root.findAll((n) => typeof n.props?.onPress === "function")[0];
+    act(() => overlay.props.onPress());
+    expect(glass().every((g) => g.props.visible === false)).toBe(true);
   });
 });

@@ -1,3 +1,4 @@
+import { GlassBackdrop } from "@/src/ui/glass";
 import React, { useCallback, useRef } from "react";
 import { View, FlatList, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,7 +32,6 @@ const YEAR_OPTIONS: { value: number | null; label: string }[] = [
 ];
 
 import { FlashList, type FlashListRef } from "@shopify/flash-list";
-import { GlassBackdrop } from "@/src/ui/glass";
 
 // We need an array of dummy skeleton objects for the initial loading empty state
 const SKELETON_DATA = Array.from({ length: 12 }, (_, i) => ({

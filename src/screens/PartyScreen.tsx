@@ -73,6 +73,7 @@ import {
 } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GlassBackdrop, GlassLayer } from "@/src/ui/glass";
 
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 // Stable empty reference so `members` doesn't churn memo deps before the snapshot lands.
@@ -596,10 +597,10 @@ export default function Party() {
               },
             ]}
           >
-            <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
+            <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8}>
               <Ionicons name="chevron-back" size={22} color={colors.text} />
             </GlassButton>
-            <GlassButton style={styles.codePill} onPress={share} blur={false}>
+            <GlassButton style={styles.codePill} onPress={share}>
               <Text style={styles.codeLabel}>ROOM · </Text>
               <Text style={styles.code}>{roomCode || "—"}</Text>
               <View style={styles.shareBtn}>
@@ -688,136 +689,140 @@ export default function Party() {
             </View>
           ) : providerId && media ? (
             <>
-              <HijackPlayer
-                ref={playerRef}
-                providerId={providerId}
-                tmdbId={media.tmdbId}
-                type={media.type}
-                season={media.season}
-                episode={media.episode}
-                posterUrl={posterUrl}
-                onPlayerEvent={onEvent}
-                onBound={() => setPlayerBound(true)}
-                onSwitchSource={isHost ? switchSource : undefined}
-                nativeControls={playerBound}
-              />
-              {/* Mount our overlay ONLY after the <video> binds. videasy gates
-                  playback behind a pre-play button (no <video> until it's tapped);
-                  covering it would stop the video ever starting. Before bind, let
-                  videasy's own button through; after, we take over the surface. */}
-              {playerBound ? (
-                <PlayerControls
-                  ref={controlsRef}
-                  canControl={canSeek}
-                  roomPlaying={snap?.playback?.status === "playing"}
-                  onPlay={party.play}
-                  onPause={party.pause}
-                  onSeekTo={party.seekTo}
-                  onSeekBy={party.seekBy}
-                  onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
-                  onTapSync={party.jumpToLive}
-                  onOpenSettings={() => {
-                    // Both reads drive videasy's ONE settings tab, so stagger them —
-                    // firing at once makes audio steal the active tab before quality
-                    // finishes reading (→ empty quality panel, stuck on "Loading…").
-                    playerRef.current?.readQuality();
-                    setTimeout(() => playerRef.current?.readAudio(), 750);
-                    setShowPlayerSettings(true);
-                  }}
-                  fullscreen={fullscreen}
-                  title={nowPlaying}
-                  subtitle={nowPlayingEpisode}
-                  embedded={!isImmersive}
-                  topBar={
-                    isImmersive ? (
-                      <View
-                        style={[
-                          styles.topBar,
-                          {
-                            paddingLeft: Math.max(insets.left, ms(12)),
-                            paddingRight: Math.max(insets.right, ms(12)),
-                            paddingTop: ms(2),
-                          },
-                        ]}
-                      >
-                        <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8} blur={false}>
-                          <Ionicons name="chevron-back" size={22} color={colors.text} />
-                        </GlassButton>
-                        <View style={styles.nowPlaying} pointerEvents="none">
-                          {nowPlaying ? (
-                            <Text style={styles.nowPlayingTitle} numberOfLines={1}>
-                              {nowPlaying}
-                            </Text>
-                          ) : null}
-                          {nowPlayingEpisode ? (
-                            <Text style={styles.nowPlayingEpisode} numberOfLines={1}>
-                              {nowPlayingEpisode}
-                            </Text>
-                          ) : null}
-                        </View>
-                        <GlassButton style={styles.codePill} onPress={share} blur={false}>
-                          <Text style={styles.codeLabel}>ROOM · </Text>
-                          <Text style={styles.code}>{roomCode || "—"}</Text>
-                          <View style={styles.shareBtn}>
-                            <Ionicons name="share-social" size={13} color={colors.text} />
+              <GlassLayer>
+                <GlassBackdrop style={StyleSheet.absoluteFill}>
+                  <HijackPlayer
+                    ref={playerRef}
+                    providerId={providerId}
+                    tmdbId={media.tmdbId}
+                    type={media.type}
+                    season={media.season}
+                    episode={media.episode}
+                    posterUrl={posterUrl}
+                    onPlayerEvent={onEvent}
+                    onBound={() => setPlayerBound(true)}
+                    onSwitchSource={isHost ? switchSource : undefined}
+                    nativeControls={playerBound}
+                  />
+                </GlassBackdrop>
+                {/* Mount our overlay ONLY after the <video> binds. videasy gates
+                    playback behind a pre-play button (no <video> until it's tapped);
+                    covering it would stop the video ever starting. Before bind, let
+                    videasy's own button through; after, we take over the surface. */}
+                {playerBound ? (
+                  <PlayerControls
+                    ref={controlsRef}
+                    canControl={canSeek}
+                    roomPlaying={snap?.playback?.status === "playing"}
+                    onPlay={party.play}
+                    onPause={party.pause}
+                    onSeekTo={party.seekTo}
+                    onSeekBy={party.seekBy}
+                    onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
+                    onTapSync={party.jumpToLive}
+                    onOpenSettings={() => {
+                      // Both reads drive videasy's ONE settings tab, so stagger them —
+                      // firing at once makes audio steal the active tab before quality
+                      // finishes reading (→ empty quality panel, stuck on "Loading…").
+                      playerRef.current?.readQuality();
+                      setTimeout(() => playerRef.current?.readAudio(), 750);
+                      setShowPlayerSettings(true);
+                    }}
+                    fullscreen={fullscreen}
+                    title={nowPlaying}
+                    subtitle={nowPlayingEpisode}
+                    embedded={!isImmersive}
+                    topBar={
+                      isImmersive ? (
+                        <View
+                          style={[
+                            styles.topBar,
+                            {
+                              paddingLeft: Math.max(insets.left, ms(12)),
+                              paddingRight: Math.max(insets.right, ms(12)),
+                              paddingTop: ms(2),
+                            },
+                          ]}
+                        >
+                          <GlassButton style={styles.glassRound} onPress={requestClose} hitSlop={8}>
+                            <Ionicons name="chevron-back" size={22} color={colors.text} />
+                          </GlassButton>
+                          <View style={styles.nowPlaying} pointerEvents="none">
+                            {nowPlaying ? (
+                              <Text style={styles.nowPlayingTitle} numberOfLines={1}>
+                                {nowPlaying}
+                              </Text>
+                            ) : null}
+                            {nowPlayingEpisode ? (
+                              <Text style={styles.nowPlayingEpisode} numberOfLines={1}>
+                                {nowPlayingEpisode}
+                              </Text>
+                            ) : null}
                           </View>
-                        </GlassButton>
-                        <View style={styles.topRightActions}>
-                          {isLandscapeMobile ? (
-                            <Pressable
-                              style={({ pressed }) => [
-                                styles.chatToggleBtn,
-                                landscapeChatOpen && styles.chatToggleBtnActive,
-                                pressed && styles.pressed,
-                              ]}
-                              onPress={() => setLandscapeChatOpen((v) => !v)}
-                              hitSlop={8}
-                            >
-                              <Ionicons
-                                name={landscapeChatOpen ? "chatbubbles" : "chatbubbles-outline"}
-                                size={ms(15)}
-                                color={landscapeChatOpen ? colors.onHoney : colors.text}
-                              />
-                              <Text style={[styles.chatToggleText, landscapeChatOpen && styles.chatToggleTextActive]}>Chat</Text>
-                              {chat.messages.length > 0 ? (
-                                <View style={[styles.chatBadge, landscapeChatOpen && styles.chatBadgeActive]}>
-                                  <Text style={[styles.chatBadgeText, landscapeChatOpen && styles.chatBadgeTextActive]}>
-                                    {chat.messages.length > 99 ? "99+" : chat.messages.length}
-                                  </Text>
-                                </View>
-                              ) : null}
-                            </Pressable>
-                          ) : null}
-                          <AvatarStack members={members} hostId={hostId} selfId={party.userId} />
-                        </View>
-                      </View>
-                    ) : undefined
-                  }
-                  overlayChildren={
-                    isImmersive ? (
-                      <>
-                        {!landscapeChatOpen && reactionsOn && canParticipate ? (
-                          <ReanimatedAnimated.View
-                            style={[styles.landscapeQuickReactions, { right: Math.max(insets.right, ms(16)), bottom: ms(66) }]}
-                            pointerEvents="box-none"
-                          >
-                            {QUICK_REACTIONS.map((e) => (
+                          <GlassButton style={styles.codePill} onPress={share}>
+                            <Text style={styles.codeLabel}>ROOM · </Text>
+                            <Text style={styles.code}>{roomCode || "—"}</Text>
+                            <View style={styles.shareBtn}>
+                              <Ionicons name="share-social" size={13} color={colors.text} />
+                            </View>
+                          </GlassButton>
+                          <View style={styles.topRightActions}>
+                            {isLandscapeMobile ? (
                               <Pressable
-                                key={e}
-                                style={({ pressed }) => [styles.landscapeEmojiChip, pressed && styles.pressed]}
-                                onPress={() => chat.sendReaction(e)}
-                                hitSlop={6}
+                                style={({ pressed }) => [
+                                  styles.chatToggleBtn,
+                                  landscapeChatOpen && styles.chatToggleBtnActive,
+                                  pressed && styles.pressed,
+                                ]}
+                                onPress={() => setLandscapeChatOpen((v) => !v)}
+                                hitSlop={8}
                               >
-                                <Text style={styles.landscapeEmojiText}>{e}</Text>
+                                <Ionicons
+                                  name={landscapeChatOpen ? "chatbubbles" : "chatbubbles-outline"}
+                                  size={ms(15)}
+                                  color={landscapeChatOpen ? colors.onHoney : colors.text}
+                                />
+                                <Text style={[styles.chatToggleText, landscapeChatOpen && styles.chatToggleTextActive]}>Chat</Text>
+                                {chat.messages.length > 0 ? (
+                                  <View style={[styles.chatBadge, landscapeChatOpen && styles.chatBadgeActive]}>
+                                    <Text style={[styles.chatBadgeText, landscapeChatOpen && styles.chatBadgeTextActive]}>
+                                      {chat.messages.length > 99 ? "99+" : chat.messages.length}
+                                    </Text>
+                                  </View>
+                                ) : null}
                               </Pressable>
-                            ))}
-                          </ReanimatedAnimated.View>
-                        ) : null}
-                      </>
-                    ) : undefined
-                  }
-                />
-              ) : null}
+                            ) : null}
+                            <AvatarStack members={members} hostId={hostId} selfId={party.userId} />
+                          </View>
+                        </View>
+                      ) : undefined
+                    }
+                    overlayChildren={
+                      isImmersive ? (
+                        <>
+                          {!landscapeChatOpen && reactionsOn && canParticipate ? (
+                            <ReanimatedAnimated.View
+                              style={[styles.landscapeQuickReactions, { right: Math.max(insets.right, ms(16)), bottom: ms(66) }]}
+                              pointerEvents="box-none"
+                            >
+                              {QUICK_REACTIONS.map((e) => (
+                                <Pressable
+                                  key={e}
+                                  style={({ pressed }) => [styles.landscapeEmojiChip, pressed && styles.pressed]}
+                                  onPress={() => chat.sendReaction(e)}
+                                  hitSlop={6}
+                                >
+                                  <Text style={styles.landscapeEmojiText}>{e}</Text>
+                                </Pressable>
+                              ))}
+                            </ReanimatedAnimated.View>
+                          ) : null}
+                        </>
+                      ) : undefined
+                    }
+                  />
+                ) : null}
+              </GlassLayer>
             </>
           ) : !snap ? (
             <View style={styles.waiting}>
@@ -903,7 +908,7 @@ export default function Party() {
               </Text>
             </View>
             <View style={styles.hostActions}>
-              <GlassButton style={styles.settingsBtn} onPress={() => setShowSettings(true)} blur={false}>
+              <GlassButton style={styles.settingsBtn} onPress={() => setShowSettings(true)}>
                 <Ionicons name="settings-outline" size={16} color={colors.text} />
                 {pendingCount > 0 ? <View style={styles.settingsDot} /> : null}
               </GlassButton>
@@ -1057,7 +1062,7 @@ export default function Party() {
               {canSendChat ? (
                 <View style={[styles.inputRow, isLandscapeMobile && styles.landscapeInputRow]}>
                   {reactionsOn ? (
-                    <GlassButton style={[styles.gifBtn, isLandscapeMobile && styles.landscapeGifBtn]} onPress={() => setShowGif(true)} hitSlop={6} blur={false}>
+                    <GlassButton style={[styles.gifBtn, isLandscapeMobile && styles.landscapeGifBtn]} onPress={() => setShowGif(true)} hitSlop={6}>
                       <Text style={[styles.gifBtnText, isLandscapeMobile && styles.landscapeGifBtnText]}>GIF</Text>
                     </GlassButton>
                   ) : null}

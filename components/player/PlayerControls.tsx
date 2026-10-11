@@ -15,6 +15,7 @@
  * (party.tsx) doesn't re-render its chat list on every 1 s tick.
  */
 import GlassCard from "@/components/ui/GlassCard";
+import { Glass } from "@/src/ui/glass";
 import { colors, font, ms, radius } from "@/theme/bearoom";
 import { absoluteFill } from "@/theme/styles/layout";
 import { gradients } from "@/theme/styles/gradients";
@@ -329,6 +330,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                   }}
                   hitSlop={10}
                 >
+                  <Glass material="control" radius={radius.pill} visible={visible} />
                   <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
                 </Pressable>
               ) : (
@@ -362,6 +364,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             {canControl ? (
               <View style={styles.centerRow} pointerEvents="box-none">
                 <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
+                  <Glass material="control" radius={radius.pill} visible={visible} />
                   <MaterialIcons name="replay-10" size={ms(29)} color={colors.text} />
                 </Pressable>
                 <Pressable
@@ -386,6 +389,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                   />
                 </Pressable>
                 <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
+                  <Glass material="control" radius={radius.pill} visible={visible} />
                   <MaterialIcons name="forward-10" size={ms(29)} color={colors.text} />
                 </Pressable>
               </View>
@@ -401,11 +405,9 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             ) : null}
           </View>
 
-          {/* Frosted-glass bottom bar: time · scrub · time · fullscreen */}
-          {/* blur={false} is LOAD-BEARING: a BlurView (dimezisBlurView) over the playing
-              video re-samples + blurs it every frame on the GPU and badly stutters
-              playback (device-confirmed, esp. 4K). Keep this a solid bar, never a blur. */}
-          <GlassCard blur={false} rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
+          {/* Glass bottom bar: time · scrub · time · actions. It blurs the video box only (the player's
+              GlassLayer), never the window — see docs/superpowers/specs/2026-10-11-glass-design.md. */}
+          <GlassCard material="bar" visible={visible} rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
             <View style={styles.bottomRow} pointerEvents="box-none">
               <Text style={styles.time}>{fmt(displayTime)}</Text>
               <View
@@ -484,7 +486,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceStrong,
+    overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
@@ -519,8 +521,7 @@ const styles = StyleSheet.create({
     left: ms(10),
     right: ms(10),
     bottom: ms(10),
-    // Solid dark backing (NOT a live blur — see below) so the controls stay readable.
-    backgroundColor: colors.playerCenter,  },
+  },
   bottomRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -576,9 +577,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.playerCenter,
+    overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,  },
+    borderColor: colors.borderStrong,
+  },
   // Plain centered title text (no pill card) to match the detail-screen header.
   topTitleCard: {
     flex: 1,

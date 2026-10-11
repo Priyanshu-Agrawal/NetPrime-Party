@@ -11,7 +11,7 @@ export const GlassInsideContext = createContext<readonly number[]>([]);
 
 /** A private backdrop for its subtree — the player's controls blur the video box, not the screen. */
 export function GlassLayer({ children }: { children: ReactNode }) {
-  const slot = useMemo(createBackdropRegistry, []);
+  const slot = useMemo(() => createBackdropRegistry(), []);
   return <GlassLayerContext.Provider value={slot}>{children}</GlassLayerContext.Provider>;
 }
 

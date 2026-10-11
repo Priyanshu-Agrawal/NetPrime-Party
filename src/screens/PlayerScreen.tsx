@@ -73,6 +73,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Animated, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "@/hooks/useResponsive";
+import { GlassBackdrop, GlassLayer } from "@/src/ui/glass";
 
 /**
  * SOLO playback = the SAME native player as the watch party (HijackPlayer + our
@@ -705,78 +706,82 @@ export const PlayerScreen: React.FC = () => {
           button and the bottom control bar respect the safe area (top edge dropped). */}
       <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
         <View style={isImmersive ? styles.playerFs : styles.playerArea}>
-          {id && selected ? (
-            <>
-              <HijackPlayer
-                ref={playerRef}
-                key={selected.id}
-                providerId={selected.id}
-                posterUrl={artworkUrl ?? undefined}
-                tmdbId={media.tmdbId}
-                type={media.type}
-                season={media.season}
-                episode={media.episode}
-                onPlayerEvent={onEvent}
-                onBound={() => {
-                  setPlayerBound(true);
-                  if (__DEV__) logBind(selected.id, true, mountTsRef.current);
-                  // Bound behind another screen (a party pushed on top): stay paused.
-                  if (onBindAction({ focused: focusedRef.current }) === "pause") {
-                    playerRef.current?.pause();
-                    return;
-                  }
-                  // The user pressed Play on the title: start as soon as we can drive the
-                  // video (some providers bind paused, e.g. TV episodes). That makes binding
-                  // the play intent — a bound provider that never advances is skipped.
-                  playIntentAtRef.current ??= Date.now();
-                  playerRef.current?.play();
-                }}
-                onBindFailed={() => {
-                  moveOn("bind");
-                }}
-                revealProviderUiOnBindFail={!hasNextBindable}
-                onFatalError={onFatalError}
-                onSwitchSource={triggerFallback}
-                onRecovered={() =>
-                  setExcludedIds((prev) => prev.filter((pid) => pid !== selected.id))
-                }
-                nativeControls={playerBound}
-                party={false}
-              />
-              {playerBound ? (
-                <PlayerControls
-                  ref={controlsRef}
-                  canControl
-                  roomPlaying={false}
-                  onPlay={() => {
-                    playIntentAtRef.current ??= Date.now();
-                    playerRef.current?.play();
-                  }}
-                  onPause={() => {
-                    if (progressAtRef.current == null) playIntentAtRef.current = null;
-                    playerRef.current?.pause();
-                  }}
-                  onSeekTo={(sec) => playerRef.current?.seek(sec)}
-                  onSeekBy={(d) => playerRef.current?.seek(Math.max(0, posRef.current + d))}
-                  onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
-                  fullscreen={isImmersive}
-                  title={displayTitle}
-                  subtitle={
-                    media.type === "tv" && media.season && media.episode
-                      ? `S${media.season} · E${media.episode}`
-                      : undefined
-                  }
-                  onBack={() => (fullscreen ? toggleFullscreen() : requestClose())}
-                  onOpenSettings={() => {
-                    playerRef.current?.readQuality();
-                    setTimeout(() => playerRef.current?.readAudio(), 750);
-                    setShowSettings(true);
-                  }}
-                  onEpisodes={media.type === "tv" ? () => episodeSheetRef.current?.present() : undefined}
-                />
-              ) : null}
-            </>
-          ) : null}
+          <GlassLayer>
+            {id && selected ? (
+              <>
+                <GlassBackdrop style={StyleSheet.absoluteFill}>
+                  <HijackPlayer
+                    ref={playerRef}
+                    key={selected.id}
+                    providerId={selected.id}
+                    posterUrl={artworkUrl ?? undefined}
+                    tmdbId={media.tmdbId}
+                    type={media.type}
+                    season={media.season}
+                    episode={media.episode}
+                    onPlayerEvent={onEvent}
+                    onBound={() => {
+                      setPlayerBound(true);
+                      if (__DEV__) logBind(selected.id, true, mountTsRef.current);
+                      // Bound behind another screen (a party pushed on top): stay paused.
+                      if (onBindAction({ focused: focusedRef.current }) === "pause") {
+                        playerRef.current?.pause();
+                        return;
+                      }
+                      // The user pressed Play on the title: start as soon as we can drive the
+                      // video (some providers bind paused, e.g. TV episodes). That makes binding
+                      // the play intent — a bound provider that never advances is skipped.
+                      playIntentAtRef.current ??= Date.now();
+                      playerRef.current?.play();
+                    }}
+                    onBindFailed={() => {
+                      moveOn("bind");
+                    }}
+                    revealProviderUiOnBindFail={!hasNextBindable}
+                    onFatalError={onFatalError}
+                    onSwitchSource={triggerFallback}
+                    onRecovered={() =>
+                      setExcludedIds((prev) => prev.filter((pid) => pid !== selected.id))
+                    }
+                    nativeControls={playerBound}
+                    party={false}
+                  />
+                </GlassBackdrop>
+                {playerBound ? (
+                  <PlayerControls
+                    ref={controlsRef}
+                    canControl
+                    roomPlaying={false}
+                    onPlay={() => {
+                      playIntentAtRef.current ??= Date.now();
+                      playerRef.current?.play();
+                    }}
+                    onPause={() => {
+                      if (progressAtRef.current == null) playIntentAtRef.current = null;
+                      playerRef.current?.pause();
+                    }}
+                    onSeekTo={(sec) => playerRef.current?.seek(sec)}
+                    onSeekBy={(d) => playerRef.current?.seek(Math.max(0, posRef.current + d))}
+                    onToggleFullscreen={isLandscapeMobile && !fullscreen ? undefined : toggleFullscreen}
+                    fullscreen={isImmersive}
+                    title={displayTitle}
+                    subtitle={
+                      media.type === "tv" && media.season && media.episode
+                        ? `S${media.season} · E${media.episode}`
+                        : undefined
+                    }
+                    onBack={() => (fullscreen ? toggleFullscreen() : requestClose())}
+                    onOpenSettings={() => {
+                      playerRef.current?.readQuality();
+                      setTimeout(() => playerRef.current?.readAudio(), 750);
+                      setShowSettings(true);
+                    }}
+                    onEpisodes={media.type === "tv" ? () => episodeSheetRef.current?.present() : undefined}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </GlassLayer>
         </View>
 
         {/* Phase 8: actionable no-bind / stall banner — never auto-pops; the user
