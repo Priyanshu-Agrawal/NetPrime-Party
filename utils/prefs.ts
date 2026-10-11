@@ -13,6 +13,7 @@ enum PrefKey {
   Audio = "pref.audioLang",
   Quality = "pref.quality",
   PersonalRecs = "pref.personalRecs",
+  SubtitleSize = "pref.subtitleSize",
 }
 
 export function hasOnboarded(): boolean {
@@ -65,4 +66,13 @@ export function getPreferredQuality(): string | null {
 }
 export function setPreferredQuality(label: string): void {
   storage.set(PrefKey.Quality, label);
+}
+
+/** Size of the subtitles we draw ourselves (sidecar files): s / m / l (default m). */
+export function getSubtitleSize(): "s" | "m" | "l" {
+  const v = storage.getString(PrefKey.SubtitleSize);
+  return v === "s" || v === "l" ? v : "m";
+}
+export function setSubtitleSize(v: "s" | "m" | "l"): void {
+  storage.set(PrefKey.SubtitleSize, v);
 }
