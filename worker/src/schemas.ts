@@ -301,12 +301,13 @@ export const ReportRequestSchema = z
     appVersion: z.string().optional().openapi({ example: "2.1.0" }),
     /** Untrusted free text — capped, stored as-is, never rendered or executed. */
     errorMessage: z.string().max(300).optional(),
+    // Telemetry extras: an invalid value is dropped (catch → undefined) rather than failing the whole report.
     /** Which lane played (spec §5.7). */
-    lane: z.enum(["native", "embed"]).optional(),
+    lane: z.enum(["native", "embed"]).optional().catch(undefined),
     /** Where it got to / failed. */
-    stage: z.enum(["load", "bind", "first_frame", "playing"]).optional(),
+    stage: z.enum(["load", "bind", "first_frame", "playing"]).optional().catch(undefined),
     /** Play → first progress, ms. */
-    ttffMs: z.number().int().nonnegative().max(600000).optional(),
+    ttffMs: z.number().int().nonnegative().max(600000).optional().catch(undefined),
   })
   .openapi("ReportRequest");
 // NOTE: country + client id are DERIVED server-side (CF geo + hashed IP) and are

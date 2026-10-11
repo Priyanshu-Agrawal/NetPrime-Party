@@ -17,8 +17,14 @@ describe("reportRow", () => {
     expect(row).not.toHaveProperty("ttff_ms");
   });
 
-  it("rejects an unknown lane or a negative ttff", () => {
-    expect(() => ReportRequestSchema.parse({ ...base, lane: "satellite" })).toThrow();
-    expect(() => ReportRequestSchema.parse({ ...base, ttffMs: -1 })).toThrow();
+  it("drops a bad lane, stage or ttff instead of losing the whole report", () => {
+    for (const extra of [{ lane: "satellite" }, { stage: "warp" }, { ttffMs: -1 }, { ttffMs: 3_600_000 }, { ttffMs: 1.5 }]) {
+      const body = ReportRequestSchema.parse({ ...base, ...extra });
+      expect(body.outcome).toBe("success");
+      const row = reportRow(body, null, "h");
+      expect(row).not.toHaveProperty("lane");
+      expect(row).not.toHaveProperty("stage");
+      expect(row).not.toHaveProperty("ttff_ms");
+    }
   });
 });

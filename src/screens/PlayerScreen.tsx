@@ -702,6 +702,8 @@ export const PlayerScreen: React.FC = () => {
           tmdbId: media.tmdbId,
           mediaType: media.type,
           outcome: "manual_switch",
+          lane: "embed",
+          stage: stageFor("manual_switch"),
           timeToFailMs: Date.now() - mountTsRef.current,
           scriptVersion: getCachedVersion(selected.id) ?? selected.scriptVersion ?? undefined,
           platform: Platform.OS as ReportArgs["platform"],
