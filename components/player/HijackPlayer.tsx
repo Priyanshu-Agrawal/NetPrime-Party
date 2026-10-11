@@ -10,12 +10,8 @@
  * only ever mounts this for a provider whose `hijack.supported` is true.
  */
 import { getCachedScript } from "@/src/scripts/bridgeCache";
-import { colors, font, ms } from "@/theme/bearoom";
-import { absoluteFill } from "@/theme/styles/layout";
+import { colors } from "@/theme/bearoom";
 import { getAutoplayNext } from "@/utils/prefs";
-import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import React, {
   forwardRef,
   useCallback,
@@ -26,17 +22,17 @@ import React, {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   AppState,
   Dimensions,
   Platform,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import WebView from "react-native-webview";
 import { subscribeRemoteCommands } from "./backgroundPlayback";
+import { PlayerErrorCard } from "./PlayerErrorCard";
+import { PlayerLoadingCard } from "./PlayerLoadingCard";
 import {
   buildEmbedUrl,
   getProvider,
@@ -670,48 +666,7 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
           // pointerEvents="none": purely visual — taps pass THROUGH to the WebView so a
           // gesture-gated provider (videasy creates its <video> only after a user
           // gesture) still gets the tap that starts playback.
-          <View style={styles.loading} pointerEvents="none">
-            {posterUrl ? (
-              <>
-                <Image
-                  source={{ uri: posterUrl }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  blurRadius={25}
-                  transition={250}
-                  cachePolicy="memory-disk"
-                />
-                <LinearGradient colors={LOADING_SCRIM} style={StyleSheet.absoluteFill} />
-              </>
-            ) : null}
-            <View style={styles.loadingContent}>
-              {posterUrl ? (
-                // Clean poster card — NO spinner over the artwork (that reads as a
-                // broken-image glitch). The spinner lives in the status row below.
-                <View style={styles.loadingThumbWrap}>
-                  <Image
-                    source={{ uri: posterUrl }}
-                    style={styles.loadingThumb}
-                    contentFit="cover"
-                    transition={250}
-                    cachePolicy="memory-disk"
-                  />
-                </View>
-              ) : (
-                <View style={styles.loadingBadge}>
-                  <Image
-                    source={require("@/assets/images/brandmark.png")}
-                    style={styles.loadingBrandMark}
-                    contentFit="contain"
-                  />
-                </View>
-              )}
-              <View style={styles.loadingStatusRow}>
-                <ActivityIndicator size="small" color={colors.honey} />
-                <Text style={styles.loadingSub}>Getting your stream ready…</Text>
-              </View>
-            </View>
-          </View>
+          <PlayerLoadingCard posterUrl={posterUrl} status="Getting your stream ready…" />
         )}
         {/* Slow to bind — keep the WebView mounted (finder keeps polling), just warn. */}
         {!bound && slow && !noSource && !fatalError && !bannerRetired && (
@@ -725,50 +680,35 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
             HTML). Opaque + tappable — a terminal "no stream on this source" state. The
             screen-level back chip (PlayerScreen) sits above for "go back". */}
         {!bound && noSource && !fatalError && (
-          <View style={styles.errorOverlay}>
-            <Ionicons name="film-outline" size={46} color={colors.textDim} />
-            <Text style={styles.errorTitle}>No stream found</Text>
-            <Text style={styles.errorSub} numberOfLines={2}>
-              {provider.name} couldn’t find this title. Try a different source.
-            </Text>
-            <View style={styles.errorBtns}>
-              {onSwitchSource ? (
-                <TouchableOpacity onPress={switchSource} style={styles.errorPrimary} hitSlop={8}>
-                  <Ionicons name="swap-horizontal" size={16} color={colors.onHoney} />
-                  <Text style={styles.errorPrimaryText}>Try another source</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity onPress={manualRetry} style={styles.errorGhost} hitSlop={8}>
-                <Text style={styles.errorGhostText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <PlayerErrorCard
+            icon="film-outline"
+            title="No stream found"
+            message={`${provider.name} couldn’t find this title. Try a different source.`}
+            actions={[
+              ...(onSwitchSource
+                ? [{ label: "Try another source", icon: "swap-horizontal" as const, kind: "primary" as const, onPress: switchSource }]
+                : []),
+              { label: "Retry", kind: "ghost" as const, onPress: manualRetry },
+            ]}
+          />
         )}
         {/* Branded fatal-error overlay — covers the WebView's raw net::ERR page.
             No blur/elevation (video screen). Auto-retry runs behind it. */}
         {fatalError && (
-          <View style={styles.errorOverlay}>
-            <Ionicons name="cloud-offline-outline" size={46} color={colors.textDim} />
-            <Text style={styles.errorTitle}>Couldn’t load {provider.name}</Text>
-            <Text style={styles.errorSub} numberOfLines={2}>
-              {fatalError.kind === "render_crash"
+          <PlayerErrorCard
+            title={`Couldn’t load ${provider.name}`}
+            message={
+              fatalError.kind === "render_crash"
                 ? "The player crashed unexpectedly."
                 : fatalError.statusCode
                   ? `The source returned an error (${fatalError.statusCode}).`
-                  : "Check your connection — we’ll keep retrying."}
-            </Text>
-            <View style={styles.errorBtns}>
-              <TouchableOpacity onPress={manualRetry} style={styles.errorPrimary} hitSlop={8}>
-                <Ionicons name="refresh" size={16} color={colors.onHoney} />
-                <Text style={styles.errorPrimaryText}>Retry</Text>
-              </TouchableOpacity>
-              {onSwitchSource && (
-                <TouchableOpacity onPress={switchSource} style={styles.errorGhost} hitSlop={8}>
-                  <Text style={styles.errorGhostText}>Try another source</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+                  : "Check your connection — we’ll keep retrying."
+            }
+            actions={[
+              { label: "Retry", icon: "refresh", kind: "primary", onPress: manualRetry },
+              ...(onSwitchSource ? [{ label: "Try another source", kind: "ghost" as const, onPress: switchSource }] : []),
+            ]}
+          />
         )}
       </View>
     );
@@ -777,48 +717,11 @@ export const HijackPlayer = forwardRef<PlayerHandle, Props>(
 
 HijackPlayer.displayName = "HijackPlayer";
 
-// Vertical scrim over the blurred poster — lighter at the top, deepening toward the
-// bottom for text legibility (warm-charcoal, derived from colors.bg #100D0A).
-const LOADING_SCRIM = ["rgba(16,13,10,0.62)", "rgba(16,13,10,0.94)"] as const;
 
 const styles = StyleSheet.create({
   web: { flex: 1, backgroundColor: colors.playerBg },
   center: { alignItems: "center", justifyContent: "center", gap: 10 },
   msg: { color: colors.textDim, fontSize: 14, paddingHorizontal: 24, textAlign: "center" },
-  loading: {
-    // Absolute-fill, NOT flex:1 — react-native-webview renders renderLoading() as
-    // a normal flex sibling of the native WebView inside a column container, so a
-    // flex:1 loader splits the space 50/50 (WebView top half, loader bottom half).
-    // Overlaying it edge-to-edge makes the branded loading screen full-bleed.
-    ...absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.bg, // solid base under the blurred poster (no poster → flat)
-  },
-  loadingContent: { alignItems: "center", gap: ms(20), paddingHorizontal: 32 },
-  loadingThumbWrap: {
-    width: ms(112),
-    height: ms(168),
-    borderRadius: ms(14),
-    overflow: "hidden",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.14)", // hairline edge, not a hard honey outline
-    // NO elevation/shadow — proven stutter rule on any video screen.
-  },
-  loadingThumb: { width: "100%", height: "100%" },
-  loadingBadge: {
-    width: ms(76),
-    height: ms(76),
-    borderRadius: ms(22),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.honeySoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.honeyGlow,
-  },
-  loadingBrandMark: { width: ms(38), height: ms(38) },
-  loadingStatusRow: { flexDirection: "row", alignItems: "center", gap: ms(8) },
-  loadingSub: { color: colors.textFaint, fontFamily: font.body, fontSize: ms(13), letterSpacing: 0.2 },
   banner: {
     position: "absolute",
     bottom: 0,
@@ -829,39 +732,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   bannerText: { color: colors.onHoney, fontSize: 12, textAlign: "center", fontWeight: "600" },
-  errorOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 28,
-    backgroundColor: colors.playerBg,
-  },
-  errorTitle: { color: colors.text, fontSize: 16, fontWeight: "700", textAlign: "center" },
-  errorSub: { color: colors.textDim, fontSize: 13, textAlign: "center", lineHeight: 18 },
-  errorBtns: { flexDirection: "row", gap: 10, marginTop: 10 },
-  errorPrimary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.honey,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  errorPrimaryText: { color: colors.onHoney, fontSize: 14, fontWeight: "700" },
-  errorGhost: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-  },
-  errorGhostText: { color: colors.text, fontSize: 14, fontWeight: "600" },
 });
 
 export default HijackPlayer;
