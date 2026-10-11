@@ -302,7 +302,7 @@ const TvDetailsScreen: React.FC = () => {
               />
             )}
           </View>
-          {released ? <PlayLanguageRow button={preview.button} reserve={preview.status !== "off"} onChoose={preview.choose} /> : null}
+          {released ? <PlayLanguageRow key={`tv:${id}`} button={preview.button} reserve={preview.status !== "off"} onChoose={preview.choose} /> : null}
           </Appear>
 
           {/* Quick actions */}

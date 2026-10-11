@@ -8,6 +8,7 @@ import { Platform } from "react-native";
 import { SourceHealth } from "./health";
 import { ProbeCache, probeCandidate, type ProbeFetch } from "./probe";
 import { previewPlayback, resolvePlayback, type ResolveResult, type TitleRequest } from "./resolver";
+import { oneAtATime } from "./serial";
 
 export const sourceHealth = new SourceHealth(universalStorage);
 
@@ -35,13 +36,22 @@ export function resolveTitle(req: TitleRequest, languages: string[]): Promise<Re
   });
 }
 
-/** The title page's preview: languages without probing; its streams seed Play through the plugin host's cache. */
-export function previewTitle(req: TitleRequest, languages: string[]) {
-  return previewPlayback(req, {
-    getStreams: (r, opts) => pluginHost.getStreams(r, opts),
-    health: sourceHealth,
-    platform: Platform.OS === "ios" ? "ios" : "android",
-    languages,
-    warm: () => warmSandbox(),
-  });
+const previews = oneAtATime();
+
+/**
+ * The title page's preview: languages without probing; its streams seed Play through the plugin host's cache. One
+ * preview at a time across the app; one whose page has gone (`alive` false) by its turn is skipped (undefined).
+ */
+export function previewTitle(req: TitleRequest, languages: string[], alive?: () => boolean) {
+  return previews(
+    () =>
+      previewPlayback(req, {
+        getStreams: (r, opts) => pluginHost.getStreams(r, opts),
+        health: sourceHealth,
+        platform: Platform.OS === "ios" ? "ios" : "android",
+        languages,
+        warm: () => warmSandbox(),
+      }),
+    alive,
+  );
 }

@@ -16,7 +16,13 @@ jest.mock("@/modules/bearoom-fetch", () => ({
 let mockOffline = false;
 jest.mock("@/hooks/useConnectivity", () => ({ useConnectivity: () => mockOffline }));
 let mockMetered = false;
-jest.mock("@react-native-community/netinfo", () => ({ useNetInfo: () => ({ details: { isConnectionExpensive: mockMetered } }) }));
+let mockNetKnown = true;
+jest.mock("@react-native-community/netinfo", () => ({
+  useNetInfo: () =>
+    mockNetKnown ? { type: "wifi", isConnected: true, details: { isConnectionExpensive: mockMetered } } : { type: "unknown", isConnected: null, details: null },
+}));
+let mockFocused = true;
+jest.mock("@react-navigation/native", () => ({ useIsFocused: () => mockFocused }));
 let mockDataSaver = false;
 let mockMeteredOptIn = false;
 jest.mock("@/utils/prefs", () => ({ getDataSaver: () => mockDataSaver, getPreviewOnMetered: () => mockMeteredOptIn }));
@@ -67,6 +73,8 @@ beforeEach(() => {
   mockAvailable = true;
   mockOffline = false;
   mockMetered = false;
+  mockNetKnown = true;
+  mockFocused = true;
   mockDataSaver = false;
   mockMeteredOptIn = false;
   mockTitleLang.clear();
@@ -88,7 +96,11 @@ describe("useLanguagePreview", () => {
     expect(mockPreview).not.toHaveBeenCalled();
     act(() => jest.advanceTimersByTime(1));
     expect(shown(r)).toBe("checking|Play|Checking languages…");
-    expect(mockPreview).toHaveBeenCalledWith(expect.objectContaining({ tmdbId: "1", type: "movie", titleName: "Big Buck Bunny", originalLanguage: "en" }), ["hi", "en"]);
+    expect(mockPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ tmdbId: "1", type: "movie", titleName: "Big Buck Bunny", originalLanguage: "en" }),
+      ["hi", "en"],
+      expect.any(Function),
+    );
     await flush();
     expect(shown(r)).toBe("done|Play in Hindi|");
     expect(hook!.button.others).toEqual([{ code: "en", label: "English" }]);
@@ -123,7 +135,7 @@ describe("useLanguagePreview", () => {
     expect(shown(r)).toBe("waiting|Play|");
     act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
     await flush();
-    expect(mockPreview).toHaveBeenLastCalledWith(expect.objectContaining({ season: 2, episode: 1 }), ["hi", "en"]);
+    expect(mockPreview).toHaveBeenLastCalledWith(expect.objectContaining({ season: 2, episode: 1 }), ["hi", "en"], expect.any(Function));
     expect(shown(r)).toBe("done|Play|Hindi not available for this title");
   });
 
@@ -133,6 +145,8 @@ describe("useLanguagePreview", () => {
     ["the phone is offline", () => (mockOffline = true)],
     ["data saver is on", () => (mockDataSaver = true)],
     ["the network is metered and the user hasn't allowed it", () => (mockMetered = true)],
+    ["the page is covered (another screen on top)", () => (mockFocused = false)],
+    ["NetInfo doesn't know the network yet", () => (mockNetKnown = false)],
   ])("never runs when %s", (_, set) => {
     set();
     const r = render();
@@ -175,5 +189,65 @@ describe("useLanguagePreview", () => {
     act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
     await flush();
     expect(shown(r)).toBe("off|Play|");
+  });
+
+  it("coming back to the page shows the answer again, without asking again or flickering", async () => {
+    mockPreview.mockResolvedValue(answer(["hi"], ["en"]));
+    const r = render();
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
+    await flush();
+    mockFocused = false;
+    act(() => r.update(<Probe {...base} />));
+    mockFocused = true;
+    act(() => r.update(<Probe {...base} />));
+    expect(shown(r)).toBe("done|Play in Hindi|");
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS * 2));
+    await flush();
+    expect(mockPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads the language the player stored for the title when the page is back in view", async () => {
+    mockPreview.mockResolvedValue(answer(["hi"], ["en"]));
+    const r = render();
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
+    await flush();
+    mockFocused = false;
+    act(() => r.update(<Probe {...base} />));
+    mockTitleLang.set("movie:1", "en"); // the player's Audio row picked English
+    mockFocused = true;
+    act(() => r.update(<Probe {...base} />));
+    expect(shown(r)).toBe("done|Play in English|");
+  });
+
+  it("a language picked on one title doesn't follow the page to the next title", async () => {
+    mockPreview.mockResolvedValue(answer(["hi"], ["en"]));
+    const r = render();
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
+    await flush();
+    act(() => hook!.choose("en"));
+    act(() => r.update(<Probe {...base} tmdbId="2" details={{ ...DETAILS, id: 2 }} />));
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
+    await flush();
+    expect(shown(r)).toBe("done|Play in Hindi|");
+  });
+
+  it("waits while the page still shows the previous title's details", () => {
+    render({ ...base, details: { ...DETAILS, id: 99 } });
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS * 3));
+    expect(mockPreview).not.toHaveBeenCalled();
+  });
+
+  it("asks the shared queue to skip it once the page has moved on", async () => {
+    let alive: (() => boolean) | undefined;
+    mockPreview.mockImplementation((_r: unknown, _l: unknown, a: () => boolean) => {
+      alive = a;
+      return new Promise(() => {});
+    });
+    const r = render();
+    act(() => jest.advanceTimersByTime(PREVIEW_DELAY_MS));
+    expect(alive!()).toBe(true);
+    act(() => r.unmount());
+    trees = [];
+    expect(alive!()).toBe(false);
   });
 });
