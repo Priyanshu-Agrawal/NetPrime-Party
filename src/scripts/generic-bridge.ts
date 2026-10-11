@@ -57,8 +57,11 @@ export const GENERIC_BRIDGE: string = `
 
   // The bound video is also forced opaque: some providers fade their own video out while their
   // (now hidden) UI thinks it hasn't started — VidFast solo plays at opacity 0.
-  var CHROME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}video{visibility:visible!important}video[data-vl-bound]{opacity:1!important}';
-  var FRAME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}iframe{visibility:visible!important}';
+  // Hidden UI still restyles: VidFast's kept ~70 style recalcs/s going through transitions (>50% of
+  // the page's main-thread work). Our controls own the surface now, so its transitions can stop.
+  var CALM_CSS = 'body *:not(video){transition:none!important}';
+  var CHROME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}video{visibility:visible!important}video[data-vl-bound]{opacity:1!important}' + CALM_CSS;
+  var FRAME_CSS = 'html,body{background:#000!important}body *{visibility:hidden!important}iframe{visibility:visible!important}' + CALM_CSS;
   var chromeOn = CFG.chromeOff === true;
   function styleEl(){
     var el = document.getElementById('__vlChromeStyle');

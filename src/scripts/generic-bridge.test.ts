@@ -80,6 +80,17 @@ describe("generic bridge", () => {
     expect(css()).toBe("");
   });
 
+  it("stops the hidden provider UI animating once chrome-off is on (VidFast churned ~70 style recalcs/s)", () => {
+    load({ chromeOff: true });
+    const css = () => document.getElementById("__vlChromeStyle")?.textContent ?? "";
+    expect(css()).toContain("body *:not(video){transition:none!important}"); // video in a frame
+    addVideo(8349);
+    jest.advanceTimersByTime(700);
+    expect(css()).toContain("body *:not(video){transition:none!important}"); // video in this page
+    (window as any).__vlChromeOff(false);
+    expect(css()).toBe(""); // provider UI back → its transitions back
+  });
+
   it("keeps the bound video opaque when the provider fades it out (VidFast solo sets opacity 0)", () => {
     load({ chromeOff: true });
     const first = addVideo(30);
