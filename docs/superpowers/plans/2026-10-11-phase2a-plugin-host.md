@@ -2729,11 +2729,11 @@ describe("SandboxBridge", () => {
 
 describe("frameScript", () => {
   it("escapes line separators so the injected script always parses", () => {
-    const js = frameScript({ t: "load", key: "k", source: "a b c" });
-    expect(js).not.toMatch(/[  ]/);
+    const js = frameScript({ t: "load", key: "k", source: "a\u2028b\u2029c" });
+    expect(js).not.toMatch(/[\u2028\u2029]/);
     const inject = jest.fn();
     inject(js);
-    expect(framesOf(inject)).toEqual([{ t: "load", key: "k", source: "a b c" }]);
+    expect(framesOf(inject)).toEqual([{ t: "load", key: "k", source: "a\u2028b\u2029c" }]);
   });
 });
 ```
@@ -2786,7 +2786,7 @@ export const RESTART_AFTER_TIMEOUTS = 3;
 
 /** A frame as a script for WebView.injectJavaScript (U+2028/2029 escaped so the literal always parses). */
 export function frameScript(frame: HostFrame): string {
-  const literal = JSON.stringify(JSON.stringify(frame)).replace(/ /g, "\\u2028").replace(/ /g, "\\u2029");
+  const literal = JSON.stringify(JSON.stringify(frame)).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   return `window.__bearoom&&window.__bearoom(${literal});true;`;
 }
 
@@ -2980,7 +2980,7 @@ let mockMounts = 0;
 jest.mock("react-native-webview", () => {
   const React = jest.requireActual("react");
   const { View } = jest.requireActual("react-native");
-  const WebView = React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
+  const WebView = React.forwardRef(function MockWebView(props: Record<string, unknown>, ref: unknown) {
     mockProps = props;
     React.useImperativeHandle(ref, () => ({ injectJavaScript: mockInject }));
     React.useEffect(() => {
@@ -3370,7 +3370,7 @@ describe("normaliseStreams", () => {
         P,
         [
           {
-            name: "Vid​rock • Hindi",
+            name: "Vid\u200Brock • Hindi",
             title: "Jawan\n  1080p",
             url: "https://cdn.test/a.m3u8",
             quality: 1080,
@@ -3723,7 +3723,7 @@ export interface PluginStream {
 }
 
 export const MAX_STREAMS_PER_PLUGIN = 200;
-const ZERO_WIDTH = /[​-‏‪-‮⁠-⁤﻿]/g;
+const ZERO_WIDTH = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
 const HTTP = /^https?:\/\//i;
 
 export function cleanText(v: unknown, max = 200): string {
