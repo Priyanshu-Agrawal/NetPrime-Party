@@ -75,7 +75,7 @@ lanes and the party.
 | `src/features/player/NativePlayerView.tsx` (+test) | Native lane screen body |
 | `utils/prefs.ts` | Subtitle size preference |
 | `worker/src/reportRow.ts` (+test), `worker/src/schemas.ts`, `worker/src/index.ts` | `/report` lane/stage/ttffMs |
-| `supabase/migrations/20261011150000_provider_reports_native_fields.sql` | Three nullable columns (owner yes before applying) |
+| `supabase/migrations/20261011141809_provider_reports_native_fields.sql` | Three nullable columns (owner yes before applying) |
 
 Branch: `phase1b/native-player` from `feat/improvements`; fast-forward back at the end.
 
@@ -4574,7 +4574,7 @@ git commit -m "feat(player): WebView lane and party on the new controls — quic
 - Create: `components/player/reportFields.ts`, `components/player/reportFields.test.ts`
 - Modify: `src/types/worker.types.ts`, `src/screens/PlayerScreen.tsx`
 - Create: `worker/src/reportRow.ts`, `worker/src/reportRow.test.ts`; Modify: `worker/src/schemas.ts`, `worker/src/index.ts`
-- Create: `supabase/migrations/20261011150000_provider_reports_native_fields.sql`
+- Create: `supabase/migrations/20261011141809_provider_reports_native_fields.sql`
 
 **Interfaces:**
 - Produces: `ReportStage = "load" | "bind" | "first_frame" | "playing"`; `ReportArgs` gains `lane?: "native" | "embed"`,
@@ -4722,7 +4722,7 @@ export function reportRow(body: z.infer<typeof ReportRequestSchema>, country: st
 `worker/src/index.ts` — replace the inline object passed to `insertReport(c.env, {…})` with
 `insertReport(c.env, reportRow(body, country, clientHash))` and import `reportRow`.
 
-`supabase/migrations/20261011150000_provider_reports_native_fields.sql`:
+`supabase/migrations/20261011141809_provider_reports_native_fields.sql`:
 ```sql
 -- Phase 1B telemetry (spec §5.7): which lane played, where it got to, and time to first frame.
 -- Nullable and additive: older apps keep inserting without them.
@@ -4740,7 +4740,7 @@ Expected: PASS; both type-checks clean.
 - [ ] **Step 6: Commit (no deploy)**
 
 ```bash
-git add components/player/reportFields.ts components/player/reportFields.test.ts src/types/worker.types.ts src/screens/PlayerScreen.tsx worker/src/reportRow.ts worker/src/reportRow.test.ts worker/src/schemas.ts worker/src/index.ts supabase/migrations/20261011150000_provider_reports_native_fields.sql
+git add components/player/reportFields.ts components/player/reportFields.test.ts src/types/worker.types.ts src/screens/PlayerScreen.tsx worker/src/reportRow.ts worker/src/reportRow.test.ts worker/src/schemas.ts worker/src/index.ts supabase/migrations/20261011141809_provider_reports_native_fields.sql
 git commit -m "feat(telemetry): /report lane, stage and TTFF (migration + worker deploy wait for owner yes)"
 ```
 

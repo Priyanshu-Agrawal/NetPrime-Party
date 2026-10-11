@@ -563,4 +563,4 @@ Spec `docs/superpowers/specs/2026-10-10-playback-languages-party-design.md` §9 
   subtitles; quick chip stretched across the bar; spinner stacked on the pause button.
 - **Pending:** the WebView lane + party on the new controls on the phone, and a normal build back on the phone
   (phone was in use); the Android emulator and iOS 27 simulator legs incl. the iOS compile of `BearoomPlayerModule`
-  (owner's call — simulators busy); `/report` migration `20261011150000` then worker deploy (owner yes — stored schema).
+  (owner's call — simulators busy); `/report` migration `20261011141809` then worker deploy (owner yes — stored schema).
