@@ -16,6 +16,9 @@ import { resolveTitle } from "@/services/playback";
 import type { PlaybackCandidate } from "@/services/playback/candidate";
 import { pluginHost } from "@/services/plugins";
 import { DEFAULT_VIEWER, NativePlayerView, type ViewerSettings } from "@/src/features/player/NativePlayerView";
+import { pendingHostStream } from "@/src/features/party/pendingHostStream";
+import { openPartyHost } from "@/src/navigation/actions";
+import { genRoomCode } from "@/utils/roomCode";
 import { useDetailsQuery } from "@/src/store/services/tmdbApi";
 import { useReportOutcomeMutation } from "@/src/store/services/workerApi";
 import type { ReportOutcome } from "@/src/types/worker.types";
@@ -337,6 +340,24 @@ export function TitlePlayer({ tmdbId, type, season, episode, title, posterUrl, s
   const onPosition = useCallback((sec: number) => {
     pos.current = sec;
   }, []);
+
+  // A watch party with this very stream: the stream waits in memory for the room screen (never in route params).
+  const startParty = useCallback(() => {
+    const s = sessionRef.current;
+    if (!s) return;
+    const room = genRoomCode();
+    pendingHostStream.set(room, { candidate: s.current, title: { tmdbId, type, season, episode, ...(title ? { name: title } : {}) } });
+    openPartyHost({
+      role: "host",
+      room,
+      id: tmdbId,
+      type,
+      ...(season != null ? { season: String(season) } : {}),
+      ...(episode != null ? { ep: String(episode) } : {}),
+      ...(title ? { title } : {}),
+      native: "1",
+    });
+  }, [tmdbId, type, season, episode, title]);
   const sidecars = useMemo(() => (session ? sidecarsOf(session.current) : []), [session]);
   const back = (
     <TouchableOpacity style={styles.back} onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Go back">
@@ -418,6 +439,7 @@ export function TitlePlayer({ tmdbId, type, season, episode, title, posterUrl, s
         onFullscreenChange={onFullscreenChange}
         carry={viewer}
         onViewerSettings={setViewer}
+        onWatchParty={startParty}
         audioChoices={audioChoices}
         notice={notice}
         onNoticeDone={() => setNotice(null)}

@@ -53,6 +53,9 @@ jest.mock("@/components/player/PlayerErrorCard", () => {
   };
 });
 jest.mock("@/hooks/useConnectivity", () => ({ useConnectivity: () => false }));
+const mockOpenPartyHost = jest.fn();
+jest.mock("@/src/navigation/actions", () => ({ openPartyHost: (p: unknown) => mockOpenPartyHost(p) }));
+jest.mock("@/utils/roomCode", () => ({ genRoomCode: () => "PARTY1" }));
 jest.mock("expo-screen-orientation", () => ({ lockAsync: async () => {}, unlockAsync: async () => {}, OrientationLock: { LANDSCAPE: 1, PORTRAIT_UP: 2 } }));
 jest.mock("react-native-safe-area-context", () => {
   const { View } = jest.requireActual("react-native");
@@ -289,5 +292,15 @@ describe("TitlePlayer", () => {
     expect(mockViewProps.subtitle).toBe("S1 · E3");
     act(() => mockViewProps.onNextEpisode());
     expect(onEpisode).toHaveBeenCalledWith(1, 4);
+  });
+
+  it("Watch together starts a party with this stream — kept in memory, never in the route", async () => {
+    const { pendingHostStream } = jest.requireActual("@/src/features/party/pendingHostStream");
+    mockResolve.mockResolvedValue(result(cand("hi1", ["hi"])));
+    await mount({ title: "Big Buck Bunny" });
+    act(() => mockViewProps.onWatchParty());
+    expect(pendingHostStream.peek("PARTY1")?.candidate.key).toBe("hi1");
+    expect(mockOpenPartyHost).toHaveBeenCalledWith({ role: "host", room: "PARTY1", id: "10378", type: "movie", title: "Big Buck Bunny", native: "1" });
+    expect(JSON.stringify(mockOpenPartyHost.mock.calls)).not.toMatch(/https?:/);
   });
 });

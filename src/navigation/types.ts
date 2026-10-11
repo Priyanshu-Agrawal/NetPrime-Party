@@ -41,6 +41,8 @@ export type RootStackParamList = {
     season?: string;
     ep?: string;
     title?: string;
+    /** "1": the host starts from the native player (its stream is in memory, never in params). */
+    native?: string;
   };
   JoinParty: undefined;
   MyList: undefined;

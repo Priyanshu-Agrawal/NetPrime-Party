@@ -22,7 +22,7 @@ export function withinCut(a?: number, b?: number): boolean {
 
 /** The same stream re-resolved on this device: the same key, else the same source in the room's language. */
 export async function relocateSame(
-  h: StreamHandoff,
+  h: Pick<StreamHandoff, "key" | "sourceId" | "language">,
   resolve: (req: TitleRequest, languages: string[]) => Promise<ResolveResult>,
   title: TitleRequest,
   languages: string[],

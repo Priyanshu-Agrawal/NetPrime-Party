@@ -292,4 +292,14 @@ describe("NativePlayerView", () => {
     expect(onOpenSource).toHaveBeenCalledTimes(1);
     jest.restoreAllMocks();
   });
+  it("Watch together pauses this player first, then starts the party", () => {
+    const onWatchParty = jest.fn();
+    let r!: ReactTestRenderer;
+    act(() => {
+      r = create(view({ onWatchParty }));
+    });
+    act(() => r.root.findByProps({ accessibilityLabel: "Watch together" }).props.onPress());
+    expect(mockHandle.pause).toHaveBeenCalled();
+    expect(onWatchParty).toHaveBeenCalledTimes(1);
+  });
 });

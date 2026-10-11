@@ -23,7 +23,7 @@ import { getSubtitleSize, setSubtitleSize } from "@/utils/prefs";
 import * as ScreenOrientation from "expo-screen-orientation";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Platform, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export interface NativePlayerViewProps {
@@ -65,6 +65,8 @@ export interface NativePlayerViewProps {
   /** The viewer's settings from the previous stream, applied to this one. */
   carry?: ViewerSettings;
   onViewerSettings?: (s: ViewerSettings) => void;
+  /** Start a watch party with this stream (this player pauses first). */
+  onWatchParty?: () => void;
 }
 
 /** What a viewer set and expects to keep when the stream underneath changes. */
@@ -117,6 +119,7 @@ export function NativePlayerView({
   onFullscreenChange,
   carry,
   onViewerSettings,
+  onWatchParty,
 }: NativePlayerViewProps) {
   const playerRef = useRef<PlayerHandle>(null);
   const controlsRef = useRef<PlayerControlsHandle>(null);
@@ -414,6 +417,19 @@ export function NativePlayerView({
               {title}
             </Text>
             <Text style={styles.infoSub}>{sourceLabel}</Text>
+            {onWatchParty ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Watch together"
+                onPress={() => {
+                  playerRef.current?.pause(); // the solo film mustn't keep playing under the party
+                  onWatchParty();
+                }}
+                style={({ pressed }) => [styles.party, pressed && styles.partyPressed]}
+              >
+                <Text style={styles.partyText}>Watch together</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
         {devHud ? (
@@ -480,6 +496,18 @@ const styles = StyleSheet.create({
   info: { padding: ms(16), gap: ms(4) },
   infoTitle: { color: colors.text, fontFamily: font.headline, fontSize: ms(18) },
   infoSub: { color: colors.textDim, fontFamily: font.body, fontSize: ms(13) },
+  party: {
+    alignSelf: "flex-start",
+    marginTop: ms(10),
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(9),
+    borderRadius: ms(20),
+    backgroundColor: colors.honeySoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.honey,
+  },
+  partyPressed: { opacity: 0.8 },
+  partyText: { color: colors.honey, fontFamily: font.label, fontSize: ms(13) },
   hud: {
     position: "absolute",
     left: ms(8),

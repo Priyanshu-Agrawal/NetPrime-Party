@@ -75,6 +75,13 @@ import {
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassLayer } from "@/src/ui/glass";
+import { NativeRoomPlayer, type StreamIdentity } from "@/src/features/party/NativeRoomPlayer";
+import { pendingHostStream } from "@/src/features/party/pendingHostStream";
+import { relocateSame } from "@/src/features/party/roomStream";
+import { currentItem, nativeSeed, roomLane } from "@/src/features/party/roomLane";
+import { resolveTitle } from "@/services/playback";
+import type { QueueItem, QueueRefPlugin } from "@/services/party/protocol";
+import { languageOrder, resolveOrder } from "@/utils/languagePrefs";
 
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 // Stable empty reference so `members` doesn't churn memo deps before the snapshot lands.
@@ -186,7 +193,8 @@ export default function Party() {
 
   const hostMedia: PartyMedia | undefined = useMemo(
     () =>
-      isHostParam && params.id
+      // A party started from the native player seeds its queue with the plugin item instead (no provider media).
+      isHostParam && params.id && params.native !== "1"
         ? {
             tmdbId: params.id,
             type: params.type === "tv" ? "tv" : "movie",
@@ -196,7 +204,7 @@ export default function Party() {
             providerId: params.provider,
           }
         : undefined,
-    [isHostParam, params.id, params.type, params.season, params.ep, params.title, params.provider],
+    [isHostParam, params.id, params.type, params.season, params.ep, params.title, params.provider, params.native],
   );
 
   const displayName = useMemo(
@@ -270,13 +278,20 @@ export default function Party() {
   const connecting = !snap && !party.error;
   const isHost = useIsPartyHost();
   const media = snap?.media;
+  // A plugin item plays in the native room player (Phase 3A); provider items stay on the web player.
+  const lane = roomLane(snap ?? null);
+  const nativeItem = lane === "native" && snap ? (currentItem(snap) as QueueItem & { ref: QueueRefPlugin }) : null;
   const config = snap?.config;
   const providerId = media?.providerId;
   // The room snapshot carries no artwork, so the loading cover would fall back to a
   // bare badge in a black void. Fetch the title's poster (cached, shared with the
   // details screens) so host AND guest get the rich blurred-poster loader.
   const { data: mediaDetails } = useDetailsQuery(
-    media ? { type: media.type, id: media.tmdbId } : skipToken,
+    media
+      ? { type: media.type, id: media.tmdbId }
+      : nativeItem
+        ? { type: nativeItem.ref.type, id: nativeItem.ref.tmdbId }
+        : skipToken,
   );
   const posterUrl = img(mediaDetails?.poster_path, "w342") ?? undefined;
   // What's playing, shown with the controls. The snapshot carries the host's title; the
@@ -303,6 +318,7 @@ export default function Party() {
   // Only those who can drive playback get a tappable "jump to this moment" chip.
   const canSeek = isHost || selfMember?.permissions?.canControlPlayback === true;
   const hasMedia = !!(providerId && media);
+  const hasPlayer = hasMedia || !!nativeItem;
   // The queue can hold items this build cannot play (a plugin source — P3 is not
   // built). Those mirror to a PartyMedia with no providerId, so hasMedia is false
   // while the queue is NOT empty. Keying the empty state on media alone made the
@@ -311,7 +327,7 @@ export default function Party() {
   // The player block only earns space when it has something to show. An idle room
   // rendered a prompt bar here and then left ~60% of the screen empty below it;
   // the empty state now lives IN that space instead (see ListEmptyComponent).
-  const showPlayerBlock = hasMedia || connecting || !!party.error;
+  const showPlayerBlock = hasPlayer || connecting || !!party.error;
 
   const pendingCount = guests.filter((g) => g.approved === false).length;
   const sessionStarted = useRef(false);
@@ -358,7 +374,46 @@ export default function Party() {
     setPlayerBound(false);
     setBridgeCaps(undefined);
     setSubtitles([]);
-  }, [providerId, media?.tmdbId, media?.season, media?.episode]);
+  }, [providerId, media?.tmdbId, media?.season, media?.episode, nativeItem?.id]);
+
+  // Host who started from the native player: put its stream in the room as the current plugin item (once).
+  const seeding = useRef(false);
+  useEffect(() => {
+    if (params.native !== "1" || !isHost || !snap || seeding.current) return;
+    const seed = nativeSeed(pendingHostStream.peek(room), snap);
+    if (!seed) return;
+    seeding.current = true;
+    void (async () => {
+      try {
+        await party.queueAdd([seed.item]);
+        await party.queueSetCurrent(seed.id);
+      } catch {
+        seeding.current = false; // retried on the next snapshot
+      }
+    })();
+  }, [params.native, isHost, snap, room, party]);
+
+  // Find the room's stream on this device (host after a restart, or a guest whose host link won't load).
+  const relocate = useCallback(
+    (id: StreamIdentity) => {
+      const ref = nativeItem?.ref;
+      if (!ref) return Promise.resolve(null);
+      return relocateSame(
+        { key: id.key, sourceId: id.sourceId, language: id.language },
+        resolveTitle,
+        {
+          tmdbId: ref.tmdbId,
+          type: ref.type,
+          season: ref.season,
+          episode: ref.episode,
+          titleName: mediaDetails?.title ?? mediaDetails?.name,
+          originalLanguage: mediaDetails?.original_language,
+        },
+        resolveOrder(languageOrder(), mediaDetails?.original_language),
+      );
+    },
+    [nativeItem?.ref, mediaDetails?.title, mediaDetails?.name, mediaDetails?.original_language],
+  );
 
   // Native fullscreen: rotate + expand our player. (HTML5 requestFullscreen needs a
   // gesture INSIDE the WebView that an RN tap can't supply, so we do it RN-side; our
@@ -663,7 +718,7 @@ export default function Party() {
                   ? styles.desktopPlayer
                   : isLandscapeMobile
                   ? styles.landscapeMobilePlayer
-                  : hasMedia
+                  : hasPlayer
                   ? styles.player
                   : connecting
                   ? styles.playerFill
@@ -688,22 +743,41 @@ export default function Party() {
               <Ionicons name="hourglass-outline" size={30} color={colors.honey} />
               <Text style={styles.waitingText}>Waiting for the host to let you in…</Text>
             </View>
-          ) : providerId && media ? (
+          ) : nativeItem || (providerId && media) ? (
             <>
               <GlassLayer>
-                <HijackPlayer
-                  ref={playerRef}
-                  providerId={providerId}
-                  tmdbId={media.tmdbId}
-                  type={media.type}
-                  season={media.season}
-                  episode={media.episode}
-                  posterUrl={posterUrl}
-                  onPlayerEvent={onEvent}
-                  onBound={() => setPlayerBound(true)}
-                  onSwitchSource={isHost ? switchSource : undefined}
-                  nativeControls={playerBound}
-                />
+                {nativeItem ? (
+                  <NativeRoomPlayer
+                    key={nativeItem.id}
+                    ref={playerRef}
+                    item={nativeItem}
+                    isHost={isHost}
+                    roomCode={roomCode}
+                    posterUrl={posterUrl}
+                    relay={party.client?.streams ?? null}
+                    onPlayerEvent={onEvent}
+                    onBound={() => {
+                      setPlayerBound(true);
+                      party.resync(); // the anchor may have arrived before this player existed
+                    }}
+                    relocate={relocate}
+                    takePending={(code) => pendingHostStream.take(code)}
+                  />
+                ) : providerId && media ? (
+                  <HijackPlayer
+                    ref={playerRef}
+                    providerId={providerId}
+                    tmdbId={media.tmdbId}
+                    type={media.type}
+                    season={media.season}
+                    episode={media.episode}
+                    posterUrl={posterUrl}
+                    onPlayerEvent={onEvent}
+                    onBound={() => setPlayerBound(true)}
+                    onSwitchSource={isHost ? switchSource : undefined}
+                    nativeControls={playerBound}
+                  />
+                ) : null}
                 {/* Mount our overlay ONLY after the <video> binds. videasy gates
                     playback behind a pre-play button (no <video> until it's tapped);
                     covering it would stop the video ever starting. Before bind, let
@@ -992,26 +1066,26 @@ export default function Party() {
             <View style={styles.chatEmpty}>
               <View style={styles.chatEmptyGlyph}>
                 <Ionicons
-                  name={hasMedia ? "chatbubbles-outline" : queueLen > 0 ? "play-skip-forward-outline" : "layers-outline"}
+                  name={hasPlayer ? "chatbubbles-outline" : queueLen > 0 ? "play-skip-forward-outline" : "layers-outline"}
                   size={ms(22)}
                   color={colors.honey}
                 />
               </View>
               <Text style={styles.chatEmptyTitle}>
-                {hasMedia
+                {hasPlayer
                   ? "Say something to the pack"
                   : queueLen > 0
                   ? "Nothing playing right now"
                   : "Nothing queued yet"}
               </Text>
               <Text style={styles.chatEmptyText}>
-                {hasMedia
+                {hasPlayer
                   ? "Reactions and messages show up here."
                   : queueLen > 0
                   ? `${queueLen} in the queue — this build can't play the current one.`
                   : "Pick something to watch, then invite the pack."}
               </Text>
-              {!hasMedia ? (
+              {!hasPlayer ? (
                 <View style={styles.chatEmptyActions}>
                   <Pressable
                     style={styles.emptyPrimary}
