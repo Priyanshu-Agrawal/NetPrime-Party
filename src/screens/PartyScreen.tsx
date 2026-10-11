@@ -79,7 +79,7 @@ import { NativeRoomPlayer, type StreamIdentity } from "@/src/features/party/Nati
 import { DriftReadout } from "@/src/features/party/DriftReadout";
 import { pendingHostStream } from "@/src/features/party/pendingHostStream";
 import { relocateSame } from "@/src/features/party/roomStream";
-import { currentItem, nativeSeed, roomLane } from "@/src/features/party/roomLane";
+import { advancesOnEnd, currentItem, nativeSeed, roomLane } from "@/src/features/party/roomLane";
 import { resolveTitle } from "@/services/playback";
 import type { QueueItem, QueueRefPlugin } from "@/services/party/protocol";
 import { languageOrder, resolveOrder } from "@/utils/languagePrefs";
@@ -536,13 +536,16 @@ export default function Party() {
       }
     }
     party.onPlayerEvent(e);
+    // Native room, host: the film ended → move the queue on (otherwise the room's clock runs past the end).
+    if (nativeItem && advancesOnEnd(e.event, lane, isHost)) void party.queueAdvance(nativeItem.id, "ended").catch(() => {});
     controlsRef.current?.setPlayback({
       currentTime: e.currentTime || 0,
       duration: e.duration || 0,
       paused: !!e.paused,
       readyState: e.readyState,
     });
-    if (!isBackgroundPlaybackAvailable()) return;
+    // The background session (FGS + lock-screen) belongs to the web lane's player; native rooms get theirs in Phase 4.
+    if (!isBackgroundPlaybackAvailable() || nativeItem) return;
     if (e.event === "ended") {
       const dur = Number(e.duration) || 0;
       const t = Number(e.currentTime) || 0;

@@ -1,6 +1,6 @@
 import type { PlaybackCandidate } from "@/services/playback/candidate";
 import { pendingHostStream } from "./pendingHostStream";
-import { nativeSeed, roomLane } from "./roomLane";
+import { advancesOnEnd, nativeSeed, roomLane } from "./roomLane";
 
 const cand = { key: "s/p:k1", sourceId: "s/p", languages: ["en"], url: "https://cdn.example.net/a.m3u8", headers: {} } as unknown as PlaybackCandidate;
 const TITLE = { tmdbId: "10378", type: "movie" as const, name: "Big Buck Bunny" };
@@ -42,3 +42,13 @@ describe("pendingHostStream", () => {
     expect(pendingHostStream.peek("WXYZ", 31 * 60_000)).toBeNull();
   });
 });
+
+describe("advancesOnEnd", () => {
+  it("the host of a native room moves the queue on when the film ends; nobody else does", () => {
+    expect(advancesOnEnd("ended", "native", true)).toBe(true);
+    expect(advancesOnEnd("ended", "native", false)).toBe(false);
+    expect(advancesOnEnd("ended", "web", true)).toBe(false);
+    expect(advancesOnEnd("pause", "native", true)).toBe(false);
+  });
+});
+

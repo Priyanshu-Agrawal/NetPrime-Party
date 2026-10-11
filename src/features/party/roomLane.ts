@@ -27,3 +27,10 @@ export function nativeSeed(
   if (cur?.id === id && isPluginItem(cur)) return null;
   return { id, item: { ref, ...(entry.title.name ? { title: entry.title.name } : {}) } };
 }
+
+/** End of item in a native room: the host advances the queue (0008's idempotent advance), so the room doesn't run on
+ * past the end. Web rooms keep today's behaviour. */
+export function advancesOnEnd(event: string, lane: "native" | "web" | "empty", isHost: boolean): boolean {
+  return event === "ended" && lane === "native" && isHost;
+}
+

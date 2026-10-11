@@ -27,8 +27,17 @@ jest.mock("@/components/player/PlayerLoadingCard", () => {
   return { PlayerLoadingCard: ({ status }: { status: string }) => <Text>{status}</Text> };
 });
 jest.mock("@/components/player/PlayerErrorCard", () => {
-  const { Text } = jest.requireActual("react-native");
-  return { PlayerErrorCard: ({ title, message }: { title: string; message: string }) => <Text>{`${title} — ${message}`}</Text> };
+  const { Pressable, Text, View } = jest.requireActual("react-native");
+  return {
+    PlayerErrorCard: ({ title, message, actions }: { title: string; message: string; actions: { label: string; onPress(): void }[] }) => (
+      <View>
+        <Text>{`${title} — ${message}`}</Text>
+        {actions.map((a) => (
+          <Pressable key={a.label} accessibilityLabel={a.label} onPress={a.onPress} />
+        ))}
+      </View>
+    ),
+  };
 });
 
 const ITEM = { id: "movie:10378", ref: { source: "plugin", tmdbId: "10378", type: "movie", pluginId: "s/p", streamId: "s/p:k1", language: "en" }, status: "queued" } as unknown as QueueItem & { ref: QueueRefPlugin };
@@ -162,3 +171,74 @@ describe("NativeRoomPlayer — the handle", () => {
     expect(onBound).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("NativeRoomPlayer — fix pass", () => {
+  it("a guest promoted to host keeps playing the stream it has and re-shares it (no re-resolve)", async () => {
+    const rl = relay();
+    const relocate = jest.fn(async () => cand({ url: "https://cdn.example.net/other.m3u8" }));
+    const { r } = mount({ relay: rl as never, relocate });
+    act(() => rl.deliver(HOSTH));
+    act(() => r.update(<NativeRoomPlayer item={ITEM} isHost roomCode="ABCD" relay={rl as never} onPlayerEvent={jest.fn()} onBound={jest.fn()} relocate={relocate} takePending={() => null} />));
+    await flush();
+    expect(relocate).not.toHaveBeenCalled();
+    expect(mockPlayer.source.uri).toBe(HOSTH.url);
+    expect(rl.send).toHaveBeenCalledWith(HOSTH);
+  });
+
+  it("every new source reports its first frame, so the room re-syncs it", async () => {
+    const rl = relay();
+    const onBound = jest.fn();
+    mount({ relay: rl as never, onBound, relocate: jest.fn(async () => cand({ url: "https://cdn.example.net/mine.m3u8", durationSec: 600 })) });
+    act(() => rl.deliver(HOSTH));
+    act(() => mockPlayer.onFirstFrame());
+    act(() => mockPlayer.onFatalError("HTTP 403"));
+    await flush();
+    act(() => mockPlayer.onFirstFrame());
+    expect(onBound).toHaveBeenCalledTimes(2);
+  });
+
+  it("the won't-play card offers Try again, which asks the host afresh", async () => {
+    const rl = relay();
+    const { r } = mount({ relay: rl as never, relocate: jest.fn(async () => null) });
+    act(() => rl.deliver(HOSTH));
+    act(() => mockPlayer.onFatalError("HTTP 403"));
+    await flush();
+    rl.request.mockClear();
+    act(() => r.root.findByProps({ accessibilityLabel: "Try again" }).props.onPress());
+    expect(rl.request).toHaveBeenCalledWith(ITEM.id);
+    expect(texts(r)).toContain("Waiting for the host's stream…");
+    act(() => rl.deliver(HOSTH));
+    expect(mockPlayer.source.uri).toBe(HOSTH.url);
+  });
+
+  it("a host whose stream fails finds it again once (fresh tokens) and re-shares it; a second failure is the card", async () => {
+    const rl = relay();
+    const relocate = jest.fn(async () => cand({ url: "https://cdn.example.net/fresh.m3u8" }));
+    const { r } = mount({ isHost: true, relay: rl as never, takePending: () => cand(), relocate });
+    await flush();
+    act(() => mockPlayer.onFatalError("HTTP 403"));
+    await flush();
+    expect(mockPlayer.source.uri).toBe("https://cdn.example.net/fresh.m3u8");
+    expect(rl.send).toHaveBeenLastCalledWith(expect.objectContaining({ url: "https://cdn.example.net/fresh.m3u8" }));
+    act(() => mockPlayer.onFatalError("HTTP 403"));
+    await flush();
+    expect(texts(r).join("\n")).toContain("This source won't play here");
+  });
+
+  it("a guest left waiting 20 s can look for the stream on this device", async () => {
+    jest.useFakeTimers();
+    try {
+      const rl = relay();
+      const relocate = jest.fn(async () => cand({ url: "https://cdn.example.net/here.m3u8" }));
+      const { r } = mount({ relay: rl as never, relocate });
+      act(() => jest.advanceTimersByTime(20_000));
+      expect(texts(r).join("\n")).toContain("The host hasn't shared the stream yet");
+      act(() => r.root.findByProps({ accessibilityLabel: "Find it here" }).props.onPress());
+      await flush();
+      expect(mockPlayer.source.uri).toBe("https://cdn.example.net/here.m3u8");
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
