@@ -66,25 +66,32 @@ pick a **material** and stay out of engine details:
 `crafted` is also forced when iOS **Reduce Transparency** is on, on Android < 12, on Android inside a `Modal` (a
 separate window — the caller passes `backdrop="none"`), and whenever the only backdrop is one the glass sits inside.
 
-**D3 — Android engine: blur only the glass's own area.** `modules/bearoom-glass` (local Expo module, Android only):
-- `BearoomGlassBackdrop` — a view that records its children into a `RenderNode` during its normal draw and then draws
-  that node. No extra work: it is the draw that happens anyway.
-- `BearoomGlassView` — draws the backdrop's `RenderNode` **translated and clipped to its own bounds plus a blur-radius
-  margin** into a small `RenderNode` carrying `RenderEffect` blur (+ a saturation lift), then an overlay tint. Unlike
-  Dimezis (full-target layer), the offscreen layer is the size of the glass, so a tab bar costs a tab bar's worth of
-  GPU, not a screen's. Position is re-checked in a pre-draw listener (two `getLocationInWindow` calls); the node is
-  re-recorded only when the offset changes. Content changes flow through automatically because the small node
-  *references* the backdrop node.
-- Native safety net: if the backdrop is an ancestor of the glass view, it draws the overlay only (never the node).
+**D3 — Android engine: a shared quarter-resolution copy, tiny blurs.** `modules/bearoom-glass` (local Expo
+module, Android only):
+- `BearoomGlassBackdrop` — records its children into a `RenderNode` during its normal draw (no extra work: it is
+  the draw that happens anyway) and keeps a **quarter-resolution copy** of that node as a compositing layer,
+  rendered once per frame however many glass views use it.
+- `BearoomGlassView` — samples the part of that copy under itself (plus a blur margin) into a tiny `RenderNode`
+  with a `RenderEffect` blur (+ saturation lift), scales it back up, and lays an **opaque base** (the app
+  background) under it and the material tint over it. The base matters: a backdrop records content, not the
+  background behind it, so without it text and gaps in the blurred copy stay see-through.
+- Freshness: the renderer caches these layers, so on every frame the window draws anyway the glass nudges a
+  no-op property (pivot) on them; that never schedules a frame. Offset changes (scrolling, transitions) are
+  checked in the same pre-draw pass.
+- Native safety net: a glass inside its own backdrop draws only its tint.
 - No window-wide capture, no software rasterising, no timers.
+- **Never a WebView backdrop** (measured 2026-10-11): blurring the provider page makes Chromium draw the video
+  again every frame (36–38 % janky with one draw per glass, 47–50 % with one shared draw), and drawing it scaled
+  renders it black. Live blur over video waits for Phase 1B's native player (`TextureView`).
 
 **D4 — Backdrops are explicit.** Glass may only blur what a `GlassBackdrop` wraps.
 - **Screen backdrop**: a screen wraps its scrolling content in `<GlassBackdrop>`. While that screen is focused it is
   the app's *current screen backdrop* (registry: most recently focused wins; blurred/unmounted screens drop out).
   Floating chrome outside any layer — tab bar, party peek bar, headers, header buttons — blurs the current screen
   backdrop.
-- **Local layer**: `<GlassLayer>` gives its subtree a private backdrop slot. The player wraps the video in
-  `<GlassBackdrop>` inside a `<GlassLayer>`, so the controls blur the video box (small, cheap) — not the screen.
+- **Local layer**: `<GlassLayer>` gives its subtree a private backdrop slot, so glass inside never blurs the
+  screen. The players use a layer **without** a backdrop (see D3): their controls get crafted glass on Android and
+  Liquid Glass on iOS.
 - **Guard**: every `GlassBackdrop` tells its descendants "you are inside backdrop #id"; a glass whose resolved
   backdrop is one it sits inside renders `crafted`. (Hero chips inside Home's scroll content → crafted.)
 
@@ -107,7 +114,7 @@ blur.
 The honey play button stays solid honey (the one primary action).
 
 **D7 — The "no blur on video screens" rule changes.** New rule: *no blur engine that captures the window, ever;
-over video only the `backdrop`/`liquid`/`material` engines, measured.* `@sbaiahmed1/react-native-blur` is removed.
+never a WebView as a backdrop; over video only OS-composited glass (iOS) until the native player lands.* `@sbaiahmed1/react-native-blur` is removed.
 `Frost` stays as a thin alias (BearAlert uses it and must not be edited): `Frost` = `Glass material="sheet"
 backdrop="none"`, so BearAlert gets system blur on iOS and crafted glass on Android.
 
@@ -121,8 +128,8 @@ backdrop="none"`, so BearAlert gets system blur on iOS and crafted glass on Andr
 | Home / details / profile header backgrounds | `chrome` | current screen |
 | Header icon buttons (`IconButton`) | `control` | current screen |
 | `GlassCard` / `GlassButton` / `GlassChip` with blur | `control` (cards: `bar`) | auto (inside content → crafted) |
-| Player bottom bar, ±10 s circles, top chips (solo + party) | `bar` / `control` | player layer (the video) |
-| Party top buttons in immersive mode | `control` | player layer |
+| Player bottom bar, ±10 s circles, top chips (solo + party) | `bar` / `control` | player layer, no backdrop (Android crafted, iOS liquid) |
+| Party top buttons in immersive mode | `control` | player layer, no backdrop |
 | Party top buttons in portrait (above the video, not over it) | `control` | auto (→ crafted) |
 | Player settings sheet (`Modal`) | unchanged solid | — |
 | BearAlert (via `Frost`) | `sheet` | none |
@@ -134,7 +141,8 @@ backdrop → crafted, which is still the designed look.
 
 1. Home scroll script (5 s): janky ≤ 10 %, GPU p90 ≤ no-blur baseline + 1.5 ms, no `traversal` hotspot.
 2. Party, video playing, controls on screen: janky ≤ 5 %, p99 ≤ 16 ms.
-3. Glass is real blur on the tab bar, peek bar, Home header and over the video (screenshots).
+3. Glass is real blur on the tab bar, peek bar and headers (screenshots); controls over the video are crafted on
+   Android (D3) and Liquid Glass on iOS.
 4. No crash with glass inside its own backdrop (Home hero chips) — unit test + device run.
 5. iOS 27 simulator: Liquid Glass on controls/tab bar, system blur on headers; controls fade in/out with no pop.
 6. `@sbaiahmed1/react-native-blur` gone from `package.json`, Podfile.lock and the APK.
