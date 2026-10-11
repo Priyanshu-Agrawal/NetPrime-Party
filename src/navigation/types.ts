@@ -47,6 +47,7 @@ export type RootStackParamList = {
   WatchHistory: undefined;
   TrendingShows: undefined;
   HomePrefs: undefined;
+  PlaybackPrefs: undefined;
   TestStreams: undefined;
   PluginLab: undefined;
 };

@@ -93,6 +93,10 @@ export function openHomePrefs() {
   navigate("HomePrefs");
 }
 
+export function openPlaybackPrefs() {
+  navigate("PlaybackPrefs");
+}
+
 export function openSearchTab() {
   navigate("MainTabs", { screen: "Search" });
 }

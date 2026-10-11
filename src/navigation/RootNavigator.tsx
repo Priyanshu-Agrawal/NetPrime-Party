@@ -7,6 +7,7 @@ import MyListScreen from "../screens/MyListScreen";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import PartyScreen from "../screens/PartyScreen";
 import HomePrefsScreen from "../screens/HomePrefsScreen";
+import PlaybackPrefsScreen from "../screens/PlaybackPrefsScreen";
 import TrendingShowsScreen from "../screens/TrendingShowsScreen";
 import TestStreamsScreen from "../screens/TestStreamsScreen";
 import PluginLabScreen from "../screens/PluginLabScreen";
@@ -40,6 +41,7 @@ export default function RootNavigator() {
       <RootStack.Screen name="WatchHistory" component={WatchHistoryScreen} />
       <RootStack.Screen name="TrendingShows" component={TrendingShowsScreen} />
       <RootStack.Screen name="HomePrefs" component={HomePrefsScreen} />
+      <RootStack.Screen name="PlaybackPrefs" component={PlaybackPrefsScreen} />
       <RootStack.Screen name="TestStreams" component={TestStreamsScreen} />
       <RootStack.Screen name="PluginLab" component={PluginLabScreen} />
     </RootStack.Navigator>

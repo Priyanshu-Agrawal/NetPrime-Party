@@ -19,7 +19,7 @@ import {
   openAppSettings,
   requestNotificationPermission,
 } from "@/services/permissions/notifications";
-import { openJoinParty, openLibrary, openHomePrefs, openPartyHost, openTestStreams } from "@/src/navigation/actions";
+import { openJoinParty, openLibrary, openHomePrefs, openPartyHost, openPlaybackPrefs, openTestStreams } from "@/src/navigation/actions";
 import { useTestStreamsEnabled } from "@/src/features/dev/testStreamsGate";
 import { genRoomCode } from "@/utils/roomCode";
 import { Appear, Text } from "@/src/ui";
@@ -249,7 +249,7 @@ export default function MoreScreen() {
               <Row icon="person-circle-outline" label="Display name & avatar" onPress={openEdit} />
               <Row icon="notifications-outline" label="Notifications & lock-screen audio" onPress={manageNotifications} />
               <Row icon="sparkles-outline" label="Home" onPress={openHomePrefs} />
-              <Row icon="options-outline" label="Playback & data" onPress={() => comingSoon("Playback & data")} last />
+              <Row icon="options-outline" label="Playback & data" onPress={openPlaybackPrefs} last />
             </Card>
           </Appear>
 
