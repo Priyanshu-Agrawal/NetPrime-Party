@@ -30,3 +30,17 @@ describe("screens with floating glass", () => {
     expect(src).toMatch(/<Glass material="sheet" backdrop="none"/);
   });
 });
+
+describe("players", () => {
+  // Blurring the WebView makes Chromium draw the video a second time every frame: 37–50 % janky frames on the
+  // Nothing Phone 1 (release build). Controls over the video use crafted glass on Android (no backdrop in the
+  // player's GlassLayer) and Liquid Glass on iOS, which needs no backdrop.
+  it.each(["src/screens/PlayerScreen.tsx", "src/screens/PartyScreen.tsx"])(
+    "%s keeps its controls in a GlassLayer but never makes the video a backdrop",
+    (f) => {
+      const src = read(f);
+      expect(src).toContain("<GlassLayer>");
+      expect(src).not.toContain("<GlassBackdrop");
+    },
+  );
+});

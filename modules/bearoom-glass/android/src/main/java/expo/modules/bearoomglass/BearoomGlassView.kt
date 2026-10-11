@@ -11,16 +11,17 @@ import android.graphics.Shader
 import android.os.Build
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.animation.AnimationUtils
 import androidx.annotation.RequiresApi
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.views.ExpoView
 import kotlin.math.ceil
 
 /**
- * Real glass on Android 12+. Draws its backdrop's RenderNode — clipped to this view plus a blur margin — into a
- * small RenderNode carrying a RenderEffect blur, then an overlay tint. The offscreen layer is this view's size,
- * not the backdrop's, so a tab bar costs a tab bar's worth of GPU. No window capture, no software drawing, no
- * timers: content changes flow through because the small node references the backdrop's node.
+ * Real glass on Android 12+. Samples its backdrop's shared quarter-resolution copy — only the part under this
+ * view, plus a blur margin — into a small RenderNode carrying a RenderEffect blur, scales it back up, and lays
+ * an opaque base under it and a tint over it. Every layer involved is tiny, the backdrop's content is rendered
+ * once per frame however many glass views use it, and there is no window capture, software drawing or timer.
  */
 class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val blur: Blur? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Blur() else null
@@ -34,16 +35,21 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   private var drawnDx = Int.MIN_VALUE
   private var drawnDy = Int.MIN_VALUE
 
-  // Runs only for frames the window draws anyway (scrolling, video, animations) — never schedules one.
+  // Runs only for frames the window draws anyway (scrolling, video, animations) — it never schedules one.
   // - Scrolling and transitions move this view (or the backdrop) without redrawing it: re-check the offset
   //   (two getLocationInWindow calls) and redraw only when it changed.
-  // - The blur layer is cached and is not refreshed when only the backdrop's content changes, so it would
-  //   freeze on the first frame: mark it for re-render in this frame (see Blur.refresh).
+  // - The renderer caches blur layers and doesn't re-render them when only the content they reference
+  //   changes: mark them for re-render in this frame.
   private val frameWatcher = ViewTreeObserver.OnPreDrawListener {
     val b = backdrop
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && b.isAttachedToWindow) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && canBlur(b)) {
       measureOffset(b)
-      if (own[0] != drawnDx || own[1] != drawnDy) invalidate() else blur.refresh()
+      if (own[0] != drawnDx || own[1] != drawnDy) {
+        invalidate()
+      } else {
+        b.refreshSmall(AnimationUtils.currentAnimationTimeMillis())
+        blur.refresh()
+      }
     }
     true
   }
@@ -99,21 +105,24 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
   override fun onDraw(canvas: Canvas) {
     super.onDraw(canvas)
     val b = backdrop
-    val source = b?.renderNode
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && source != null &&
-      canvas.isHardwareAccelerated && b.isAttachedToWindow && width > 0 && height > 0 && !isInside(b)
+    val small = b?.small
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && blur != null && b != null && small != null &&
+      canvas.isHardwareAccelerated && canBlur(b)
     ) {
       measureOffset(b)
       drawnDx = own[0]
       drawnDy = own[1]
-      val radiusPx = blurRadiusDp * resources.displayMetrics.density
       // The backdrop records content, not the background behind it: without an opaque base, text and gaps in
       // the blurred copy stay see-through and the sharp originals show through the glass.
       if (baseColor != Color.TRANSPARENT) canvas.drawColor(baseColor)
-      blur.draw(canvas, source, width, height, drawnDx, drawnDy, radiusPx, saturation)
+      val radiusPx = blurRadiusDp * resources.displayMetrics.density
+      blur.draw(canvas, small, width, height, drawnDx, drawnDy, radiusPx, saturation)
     }
     if (overlayColor != Color.TRANSPARENT) canvas.drawColor(overlayColor)
   }
+
+  /** Attached, sized, and not inside the backdrop (drawing that would make the render tree contain itself). */
+  private fun canBlur(b: View): Boolean = b.isAttachedToWindow && width > 0 && height > 0 && !isInside(b)
 
   /** Leaves this view's offset from the backdrop in own[0], own[1]. */
   private fun measureOffset(b: View) {
@@ -123,7 +132,6 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
     own[1] -= theirs[1]
   }
 
-  /** Drawing a backdrop we sit inside would make the render tree contain itself (libhwui recursion crash). */
   private fun isInside(b: View): Boolean {
     var p = parent
     while (p != null) {
@@ -139,43 +147,42 @@ class BearoomGlassView(context: Context, appContext: AppContext) : ExpoView(cont
     private var effectDirty = true
     private var flip = false
 
-    /**
-     * Re-render the cached blur layer this frame. A changed property is what makes the renderer redraw a
-     * layer; the pivot has no visible effect here (no rotation or scale), and setting it never schedules a
-     * frame, so this costs one small blur only on frames that are being drawn anyway.
-     */
+    fun markDirty() {
+      effectDirty = true
+    }
+
+    /** Re-render the cached blur layer this frame (a changed property; the pivot has no visible effect). */
     fun refresh() {
       flip = !flip
       node.setPivotX(if (flip) 1f else 0f)
     }
 
-    fun markDirty() {
-      effectDirty = true
-    }
-
-    fun draw(canvas: Canvas, source: RenderNode, width: Int, height: Int, dx: Int, dy: Int, radiusPx: Float, saturation: Float) {
-      val margin = ceil(radiusPx).toInt()
-      node.setPosition(0, 0, width + 2 * margin, height + 2 * margin)
+    /** Everything here runs at the backdrop's quarter resolution; the result is scaled up by DOWNSAMPLE. */
+    fun draw(canvas: Canvas, small: RenderNode, width: Int, height: Int, dx: Int, dy: Int, radiusPx: Float, saturation: Float) {
+      val radius = radiusPx / DOWNSAMPLE
+      val margin = ceil(radius).toInt()
+      node.setPosition(0, 0, ceil(width / DOWNSAMPLE).toInt() + 2 * margin, ceil(height / DOWNSAMPLE).toInt() + 2 * margin)
       val recording = node.beginRecording()
       try {
-        recording.translate((margin - dx).toFloat(), (margin - dy).toFloat())
-        recording.drawRenderNode(source)
+        recording.translate(margin - dx / DOWNSAMPLE, margin - dy / DOWNSAMPLE)
+        recording.drawRenderNode(small)
       } finally {
         node.endRecording()
       }
       if (effectDirty) {
-        node.setRenderEffect(effect(radiusPx, saturation))
+        node.setRenderEffect(effect(radius, saturation))
         effectDirty = false
       }
       canvas.save()
       canvas.clipRect(0, 0, width, height)
+      canvas.scale(DOWNSAMPLE, DOWNSAMPLE)
       canvas.translate(-margin.toFloat(), -margin.toFloat())
       canvas.drawRenderNode(node)
       canvas.restore()
     }
 
-    private fun effect(radiusPx: Float, saturation: Float): RenderEffect {
-      val r = radiusPx.coerceAtLeast(1f)
+    private fun effect(radius: Float, saturation: Float): RenderEffect {
+      val r = radius.coerceAtLeast(1f)
       val blur = RenderEffect.createBlurEffect(r, r, Shader.TileMode.CLAMP)
       if (saturation == 1f) return blur
       val lift = ColorMatrix().apply { setSaturation(saturation) }

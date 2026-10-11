@@ -73,7 +73,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Animated, Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "@/hooks/useResponsive";
-import { GlassBackdrop, GlassLayer } from "@/src/ui/glass";
+import { GlassLayer } from "@/src/ui/glass";
 
 /**
  * SOLO playback = the SAME native player as the watch party (HijackPlayer + our
@@ -709,44 +709,42 @@ export const PlayerScreen: React.FC = () => {
           <GlassLayer>
             {id && selected ? (
               <>
-                <GlassBackdrop style={StyleSheet.absoluteFill}>
-                  <HijackPlayer
-                    ref={playerRef}
-                    key={selected.id}
-                    providerId={selected.id}
-                    posterUrl={artworkUrl ?? undefined}
-                    tmdbId={media.tmdbId}
-                    type={media.type}
-                    season={media.season}
-                    episode={media.episode}
-                    onPlayerEvent={onEvent}
-                    onBound={() => {
-                      setPlayerBound(true);
-                      if (__DEV__) logBind(selected.id, true, mountTsRef.current);
-                      // Bound behind another screen (a party pushed on top): stay paused.
-                      if (onBindAction({ focused: focusedRef.current }) === "pause") {
-                        playerRef.current?.pause();
-                        return;
-                      }
-                      // The user pressed Play on the title: start as soon as we can drive the
-                      // video (some providers bind paused, e.g. TV episodes). That makes binding
-                      // the play intent — a bound provider that never advances is skipped.
-                      playIntentAtRef.current ??= Date.now();
-                      playerRef.current?.play();
-                    }}
-                    onBindFailed={() => {
-                      moveOn("bind");
-                    }}
-                    revealProviderUiOnBindFail={!hasNextBindable}
-                    onFatalError={onFatalError}
-                    onSwitchSource={triggerFallback}
-                    onRecovered={() =>
-                      setExcludedIds((prev) => prev.filter((pid) => pid !== selected.id))
+                <HijackPlayer
+                  ref={playerRef}
+                  key={selected.id}
+                  providerId={selected.id}
+                  posterUrl={artworkUrl ?? undefined}
+                  tmdbId={media.tmdbId}
+                  type={media.type}
+                  season={media.season}
+                  episode={media.episode}
+                  onPlayerEvent={onEvent}
+                  onBound={() => {
+                    setPlayerBound(true);
+                    if (__DEV__) logBind(selected.id, true, mountTsRef.current);
+                    // Bound behind another screen (a party pushed on top): stay paused.
+                    if (onBindAction({ focused: focusedRef.current }) === "pause") {
+                      playerRef.current?.pause();
+                      return;
                     }
-                    nativeControls={playerBound}
-                    party={false}
-                  />
-                </GlassBackdrop>
+                    // The user pressed Play on the title: start as soon as we can drive the
+                    // video (some providers bind paused, e.g. TV episodes). That makes binding
+                    // the play intent — a bound provider that never advances is skipped.
+                    playIntentAtRef.current ??= Date.now();
+                    playerRef.current?.play();
+                  }}
+                  onBindFailed={() => {
+                    moveOn("bind");
+                  }}
+                  revealProviderUiOnBindFail={!hasNextBindable}
+                  onFatalError={onFatalError}
+                  onSwitchSource={triggerFallback}
+                  onRecovered={() =>
+                    setExcludedIds((prev) => prev.filter((pid) => pid !== selected.id))
+                  }
+                  nativeControls={playerBound}
+                  party={false}
+                />
                 {playerBound ? (
                   <PlayerControls
                     ref={controlsRef}

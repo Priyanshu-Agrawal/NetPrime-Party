@@ -73,7 +73,7 @@ import {
 } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GlassBackdrop, GlassLayer } from "@/src/ui/glass";
+import { GlassLayer } from "@/src/ui/glass";
 
 const QUICK_REACTIONS = ["❤️", "😂", "🔥", "👏", "😮"];
 // Stable empty reference so `members` doesn't churn memo deps before the snapshot lands.
@@ -690,21 +690,19 @@ export default function Party() {
           ) : providerId && media ? (
             <>
               <GlassLayer>
-                <GlassBackdrop style={StyleSheet.absoluteFill}>
-                  <HijackPlayer
-                    ref={playerRef}
-                    providerId={providerId}
-                    tmdbId={media.tmdbId}
-                    type={media.type}
-                    season={media.season}
-                    episode={media.episode}
-                    posterUrl={posterUrl}
-                    onPlayerEvent={onEvent}
-                    onBound={() => setPlayerBound(true)}
-                    onSwitchSource={isHost ? switchSource : undefined}
-                    nativeControls={playerBound}
-                  />
-                </GlassBackdrop>
+                <HijackPlayer
+                  ref={playerRef}
+                  providerId={providerId}
+                  tmdbId={media.tmdbId}
+                  type={media.type}
+                  season={media.season}
+                  episode={media.episode}
+                  posterUrl={posterUrl}
+                  onPlayerEvent={onEvent}
+                  onBound={() => setPlayerBound(true)}
+                  onSwitchSource={isHost ? switchSource : undefined}
+                  nativeControls={playerBound}
+                />
                 {/* Mount our overlay ONLY after the <video> binds. videasy gates
                     playback behind a pre-play button (no <video> until it's tapped);
                     covering it would stop the video ever starting. Before bind, let
