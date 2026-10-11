@@ -60,13 +60,24 @@ describe("NativeEventMachine", () => {
     await expect(landed).resolves.toBe(117.6);
   });
 
-  it("never hangs: a seek with no landing resolves after the timeout", async () => {
+  it("an in-buffer seek (loading → ready, no tick between — ExoPlayer) lands at the target, not where it started", async () => {
+    const { m, events } = setup();
+    m.onStatus("readyToPlay", 600);
+    m.onTime(30, 60);
+    const landed = m.beginSeek(40);
+    m.onStatus("loading");
+    m.onStatus("readyToPlay");
+    await expect(landed).resolves.toBe(40);
+    expect(events.filter((e) => e.event === "seeked" || e.event === "buffering").every((e) => e.currentTime === 40)).toBe(true);
+  });
+
+  it("never hangs: a seek with no landing resolves after the timeout, at the target the player reports", async () => {
     const { m, advance } = setup();
     m.onStatus("readyToPlay", 600);
     const landed = m.beginSeek(50);
     advance(SEEK_TIMEOUT_MS);
     m.expireSeek();
-    await expect(landed).resolves.toBe(0);
+    await expect(landed).resolves.toBe(50);
   });
 
   it("clamps the target to the duration", async () => {
@@ -83,7 +94,7 @@ describe("NativeEventMachine", () => {
     m.onTime(5, 5);
     const first = m.beginSeek(10);
     const second = m.beginSeek(20);
-    await expect(first).resolves.toBe(5);
+    await expect(first).resolves.toBe(10); // where it was headed when superseded
     m.onTime(20, 30);
     await expect(second).resolves.toBe(20);
   });

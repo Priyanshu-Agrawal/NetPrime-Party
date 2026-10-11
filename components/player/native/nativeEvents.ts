@@ -98,7 +98,10 @@ export class NativeEventMachine {
     const t = Math.max(0, this.duration > 0 ? Math.min(target, this.duration) : target);
     this.atEnd = false;
     this.seek?.resolve(this.time);
-    this.out("seeking", undefined, t);
+    // Both players report the target while a seek is in flight; ExoPlayer sends no tick for an in-buffer seek, so
+    // without this the landing would carry the position from before the seek.
+    this.time = t;
+    this.out("seeking");
     return new Promise((resolve) => {
       this.seek = { target: t, startedAt: this.now(), sawLoading: false, resolve };
     });
