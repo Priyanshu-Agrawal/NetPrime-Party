@@ -626,3 +626,32 @@ scorecard → recommendation to the owner).
   - Other minors are deferred in BACKLOG.
 - **iOS 27 simulator (owner allowed it 22:07):** the sandbox comes up in WKWebView with direct network blocked; a fresh install downloaded and hash-checked Open Movies through the iOS BearoomFetch; self-test **11/11** after one fix (iOS wraps native errors differently from Android; plugins now get the plain reason); Big Buck Bunny resolves in 1.5 s. Android phone re-run after the fixes: 11/11, all four lookups unchanged.
 
+## `[x]` Phase 2B-1 — resolution pipeline (2026-10-11)
+
+Plan `docs/superpowers/plans/2026-10-11-phase2b1-resolution-pipeline.md` · branch `feat/phase2b-native-sources`.
+Spec §5.3, §5.5–5.7, §7 F5.
+
+- **Pure modules, all under `services/playback/`, test-first:**
+  - `languages`: names and native-script names to ISO codes, a fixed set of unambiguous 3-letter codes, "Original" → TMDB `original_language`, and the film's own title stripped first. Nothing is guessed.
+  - `candidate`: stable keys that survive token and CDN changes; container and platform from the URL.
+  - `manifests`: HLS master/media, DASH, MP4 `mvhd`.
+  - `probe` (StreamProbe): master → variant → first segment, HTML refused, length ±8 / ±3 min, languages from renditions, DASH and Origin-after-302 kept off iOS, Matroska rejected; 6 s budget; a timeout leaves a stream unverified, never rejected.
+  - `rank`: spec §5.6 order.
+  - `health`: 5 strikes, then 1 h → 4 h → 8 h; `empty-fast` and sandbox trouble don't count.
+  - `resolver`: probes the top 4, one request at a time per backend, backends in parallel.
+- **Elsewhere:**
+  - `utils/languagePrefs`: order from the last audio the user picked (default Hindi → original), and per-title memory for 300 titles.
+  - The sandbox mounts only while something holds it: a resolve keeps it 2 min, the Plugin Lab while it is open.
+  - `/report` accepts native-lane rows for listed plugin sources (worker `075f2622`).
+- **Phone (release build, Plugin Lab):**
+
+  | Title | Result |
+  |---|---|
+  | Big Buck Bunny | `ok` · English · 10.6 min · probed **1080p** (the plugin said 720p) · iOS+Android · 5.1 s |
+  | Tears of Steel | HLS `ok` 12.2 min 800p; the MOV `unverified` (its `moov` is at the end, so no length) |
+  | Sintel | DASH `ok` 14.8 min · Android only |
+  | Fight Club | 0 playable, `empty-fast` 71 ms |
+
+- **iOS 27 simulator:** Sintel → 0 playable (DASH filtered for iPhone); Big Buck Bunny resolves.
+- **Found:** Android keeps WebView's renderer process (~50–57 MB PSS) after the sandbox unmounts. The page itself is freed; getting the process back would need `WebViewRenderProcess.terminate()` (API 29+) — backlog.
+

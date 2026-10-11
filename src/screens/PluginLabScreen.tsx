@@ -3,7 +3,11 @@ import { runSelfTest, type SelfTestResult } from "@/src/features/dev/pluginSelfT
 import { useTestStreamsEnabled } from "@/src/features/dev/testStreamsGate";
 import { pluginHost, repoStatuses, runInSandbox, sandboxBridge, subscribeRepos } from "@/services/plugins";
 import { holdSandbox } from "@/services/plugins/demand";
-import type { HostResult } from "@/services/plugins/PluginHost";
+import { resolveTitle } from "@/services/playback";
+import type { ResolveResult } from "@/services/playback/resolver";
+import { languageName } from "@/components/player/native/languages";
+import { languageOrder, resolveOrder } from "@/utils/languagePrefs";
+import { fetchDetails } from "@/utils/tmdbDetails";
 import { IconButton } from "@/src/ui";
 import { colors, font, ms, radius, spacing } from "@/theme/bearoom";
 import { pressedStyle } from "@/theme/styles/interaction";
@@ -46,7 +50,6 @@ export default function PluginLabScreen() {
   const [tests, setTests] = useState<SelfTestResult[]>([]);
   const [tmdbId, setTmdbId] = useState("10378");
   const [type, setType] = useState<"movie" | "tv">("movie");
-  const [result, setResult] = useState<(HostResult & { ms: number }) | null>(null);
 
   useEffect(() => (enabled ? holdSandbox() : undefined), [enabled]);
 
@@ -57,13 +60,29 @@ export default function PluginLabScreen() {
     setBusy(false);
   };
 
+  const [ranked, setRanked] = useState<(ResolveResult & { ms: number; wanted: string[] }) | null>(null);
+
   const resolve = async () => {
     setBusy(true);
-    setResult(null);
+    setRanked(null);
     pluginHost.clearCache();
     const started = Date.now();
-    const r = await pluginHost.getStreams({ tmdbId: tmdbId.trim(), type, season: type === "tv" ? 1 : undefined, episode: type === "tv" ? 1 : undefined });
-    setResult({ ...r, ms: Date.now() - started });
+    const details = await fetchDetails(type, tmdbId.trim()).catch(() => null);
+    const runtimeMin = type === "movie" ? details?.runtime : details?.episode_run_time?.[0];
+    const wanted = resolveOrder(languageOrder(), details?.original_language);
+    const r = await resolveTitle(
+      {
+        tmdbId: tmdbId.trim(),
+        type,
+        season: type === "tv" ? 1 : undefined,
+        episode: type === "tv" ? 1 : undefined,
+        titleName: details?.title ?? details?.name,
+        runtimeMin: runtimeMin || undefined,
+        originalLanguage: details?.original_language,
+      },
+      wanted,
+    );
+    setRanked({ ...r, ms: Date.now() - started, wanted });
     setBusy(false);
   };
 
@@ -120,15 +139,26 @@ export default function PluginLabScreen() {
             <Button label={type === "movie" ? "Movie" : "TV S1E1"} onPress={() => setType(type === "movie" ? "tv" : "movie")} />
             <Button label="Resolve" onPress={resolve} disabled={busy} />
           </View>
-          {result ? (
+          {ranked ? (
             <>
-              <Text style={styles.line}>{`${result.streams.length} streams · ${result.failures.length} failures · ${(result.ms / 1000).toFixed(1)} s · ${result.complete ? "complete" : "returned early"}`}</Text>
-              {result.streams.map((s, i) => (
-                <Text key={`${s.pluginKey}-${i}`} style={styles.line}>
-                  {`${s.name} · ${s.quality ?? "?"} · ${hostOf(s.url)} · subs ${s.subtitles.length}${s.headers.Cookie ? " · cookie" : ""}`}
+              <Text style={styles.line}>
+                {`${ranked.ranked.length} playable · ${ranked.rejected.length} rejected · ${(ranked.ms / 1000).toFixed(1)} s · wants ${ranked.wanted.join(" > ") || "–"}`}
+              </Text>
+              {[...ranked.ranked, ...ranked.rejected].map((c) => (
+                <Text key={c.key} style={[styles.line, c.verdict === "rejected" && styles.fail]}>
+                  {[
+                    `${c.verdict}${c.rejectReason ? ` (${c.rejectReason})` : ""}`,
+                    c.label,
+                    c.languages.map(languageName).join("/") || "lang ?",
+                    c.durationSec != null ? `${(c.durationSec / 60).toFixed(1)} min` : "len ?",
+                    c.quality?.label ?? "?",
+                    c.container,
+                    c.platforms.ios ? "iOS+Android" : c.platforms.android ? "Android" : "none",
+                    hostOf(c.url),
+                  ].join(" · ")}
                 </Text>
               ))}
-              {result.failures.map((f) => (
+              {ranked.failures.map((f) => (
                 <Text key={f.pluginKey} style={[styles.line, styles.fail]}>{`${f.pluginKey} · ${f.reason} · ${f.ms} ms`}</Text>
               ))}
             </>
