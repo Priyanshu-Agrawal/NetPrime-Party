@@ -19,6 +19,11 @@ const probeFetch: ProbeFetch = async (url, headers, opts) => {
 
 const probeCache = new ProbeCache();
 
+/** The StreamProbe on the real fetch path, uncached (the dev scorecard measures every run afresh). */
+export function probeStream(c: Parameters<typeof probeCandidate>[0], ctx: Parameters<typeof probeCandidate>[1]) {
+  return probeCandidate(c, ctx, probeFetch);
+}
+
 export function resolveTitle(req: TitleRequest, languages: string[]): Promise<ResolveResult> {
   return resolvePlayback(req, {
     getStreams: (r, opts) => pluginHost.getStreams(r, opts),

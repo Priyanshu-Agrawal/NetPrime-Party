@@ -1,9 +1,12 @@
 /** Dev-only Plugin Lab: sandbox state, installed repos, the on-device self-test, and a resolve probe (spec §5.4). */
 import { runSelfTest, type SelfTestResult } from "@/src/features/dev/pluginSelfTest";
 import { useTestStreamsEnabled } from "@/src/features/dev/testStreamsGate";
-import { pluginHost, repoStatuses, runInSandbox, sandboxBridge, subscribeRepos } from "@/services/plugins";
+import { bytesUsed, pluginHost, repoStatuses, runInSandbox, sandboxBridge, scorecardRepo, subscribeRepos } from "@/services/plugins";
+import { scoreRepo } from "@/services/plugins/scorecard";
+import { CANDIDATE_REPOS } from "@/src/features/dev/scorecardData";
+import { ScorecardPanel } from "@/src/features/dev/ScorecardPanel";
 import { holdSandbox } from "@/services/plugins/demand";
-import { resolveTitle } from "@/services/playback";
+import { probeStream, resolveTitle } from "@/services/playback";
 import type { ResolveResult } from "@/services/playback/resolver";
 import { languageName } from "@/components/player/native/languages";
 import { languageOrder, resolveOrder } from "@/utils/languagePrefs";
@@ -15,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState, useSyncExternalStore } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function hostOf(url: string): string {
@@ -106,6 +109,15 @@ export default function PluginLabScreen() {
             {!sandbox.attached ? "Not mounted" : !sandbox.ready ? "Starting…" : sandbox.csp ? "Ready · direct network blocked" : "Ready · CSP NOT enforced"}
             {`  ·  page ${sandbox.generation}  ·  ${sandbox.running} running`}
           </Text>
+
+          <ScorecardPanel
+            candidates={CANDIDATE_REPOS}
+            openRepo={scorecardRepo}
+            runScore={scoreRepo}
+            probe={probeStream}
+            platform={Platform.OS === "ios" ? "ios" : "android"}
+            bytesUsed={bytesUsed}
+          />
 
           <Text style={styles.section}>REPOS</Text>
           {repos.length ? (
