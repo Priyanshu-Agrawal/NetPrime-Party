@@ -84,9 +84,9 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 | Glass over video (Android) | DEFERRED → Phase 1B | Live blur over the native player once it renders into a `TextureView`; WebView backdrops are banned (36–50 % janky / black when scaled). |
 | Glass review minors (2026-10-11) | DONE 2026-10-11 | Opaque fallback, one invalidate per offset + isShown guard, same-window check, backdrop prop on primitives, backdrops registered from navigation events, single reduce-transparency subscription, touchable interactive Liquid Glass, weak backdrop ref + recordings freed on detach. |
 | Glass: low-end Android check | DEFERRED | Bar blur on a weak Android 12+ device (gate is already API 31+ and bars-only). |
-| Party playback jank | OPEN | 10–52 % janky frames (~33 fps drawn, p99 15–20 ms) with no blur over the video, 2026-10-11 — investigate separately. |
+| Party playback jank | ROOT CAUSE FOUND → Phase 1B | WebView video costs every video frame ~10–12 ms of our threads (Chromium draws inside our RenderThread ~4.5–5 ms at ~1.3 GHz + its vsync tick ~1.1 ms on the main thread at 120/s); frames start evenly every 5th vsync but land 2–4 vsyncs later → uneven cadence (≈⅓ of frames off by ±1–3 vsyncs). Not ours to fix inside a WebView: 60 Hz A/B was mixed, controls add only ~1.2 ms. Fix = native player (SurfaceView: zero app frames per video frame). Measured 2026-10-11. |
 | Details error state has no way back | DONE 2026-10-11 | `DetailsError` (back + Try again) on movie/TV details. |
-| Home scroll animation frames | OPEN | 50–67 ms frames inside main-thread animation callbacks while scrolling Home (pre-existing, not glass). |
+| Home scroll animation frames | DONE 2026-10-11 | Not scrolling: pull-to-refresh (my scroll script's up-swipes hit the top) cleared the TMDB cache → every rail swapped to skeletons in one frame (~1,800 views torn down, up to 63 ms frames). Now invalidates in place (`c66e79e`): 0 frames > 12 ms. Real Home scrolling: 0.2–0.4 % janky. |
 
 ## H. Atmospheric background
 | Item | Status | Detail |

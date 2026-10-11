@@ -494,6 +494,27 @@ Spec `docs/superpowers/specs/2026-10-11-glass-design.md` · plan `docs/superpowe
 - Follow-ups done the same day: all review minors (opaque fallback, frame-loop guard, same-window check,
   backdrop prop, backdrops registered from navigation events, touchable interactive Liquid Glass, recordings
   freed on detach) and the movie/TV details error state (back + Try again, checked in airplane mode).
-- Separate finding (not glass): party playback measured 10–52 % janky frames (~33 fps drawn, p99 15–20 ms) while
-  no blur runs over the video; Home scroll has 50–67 ms frames inside main-thread animation callbacks. Both
-  queued as their own perf items.
+- Separate finding (not glass): party playback jank and long Home frames — investigated the same day, see below.
+- Correction: the Home A/B runs above used a scroll script whose up-swipes landed at the top and fired
+  pull-to-refresh, which inflated every row (see below). The ranking holds (runs alternated), the absolute numbers
+  don't: clean Home scrolling with bar blur measures 0.2–0.4 % janky.
+
+## `[x]` Party playback + Home frames investigation (2026-10-11)
+
+Nothing Phone 1, release build, thermal status 0, perfetto traces + framestats.
+
+- **Home "50–67 ms frames" — fixed (`c66e79e`).** Not scrolling at all: pull-to-refresh called
+  `resetApiState()`, so every rail dropped to its skeleton in one frame (~1,800 native views torn down, ~500
+  skeleton views built, then rails rebuilt as data returned: 17 frames over 12 ms, worst 63 ms, plus a visible
+  skeleton flash). Every TMDB endpoint now provides one tag and refresh invalidates it — rails refetch in place.
+  After: 0 frames over 12 ms (worst 7 ms), no flash; failed loads still retry (offline page's Try again).
+  Plain Home scrolling: 0.2–0.4 % janky.
+- **Party playback jank — root cause found, fix is Phase 1B.** The provider's video plays inside a WebView, and
+  every video frame runs through our app: Chromium draws it inside our RenderThread (~4.5–5 ms at ~1.3 GHz) and
+  ticks our main thread on every refresh (~1.1 ms × 120/s while playing). Each video frame costs ~10–12 ms
+  against an 8.3 ms budget, so frames that *start* perfectly evenly (every 5th vsync, 119/119) *land* 2–4 vsyncs
+  later — about a third of frames off the even 24 fps rhythm by 1–3 refreshes (micro-judder, no dropped frames).
+  Tried: 60 Hz while playing (one run perfect 3:2, one run 21 % of frames a full 60 Hz refresh late — not
+  reliable); our controls add only ~1.2 ms. Nothing inside the WebView path fixes it; the native player does
+  (`SurfaceView`: video composited by the system, zero app frames per video frame — a `TextureView` — needed for
+  glass over video — brings back one app frame per video frame: far less work than Chromium's, not yet measured).
