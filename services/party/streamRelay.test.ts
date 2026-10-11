@@ -77,4 +77,20 @@ describe("StreamRelay", () => {
     const relay = new StreamRelay();
     expect(() => relay.send(H)).not.toThrow();
   });
+
+  it("tells members when the host's player stalls and recovers (no URL in it)", async () => {
+    const f = fakeChannel();
+    const relay = new StreamRelay();
+    relay.attach(f.channel);
+    const got = jest.fn();
+    relay.onStall(got);
+    relay.sendStall(true);
+    await Promise.resolve();
+    expect(f.sent).toEqual([{ event: "stall", payload: { stalled: true } }]);
+    f.deliver("stall", { stalled: false });
+    f.deliver("stall", { stalled: "yes" });
+    expect(got).toHaveBeenCalledTimes(1);
+    expect(got).toHaveBeenCalledWith(false);
+  });
 });
+

@@ -59,11 +59,14 @@ const cand = (over: Partial<PlaybackCandidate> = {}): PlaybackCandidate => ({
 function relay() {
   const streamCbs = new Set<(h: StreamHandoff) => void>();
   const reqCbs = new Set<(id: string) => void>();
+  const stallCbs = new Set<(s: boolean) => void>();
   return {
     send: jest.fn(),
     request: jest.fn(),
     onStream: (cb: (h: StreamHandoff) => void) => (streamCbs.add(cb), () => streamCbs.delete(cb)),
     onRequest: (cb: (id: string) => void) => (reqCbs.add(cb), () => reqCbs.delete(cb)),
+    onStall: (cb: (s: boolean) => void) => (stallCbs.add(cb), () => stallCbs.delete(cb)),
+    stall: (s: boolean) => stallCbs.forEach((cb) => cb(s)),
     deliver: (h: StreamHandoff) => streamCbs.forEach((cb) => cb(h)),
     ask: (id: string) => reqCbs.forEach((cb) => cb(id)),
   };
@@ -239,6 +242,16 @@ describe("NativeRoomPlayer — fix pass", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("a guest sees 'Waiting for the host…' while the host's player stalls", async () => {
+    const rl = relay();
+    const { r } = mount({ relay: rl as never });
+    act(() => rl.deliver(HOSTH));
+    act(() => rl.stall(true));
+    expect(texts(r)).toContain("Waiting for the host…");
+    act(() => rl.stall(false));
+    expect(texts(r)).not.toContain("Waiting for the host…");
   });
 });
 

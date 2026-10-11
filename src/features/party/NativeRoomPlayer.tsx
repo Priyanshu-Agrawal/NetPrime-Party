@@ -18,7 +18,8 @@ import type { StreamRelay } from "@/services/party/streamRelay";
 import type { PlaybackCandidate } from "@/services/playback/candidate";
 import { toNativeSource } from "@/src/features/player/nativeSession";
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { colors, font, ms } from "@/theme/bearoom";
+import { StyleSheet, Text, View } from "react-native";
 import { guestFallback, hostSource } from "./roomStream";
 
 /** What a re-resolve needs to find the same stream again. */
@@ -34,7 +35,7 @@ export interface NativeRoomPlayerProps {
   isHost: boolean;
   roomCode: string;
   posterUrl?: string;
-  relay: Pick<StreamRelay, "send" | "request" | "onStream" | "onRequest"> | null;
+  relay: Pick<StreamRelay, "send" | "request" | "onStream" | "onRequest" | "onStall"> | null;
   onPlayerEvent(e: PlayerEvent): void;
   /** A source's first frame is up (each new source): the party screen mounts its controls and re-syncs. */
   onBound(): void;
@@ -70,6 +71,7 @@ export const NativeRoomPlayer = forwardRef<PlayerHandle, NativeRoomPlayerProps>(
   const [source, setSource] = useState<NativeSource | null>(null);
   const [card, setCard] = useState<Card>(null);
   const [attempt, setAttempt] = useState(0);
+  const [hostStalled, setHostStalled] = useState(false);
   const handoff = useRef<StreamHandoff | null>(null);
   const usingHostLink = useRef(false);
   const hostRetried = useRef(false);
@@ -123,6 +125,12 @@ export const NativeRoomPlayer = forwardRef<PlayerHandle, NativeRoomPlayerProps>(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- per item, per role, per retry
   }, [isHost, item.id, attempt]);
+
+  // Guest: the room is waiting for the host's player (spec §6.4 "Waiting for <host>…").
+  useEffect(() => {
+    if (isHost || !relay) return;
+    return relay.onStall(setHostStalled);
+  }, [isHost, relay]);
 
   // Host: answer a member's request for this item's stream.
   useEffect(() => {
@@ -274,15 +282,37 @@ export const NativeRoomPlayer = forwardRef<PlayerHandle, NativeRoomPlayerProps>(
     );
   }
   return (
-    <NativePlayer
-      key={source.uri}
-      ref={inner}
-      source={source}
-      autoPlay={false}
-      onPlayerEvent={onPlayerEvent}
-      onFirstFrame={onFirstFrame}
-      onFatalError={onFatalError}
-      style={StyleSheet.absoluteFill}
-    />
+    <>
+      <NativePlayer
+        key={source.uri}
+        ref={inner}
+        source={source}
+        autoPlay={false}
+        onPlayerEvent={onPlayerEvent}
+        onFirstFrame={onFirstFrame}
+        onFatalError={onFatalError}
+        style={StyleSheet.absoluteFill}
+      />
+      {hostStalled && !isHost ? (
+        <View pointerEvents="none" style={styles.stallWrap}>
+          <Text style={styles.stall}>Waiting for the host…</Text>
+        </View>
+      ) : null}
+    </>
   );
+});
+
+// Solid pill — no blur or glow over video.
+const styles = StyleSheet.create({
+  stallWrap: { position: "absolute", top: "42%", left: 0, right: 0, alignItems: "center" },
+  stall: {
+    color: colors.text,
+    fontFamily: font.bodySemi,
+    fontSize: ms(13),
+    backgroundColor: colors.bgElevated,
+    paddingHorizontal: ms(14),
+    paddingVertical: ms(8),
+    borderRadius: ms(18),
+    overflow: "hidden",
+  },
 });

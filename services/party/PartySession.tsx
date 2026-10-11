@@ -304,6 +304,7 @@ function PartySessionInner({
     return new PartySyncEngine(client, player, {
       onDetach: setDetached,
       onHostStall: (stalled, atSec) => {
+        client.streams.sendStall(stalled); // members show "Waiting for the host…"
         stallChain = stallChain
           .then(async () => {
             if (!stalled) return client.play();
