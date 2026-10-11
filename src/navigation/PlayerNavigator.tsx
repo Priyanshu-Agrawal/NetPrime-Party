@@ -5,7 +5,7 @@ import RailSeeAllScreen from "@/src/features/discovery/RailSeeAllScreen";
 import CollectionScreen from "../screens/CollectionScreen";
 import MovieDetailsScreen from "../screens/MovieDetailsScreen";
 import PersonDetailsScreen from "../screens/PersonDetailsScreen";
-import { PlayerScreen } from "../screens/PlayerScreen";
+import { PlayerLaneScreen } from "../screens/PlayerLaneScreen";
 import NativePlayerScreen from "../screens/NativePlayerScreen";
 import TvDetailsScreen from "../screens/TvDetailsScreen";
 import type { PlayerStackParamList } from "./types";
@@ -27,9 +27,10 @@ export default function PlayerNavigator() {
       {/* Player fades in — gentle on the WebView, no hard cut. Swipe-back is
           disabled so an accidental edge-swipe can't dismiss the player (and
           trigger orientation re-lock churn) mid-playback; use its own back control. */}
+      {/* Player: Bearoom's own player when the title has a native stream here, else the web flow (PlayerLaneScreen). */}
       <PlayerStack.Screen
         name="Player"
-        component={PlayerScreen}
+        component={PlayerLaneScreen}
         options={{ animation: "fade", gestureEnabled: false }}
       />
       {/* Native lane (expo-video) — Phase 1B opens it from the dev test streams. */}
