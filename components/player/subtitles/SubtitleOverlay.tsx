@@ -8,7 +8,15 @@ import { StyleSheet, Text, View } from "react-native";
 import { activeText, nextChange, parseSubtitles, type Cue } from "./parse";
 
 export type SubtitleSize = "s" | "m" | "l";
-export const SUBTITLE_FONT: Record<SubtitleSize, number> = { s: ms(14), m: ms(17), l: ms(21) };
+
+/** Share of the player's height per size step; the floor keeps a tiny player readable. */
+const SIZE_SHARE: Record<SubtitleSize, number> = { s: 0.045, m: 0.055, l: 0.068 };
+const MIN_FONT = 11;
+
+/** Subtitle font size for a player this tall — scales so a small portrait player isn't buried in text. */
+export function subtitleFontSize(size: SubtitleSize, playerHeight: number): number {
+  return Math.max(MIN_FONT, playerHeight * SIZE_SHARE[size]);
+}
 
 /** The last reported playback position and when it was reported. */
 export interface PlaybackClock {
@@ -70,6 +78,7 @@ interface Props {
 
 export function SubtitleOverlay({ cues, clock, offsetSec = 0, size = "m", lifted = false }: Props) {
   const [text, setText] = useState<string | null>(null);
+  const [height, setHeight] = useState(0);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -88,10 +97,13 @@ export function SubtitleOverlay({ cues, clock, offsetSec = 0, size = "m", lifted
     };
   }, [cues, clock, offsetSec]);
 
-  if (!text) return null;
   return (
-    <View pointerEvents="none" style={[styles.wrap, lifted && styles.lifted]}>
-      <Text style={[styles.text, { fontSize: SUBTITLE_FONT[size] }]}>{text}</Text>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
+      {text ? (
+        <View style={[styles.wrap, lifted && styles.lifted]}>
+          <Text style={[styles.text, { fontSize: subtitleFontSize(size, height) }]}>{text}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

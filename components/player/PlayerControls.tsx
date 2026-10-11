@@ -505,9 +505,8 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                     </Text>
                     <Ionicons name="chevron-up" size={ms(12)} color={colors.textDim} />
                   </Pressable>
-                ) : (
-                  <View style={styles.flex} />
-                )}
+                ) : null}
+                <View style={styles.flex} />
                 <View style={styles.actionsRight} pointerEvents="box-none">
                   {canControl && onNextEpisode ? (
                     <BarButton label="Next episode" icon="play-skip-forward" onPress={() => { onNextEpisode(); show(); }} />
@@ -656,7 +655,7 @@ const styles = StyleSheet.create({
   },
   actionsRight: { flexDirection: "row", alignItems: "center", gap: ms(2) },
   quickChip: {
-    flex: 1,
+    flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: ms(4),
@@ -718,7 +717,8 @@ const styles = StyleSheet.create({
   rippleLeft: { left: ms(28) },
   rippleRight: { right: ms(28) },
   rippleText: { color: colors.text, fontFamily: font.label, fontSize: ms(12), marginTop: ms(2) },
-  unlockLayer: { ...absoluteFill, alignItems: "center", justifyContent: "flex-end", paddingBottom: ms(40) },
+  // Top of the player, clear of subtitles at the bottom.
+  unlockLayer: { ...absoluteFill, alignItems: "center", justifyContent: "flex-start", paddingTop: ms(14) },
   unlockPill: {
     flexDirection: "row",
     alignItems: "center",

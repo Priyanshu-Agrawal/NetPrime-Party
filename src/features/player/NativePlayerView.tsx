@@ -266,7 +266,7 @@ export function NativePlayerView({
           </View>
         ) : null}
         {devHud ? (
-          <Text accessibilityLabel="dev-hud" pointerEvents="none" style={styles.hud}>
+          <Text accessibilityLabel="dev-hud" pointerEvents="none" style={[styles.hud, immersive && styles.hudImmersive]}>
             {hudText(hud, chips, surfaceType)}
           </Text>
         ) : null}
@@ -325,4 +325,6 @@ const styles = StyleSheet.create({
     fontFamily: font.label,
     fontSize: ms(10),
   },
+  // Fullscreen: next to the back button, clear of the control bar.
+  hudImmersive: { top: ms(4), bottom: undefined, left: ms(64) },
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { loadCues, SubtitleOverlay, type PlaybackClock } from "./SubtitleOverlay";
+import { loadCues, subtitleFontSize, SubtitleOverlay, type PlaybackClock } from "./SubtitleOverlay";
 
 const cues = [
   { start: 23, end: 24.5, text: "You're a jerk, Thom." },
@@ -60,5 +60,14 @@ describe("loadCues", () => {
     await expect(loadCues(url, undefined, fetcher as unknown as typeof fetch)).resolves.toEqual([
       { start: 1, end: 2, text: "Back" },
     ]);
+  });
+});
+
+describe("subtitleFontSize", () => {
+  it("scales with the player's height so a small portrait player isn't buried in text", () => {
+    expect(subtitleFontSize("m", 231)).toBeCloseTo(12.7, 1); // portrait player on a phone
+    expect(subtitleFontSize("m", 411)).toBeCloseTo(22.6, 1); // landscape fullscreen
+    expect(subtitleFontSize("l", 231)).toBeGreaterThan(subtitleFontSize("m", 231));
+    expect(subtitleFontSize("s", 100)).toBe(11); // never below a readable floor
   });
 });
