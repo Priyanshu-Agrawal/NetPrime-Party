@@ -84,8 +84,9 @@ export class PartySyncEngine {
     private player: PlayerControl,
     private opts: {
       onDetach?: (detached: boolean) => void;
-      /** Host only, native rooms: the host's player stalled for over 3 s (pause the room) / recovered (resume). */
-      onHostStall?: (stalled: boolean) => void;
+      /** Host only, native rooms: the host's player stalled for over 3 s — pause the room at `atSec`, the host's frozen
+       * frame — or recovered (resume). */
+      onHostStall?: (stalled: boolean, atSec?: number) => void;
     } = {},
   ) {}
 
@@ -95,6 +96,7 @@ export class PartySyncEngine {
 
   /** Feed a new snapshot's playback anchor. Re-applies only when it changed. */
   setAnchor(anchor: PlaybackAnchor): void {
+    if (this.anchor && anchor.epoch !== this.anchor.epoch) this.resetStall(); // a new item: an old stall is moot
     this.anchor = anchor;
     const key = `${anchor.epoch}:${anchor.seq}`;
     if (key !== this.appliedKey) {
@@ -143,6 +145,23 @@ export class PartySyncEngine {
     this.drift(e);
   }
 
+  /** The host paused or seeked on purpose: a stall-pause in progress is theirs now, so recovery won't resume it. */
+  userPaused(): void {
+    this.pausedForStall = false;
+  }
+
+  /** Stop the stall timer (the session is going away). */
+  dispose(): void {
+    this.resetStall();
+  }
+
+  private resetStall(): void {
+    if (this.stallTimer) clearTimeout(this.stallTimer);
+    this.stallTimer = null;
+    this.stalled = false;
+    this.pausedForStall = false;
+  }
+
   /** Spec §6.4 buffering protocol (native rooms): only a stall over 3 s counts; a host's pauses the room, a guest's
    * never does — the guest catches up to live when it recovers. */
   private onBuffering(buffering: boolean): void {
@@ -153,7 +172,7 @@ export class PartySyncEngine {
         this.stalled = true;
         if (this.client.isHost && this.anchor?.status === "playing") {
           this.pausedForStall = true;
-          this.opts.onHostStall?.(true);
+          this.opts.onHostStall?.(true, this.lastCt);
         }
       }, STALL_MS);
       return;
@@ -169,6 +188,8 @@ export class PartySyncEngine {
         this.pausedForStall = false;
         this.opts.onHostStall?.(false);
       }
+    } else if (this.pausedForStall) {
+      this.pausedForStall = false; // lost the host role mid-stall: the new host owns the room now
     } else if (!this.detached && this.anchor?.status === "playing") this.player.seek(this.expectedSec() + CATCH_UP_LEAD_S);
   }
 
@@ -200,6 +221,9 @@ export class PartySyncEngine {
 
   private applyAnchorNow(): void {
     if (!this.anchor || this.detached) return;
+    // The room paused for this host's own stall: leave the player loading where it froze — pausing it would end the
+    // "stall" (and resume the room at once), and seeking would jump into media that isn't there yet.
+    if (this.client.isHost && this.pausedForStall) return;
     this.driftEma = 0;
     this.driftSamples.length = 0;
     this.correcting = false;

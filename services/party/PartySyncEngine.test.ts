@@ -2,6 +2,7 @@ import type { PlayerEvent } from "@/components/player/types";
 import type { PartyClient } from "./PartyClient";
 import { PartySyncEngine, type PlayerControl } from "./PartySyncEngine";
 import type { PlaybackAnchor } from "./protocol";
+import { NativeEventMachine } from "@/components/player/native/nativeEvents";
 
 let serverNow = 1_000_000;
 const client = (isHost: boolean) =>
@@ -35,7 +36,7 @@ describe("PartySyncEngine — native rooms (partySync)", () => {
     expect(onHostStall).not.toHaveBeenCalled();
     e.onPlayerEvent(ev("buffering", 100, { buffering: true }));
     jest.advanceTimersByTime(3100);
-    expect(onHostStall).toHaveBeenLastCalledWith(true);
+    expect(onHostStall).toHaveBeenLastCalledWith(true, 100); // paused at the host's frozen frame
     e.onPlayerEvent(ev("buffering", 100, { buffering: false }));
     expect(onHostStall).toHaveBeenLastCalledWith(false);
   });
@@ -106,6 +107,57 @@ describe("PartySyncEngine — drift stats (the S5 gate's readout)", () => {
     expect(s.n).toBe(10);
     expect(s.p50).toBeCloseTo(0.1, 5);
     expect(s.p95).toBeCloseTo(0.4, 5);
+  });
+});
+
+describe("PartySyncEngine — host stall with the real native event machine", () => {
+  it("one stall → the room pauses at the host's frame once, and resumes once when the media is back (no flapping)", () => {
+    const calls: string[] = [];
+    let engine!: PartySyncEngine;
+    const machine = new NativeEventMachine((e) => engine.onPlayerEvent(e));
+    const p: PlayerControl = {
+      play: () => machine.setIntent(true),
+      pause: () => machine.setIntent(false),
+      seek: jest.fn(),
+      setRate: jest.fn(),
+      capabilities: () => NATIVE,
+    };
+    engine = new PartySyncEngine(client(true), p, { onHostStall: (stalled, at) => void calls.push(stalled ? `pause@${at}` : "play") });
+    machine.onStatus("readyToPlay", 600);
+    engine.setAnchor(anchor({ positionMs: 100_000 }));
+    machine.onTime(100, 101);
+    machine.onStatus("loading"); // starved
+    jest.advanceTimersByTime(3100);
+    expect(calls).toEqual(["pause@100"]);
+    // The room's pause (at the host's frame) arrives: the host keeps loading instead of pausing itself.
+    engine.setAnchor(anchor({ status: "paused", positionMs: 100_000, seq: 2 }));
+    jest.advanceTimersByTime(10_000);
+    expect(calls).toEqual(["pause@100"]);
+    machine.onStatus("readyToPlay"); // media back
+    expect(calls).toEqual(["pause@100", "play"]);
+  });
+
+  it("the host pausing on purpose during a stall cancels the resume", () => {
+    const onHostStall = jest.fn();
+    const e = new PartySyncEngine(client(true), player(NATIVE), { onHostStall });
+    e.setAnchor(anchor());
+    e.onPlayerEvent(ev("buffering", 100, { buffering: true }));
+    jest.advanceTimersByTime(3100);
+    e.userPaused();
+    e.onPlayerEvent(ev("buffering", 100, { buffering: false }));
+    expect(onHostStall).toHaveBeenCalledTimes(1);
+  });
+
+  it("a new item (epoch) or losing the host role forgets a pending stall", () => {
+    const onHostStall = jest.fn();
+    const c = client(true);
+    const e = new PartySyncEngine(c, player(NATIVE), { onHostStall });
+    e.setAnchor(anchor());
+    e.onPlayerEvent(ev("buffering", 100, { buffering: true }));
+    e.setAnchor(anchor({ epoch: 2, seq: 1 }));
+    jest.advanceTimersByTime(5000);
+    expect(onHostStall).not.toHaveBeenCalled();
+    e.dispose();
   });
 });
 

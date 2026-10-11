@@ -298,10 +298,20 @@ function PartySessionInner({
       // Only the native room player opts into the §6.4 buffering protocol; WebView rooms keep today's behaviour.
       capabilities: () => (playerRef.current?.engine === "native" ? NATIVE_ROOM_CAPS : undefined),
     };
+    // Host's player stalled > 3 s while the room played: pause the room at the host's frozen frame (pause, then seek
+    // there — in order), and resume when it recovers. Chained so a quick recovery can't land before the pause.
+    let stallChain: Promise<void> = Promise.resolve();
     return new PartySyncEngine(client, player, {
       onDetach: setDetached,
-      // Host's player stalled > 3 s while the room played: pause the room; resume when it recovers.
-      onHostStall: (stalled) => void (stalled ? client.pause() : client.play()),
+      onHostStall: (stalled, atSec) => {
+        stallChain = stallChain
+          .then(async () => {
+            if (!stalled) return client.play();
+            await client.pause();
+            if (atSec != null && Number.isFinite(atSec)) await client.seek(Math.max(0, atSec) * 1000);
+          })
+          .catch(() => {});
+      },
     });
   }, [client]);
 
@@ -345,6 +355,7 @@ function PartySessionInner({
       if (__DEV__) console.log("[party] session EFFECT CLEANUP — destroying client");
       cancelled = true;
       unsub();
+      engine.dispose();
       void client.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,15 +392,25 @@ function PartySessionInner({
         if (e.event === "tick") client.renewLeaseIfDue();
       },
       setMedia: (m) => client.setMedia(m),
-      play: () => void client.play(),
-      pause: () => void client.pause(),
+      play: () => {
+        engine.userPaused(); // a deliberate control: a stall-pause in progress is the host's now
+        void client.play();
+      },
+      pause: () => {
+        engine.userPaused();
+        void client.pause();
+      },
       seekBy: (deltaSec) => {
+        engine.userPaused();
         const s = client.snapshot;
         if (!s) return;
         const curSec = effectivePositionMs(s.playback, client.now()) / 1000;
         void client.seek(Math.max(0, curSec + deltaSec) * 1000);
       },
-      seekTo: (sec) => void client.seek(Math.max(0, sec) * 1000),
+      seekTo: (sec) => {
+        engine.userPaused();
+        void client.seek(Math.max(0, sec) * 1000);
+      },
       setRate: (rate) => void client.setRate(rate),
       transferHost: (uid) => client.transferHost(uid),
       claimHost: () => void client.claimHost(),
