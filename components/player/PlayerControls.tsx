@@ -1,18 +1,13 @@
 /**
- * PlayerControls — the Bearoom-skinned control overlay for the hijacked WebView.
+ * PlayerControls — the one Bearoom control layer, for every engine (native expo-video and the WebView bridge) and
+ * for solo and party (spec §6.2.1).
  *
- * videasy's own chrome is hidden (HijackPlayer `__vlChromeOff`), so THIS is the
- * only control surface. Presentational + stateless about transport: the callbacks
- * route through the room authority in a party (host), so a press stays in sync.
+ * Presentational and stateless about transport: the callbacks route through the room authority in a party, so a
+ * press stays in sync. Playback state arrives imperatively (`setPlayback`) so the parent doesn't re-render its chat
+ * list on every tick.
  *
- * Skin = the cozy cinema-lounge system (theme/bearoom + GlassCard): a warm
- * gradient scrim, frosted-glass bottom bar, translucent honey-accented chips, and
- * a honey CTA with glow. Host gets full transport; a guest gets a read-only bar +
- * a non-interactive indicator, plus a "Tap to sync" when paused while the room
- * plays.
- *
- * Playback state is pushed imperatively via the ref (`setPlayback`) so the parent
- * (party.tsx) doesn't re-render its chat list on every 1 s tick.
+ * Gestures: a tap toggles the controls; for anyone who may drive playback a double tap on the left/right third seeks
+ * ∓10 s and every further tap there adds 10 s; the lock ignores every touch except the unlock pill.
  */
 import GlassCard from "@/components/ui/GlassCard";
 import { Glass, GlassVisible } from "@/src/ui/glass";
@@ -21,19 +16,12 @@ import { absoluteFill } from "@/theme/styles/layout";
 import { gradients } from "@/theme/styles/gradients";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  LayoutChangeEvent,
+  type GestureResponderEvent,
+  type LayoutChangeEvent,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -41,6 +29,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { NO_TAPS, onTap, SEEK_STEP_SEC, STREAK_MS, type TapState } from "./doubleTap";
 
 export interface PlaybackState {
   currentTime: number;
@@ -48,10 +37,19 @@ export interface PlaybackState {
   paused: boolean;
   /** HTMLMediaElement.readyState; <3 while playing ⇒ the stream stalled → spinner. */
   readyState?: number;
+  /** Media time buffered up to, in seconds, when the engine knows it. */
+  bufferedTime?: number;
 }
 
 export interface PlayerControlsHandle {
   setPlayback: (s: PlaybackState) => void;
+}
+
+/** Current audio / subtitles / quality, shown as one quick chip. */
+export interface ControlChips {
+  audio?: string;
+  subtitles?: string | null;
+  quality?: string;
 }
 
 export interface PlayerControlsProps {
@@ -65,42 +63,69 @@ export interface PlayerControlsProps {
   onSeekTo: (sec: number) => void;
   /** Relative seek, seconds (±10). */
   onSeekBy: (deltaSec: number) => void;
-  /** Toggle the provider's HTML5 fullscreen. */
+  /** Toggle fullscreen / landscape. */
   onToggleFullscreen?: () => void;
   /** Guest tap-to-sync (jump to live) when out of sync. */
   onTapSync?: () => void;
-  /** Open the player settings sheet (speed / quality). */
+  /** Open the player settings sheet. */
   onOpenSettings?: () => void;
   /** Open the episode picker — provided only for TV shows. */
   onEpisodes?: () => void;
+  /** Play the next episode (solo, or the host in a party). */
+  onNextEpisode?: () => void;
   /** Back button callback (e.g. exit fullscreen). */
   onBack?: () => void;
-  /** Title shown in the top overlay header (fullscreen). */
+  /** Title shown in the top overlay header. */
   title?: string;
   /** Subtitle (e.g. "S1 · E1") shown under the title. */
   subtitle?: string;
-  /** Whether the player is fullscreen/immersive (gates the default overlay header). */
+  /** Whether the player is fullscreen/immersive. */
   fullscreen?: boolean;
-  /** The player sits below the screen's own header (party, portrait) instead of full-bleed
-   *  behind the status bar, so the overlay header hugs the video's top edge. */
+  /** The player sits below the screen's own header, so the overlay header hugs the video's top edge. */
   embedded?: boolean;
   /** Custom top-bar node for the overlay (the party fills this). */
   topBar?: React.ReactNode;
   /** Extra overlay children (badges, reaction pills) that fade with the controls. */
   overlayChildren?: React.ReactNode;
+  /** Current audio / subtitles / quality for the quick chip (needs onOpenSettings). */
+  chips?: ControlChips;
   /** Notified when the auto-hide visibility flips. */
   onVisibilityChange?: (visible: boolean) => void;
 }
 
-const AUTO_HIDE_MS = 3800;
+export const AUTO_HIDE_MS = 3000;
+export const SPINNER_DELAY_MS = 300;
+const UNLOCK_PILL_MS = 2500;
 
-function fmt(sec: number): string {
+export function fmt(sec: number): string {
   const s = Math.max(0, Math.floor(sec || 0));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const ss = s % 60;
   const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
   return `${h > 0 ? `${h}:` : ""}${mm}:${String(ss).padStart(2, "0")}`;
+}
+
+/** "Hindi · CC · 1080p"; empty while nothing is known. */
+export function chipText(c?: ControlChips): string {
+  if (!c) return "";
+  return [c.audio, c.subtitles ? "CC" : null, c.quality].filter(Boolean).join(" · ");
+}
+
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
+function BarButton({ label, icon, size = ms(17), onPress }: { label: string; icon: IoniconName; size?: number; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.barBtn, pressed && styles.pressedFlat]}
+      onPress={onPress}
+      hitSlop={8}
+    >
+      <Ionicons name={icon} size={size} color={colors.text} />
+    </Pressable>
+  );
 }
 
 export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsProps>(
@@ -116,6 +141,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       onTapSync,
       onOpenSettings,
       onEpisodes,
+      onNextEpisode,
       onBack,
       title,
       subtitle,
@@ -123,50 +149,59 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       embedded,
       topBar,
       overlayChildren,
+      chips,
       onVisibilityChange,
     },
     ref,
   ) => {
     const insets = useSafeAreaInsets();
-    // Full-bleed players clear the status bar themselves; fullscreen hides it, and an
-    // embedded player already sits below the screen's header.
     const headerTop = fullscreen || embedded ? ms(10) : Math.max(insets.top, ms(10));
     const [paused, setPaused] = useState(true);
-    // Progress is stepwise (one setState per tick), NOT a 60 fps animation. A JS-driven
-    // width/left glide restarts every tick and congests the UI thread the WebView video
-    // renders on → the video hitches once a second. A per-tick step plays smoothly and
-    // is plenty for a scrubber.
+    // Progress is stepwise (one setState per tick), not a 60 fps animation: a JS-driven glide restarts every tick
+    // and congests the UI thread the video draws on.
     const [displayTime, setDisplayTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [bufferedTime, setBufferedTime] = useState(0);
     const [visible, setVisible] = useState(true);
+    const visibleRef = useRef(true);
+    const [locked, setLocked] = useState(false);
+    const lockedRef = useRef(false);
+    const [unlockPill, setUnlockPill] = useState(false);
+    const unlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [barWidth, setBarWidth] = useState(0);
     const [scrubbing, setScrubbing] = useState(false);
-    // Buffering spinner: the stream stalled (readyState<3) while meant to be playing.
+    const [showRemaining, setShowRemaining] = useState(true);
     const [buffering, setBuffering] = useState(false);
     const bufferingRef = useRef(false);
     const bufferTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrubbingRef = useRef(false);
-    const durationRef = useRef(0);
-    // Commit-hold: after release, keep the thumb at the dropped spot until the video
-    // actually reaches it — no snap-back to the stale live position, no jump.
+    // Commit-hold: after release, keep the thumb at the dropped spot until the video reaches it.
     const seekTargetRef = useRef<number | null>(null);
-    const fade = useRef(new Animated.Value(1)).current;
+    const [fade] = useState(() => new Animated.Value(1));
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const surfaceWidth = useRef(0);
+    const taps = useRef<TapState>(NO_TAPS);
+    const visibleBeforeTap = useRef(true);
+    const [ripple, setRipple] = useState<{ zone: "left" | "right"; sec: number } | null>(null);
+    const [rippleFade] = useState(() => new Animated.Value(0));
+    const shown = visible && !locked;
 
-    // Parent pushes playback here every event — no parent re-render.
+    useEffect(() => {
+      visibleRef.current = visible;
+    }, [visible]);
+    useEffect(() => {
+      lockedRef.current = locked;
+    }, [locked]);
+
     useImperativeHandle(
       ref,
       () => ({
         setPlayback: (s) => {
           setPaused(s.paused);
-          if (Number.isFinite(s.duration)) {
-            setDuration(s.duration);
-            durationRef.current = s.duration;
-          }
-          // Buffering: the stream stalled (readyState<3) while meant to be playing —
-          // segment starvation. videasy used to show its own spinner here; we hid its
-          // chrome, so surface our own. Debounced so a brief dip (e.g. just after a
-          // seek) doesn't flash the spinner.
+          if (Number.isFinite(s.duration)) setDuration(s.duration);
+          if (typeof s.bufferedTime === "number" && Number.isFinite(s.bufferedTime)) setBufferedTime(s.bufferedTime);
+          // A stall while meant to be playing shows the spinner after a short delay, so a brief dip (just after a
+          // seek) doesn't flash it.
           const stalled = !s.paused && typeof s.readyState === "number" && s.readyState < 3;
           if (stalled && !bufferingRef.current) {
             if (bufferTimer.current == null) {
@@ -174,7 +209,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                 bufferTimer.current = null;
                 bufferingRef.current = true;
                 setBuffering(true);
-              }, 450);
+              }, SPINNER_DELAY_MS);
             }
           } else if (!stalled) {
             if (bufferTimer.current != null) {
@@ -186,11 +221,9 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               setBuffering(false);
             }
           }
-          // Committed seek reached its target → resume following live.
           if (seekTargetRef.current != null && Math.abs(s.currentTime - seekTargetRef.current) < 1.5) {
             seekTargetRef.current = null;
           }
-          // While dragging, or holding a committed seek, freeze the thumb + label.
           if (scrubbingRef.current || seekTargetRef.current != null || !Number.isFinite(s.currentTime)) return;
           setDisplayTime(s.currentTime);
         },
@@ -212,21 +245,21 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
     }, [paused, scrubbing, clearHide]);
 
     useEffect(() => {
-      Animated.timing(fade, { toValue: visible ? 1 : 0, duration: 190, useNativeDriver: true }).start();
-      onVisibilityChange?.(visible);
-      if (visible) armHide();
+      Animated.timing(fade, { toValue: shown ? 1 : 0, duration: 190, useNativeDriver: true }).start();
+      onVisibilityChange?.(shown);
+      if (shown) armHide();
       return clearHide;
-    }, [visible, armHide, clearHide, fade, onVisibilityChange]);
+    }, [shown, armHide, clearHide, fade, onVisibilityChange]);
 
-    // Surface the controls whenever playback flips (e.g. host paused remotely).
+    // Surface the controls whenever playback flips (e.g. host paused remotely) — unless locked.
     useEffect(() => {
-      setVisible(true);
+      if (!lockedRef.current) setVisible(true);
     }, [paused]);
 
-    // Clear the buffering-debounce timer on unmount.
     useEffect(
       () => () => {
         if (bufferTimer.current) clearTimeout(bufferTimer.current);
+        if (unlockTimer.current) clearTimeout(unlockTimer.current);
       },
       [],
     );
@@ -235,7 +268,49 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       setVisible(true);
       armHide();
     }, [armHide]);
-    const toggle = useCallback(() => setVisible((v) => !v), []);
+
+    const revealUnlock = useCallback(() => {
+      setUnlockPill(true);
+      if (unlockTimer.current) clearTimeout(unlockTimer.current);
+      unlockTimer.current = setTimeout(() => setUnlockPill(false), UNLOCK_PILL_MS);
+    }, []);
+
+    const lock = useCallback(() => {
+      clearHide();
+      setLocked(true);
+      setVisible(false);
+    }, [clearHide]);
+
+    const unlock = useCallback(() => {
+      if (unlockTimer.current) clearTimeout(unlockTimer.current);
+      setUnlockPill(false);
+      setLocked(false);
+      setVisible(true);
+    }, []);
+
+    const onSurfacePress = useCallback(
+      (e?: GestureResponderEvent) => {
+        if (lockedRef.current) {
+          revealUnlock();
+          return;
+        }
+        const x = e?.nativeEvent?.locationX ?? 0;
+        const { state, action } = onTap(taps.current, x, surfaceWidth.current, Date.now(), canControl);
+        taps.current = state;
+        if (action.kind === "toggle") {
+          visibleBeforeTap.current = visibleRef.current;
+          setVisible(!visibleRef.current);
+          return;
+        }
+        if (action.undoToggle) setVisible(visibleBeforeTap.current);
+        onSeekBy(action.zone === "left" ? -SEEK_STEP_SEC : SEEK_STEP_SEC);
+        setRipple({ zone: action.zone, sec: action.streak * SEEK_STEP_SEC });
+        rippleFade.stopAnimation();
+        rippleFade.setValue(1);
+        Animated.timing(rippleFade, { toValue: 0, duration: 250, delay: STREAK_MS, useNativeDriver: true }).start();
+      },
+      [canControl, onSeekBy, revealUnlock, rippleFade],
+    );
 
     const secForX = useCallback(
       (x: number) => {
@@ -245,13 +320,10 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
       [barWidth, duration],
     );
 
-    // Move the thumb + label to a position immediately (while dragging / on commit).
-    const showAt = useCallback((sec: number) => {
-      setDisplayTime(sec);
-    }, []);
-
     const pan = useMemo(
       () =>
+        // PanResponder calls these handlers only during a drag, never while rendering.
+        // eslint-disable-next-line react-hooks/refs
         PanResponder.create({
           onStartShouldSetPanResponder: () => canControl && duration > 0,
           onMoveShouldSetPanResponder: () => canControl && duration > 0,
@@ -260,16 +332,15 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             seekTargetRef.current = null;
             scrubbingRef.current = true;
             setScrubbing(true);
-            showAt(secForX(e.nativeEvent.locationX));
+            setDisplayTime(secForX(e.nativeEvent.locationX));
           },
-          onPanResponderMove: (e) => showAt(secForX(e.nativeEvent.locationX)),
+          onPanResponderMove: (e) => setDisplayTime(secForX(e.nativeEvent.locationX)),
           onPanResponderRelease: (e) => {
             const sec = secForX(e.nativeEvent.locationX);
             scrubbingRef.current = false;
             setScrubbing(false);
-            // Commit-hold at the dropped position until the video catches up.
             seekTargetRef.current = sec;
-            showAt(sec);
+            setDisplayTime(sec);
             onSeekTo(sec);
             armHide();
           },
@@ -279,24 +350,25 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
             armHide();
           },
         }),
-      [canControl, duration, secForX, onSeekTo, clearHide, armHide, showAt],
+      [canControl, duration, secForX, onSeekTo, clearHide, armHide],
     );
 
-    // Guest is stuck (video paused while the room plays) → offer a rejoin.
     const outOfSync = !canControl && paused && roomPlaying;
-
-    // Stepwise 0..1 progress for fill + thumb. displayTime already holds the drag/commit
-    // position while scrubbing and the live time otherwise, so this covers every state.
     const progress = duration > 0 ? Math.min(1, Math.max(0, displayTime / duration)) : 0;
+    const bufferedProgress = duration > 0 ? Math.min(1, Math.max(0, bufferedTime / duration)) : 0;
+    const chip = chipText(chips);
 
     return (
-      <Pressable style={StyleSheet.absoluteFill} onPress={toggle}>
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { opacity: fade }]}
-          pointerEvents={visible ? "auto" : "none"}
-        >
-          <GlassVisible value={visible}>
-            {/* Warm cinema scrim — subtle top vignette, stronger under the bar. */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={onSurfacePress}
+        onLayout={(e: LayoutChangeEvent) => {
+          surfaceWidth.current = e.nativeEvent.layout.width;
+        }}
+        accessibilityLabel="Player surface"
+      >
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fade }]} pointerEvents={shown ? "auto" : "none"}>
+          <GlassVisible value={shown}>
             <LinearGradient
               colors={[...gradients.playerControls]}
               locations={[0, 0.4, 0.72, 1]}
@@ -304,26 +376,16 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               pointerEvents="none"
             />
 
-            {/* Top overlay header — custom topBar (party) OR default back + title/episode
-                (solo, portrait + fullscreen). Shares the auto-hide fade + scrim. */}
             {topBar ? (
-              <View
-                style={[styles.topBarCustom, { top: headerTop }]}
-                pointerEvents="box-none"
-              >
+              <View style={[styles.topBarCustom, { top: headerTop }]} pointerEvents="box-none">
                 {topBar}
               </View>
             ) : onBack || title ? (
-              // The player is now full-bleed (its SafeAreaView drops the top edge so the
-              // video/loading backdrop reaches behind the status bar), so the header adds the
-              // top inset ITSELF — same as topBarCustom above. Landscape hides the status bar
-              // → flat ms(10). Matches the detail-screen header offset.
-              <View
-                style={[styles.topRow, { top: headerTop }]}
-                pointerEvents="box-none"
-              >
+              <View style={[styles.topRow, { top: headerTop }]} pointerEvents="box-none">
                 {onBack ? (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Back"
                     style={({ pressed }) => [styles.topBackBtn, pressed && styles.pressed]}
                     onPress={() => {
                       onBack();
@@ -331,13 +393,12 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                     }}
                     hitSlop={10}
                   >
-                    <Glass material="control" radius={radius.pill} visible={visible} />
+                    <Glass material="control" radius={radius.pill} visible={shown} />
                     <Ionicons name="chevron-back" size={ms(22)} color={colors.text} />
                   </Pressable>
                 ) : (
                   <View style={styles.topSpacer} />
                 )}
-
                 {title ? (
                   <View style={styles.topTitleCard} pointerEvents="none">
                     <Text style={styles.topTitle} numberOfLines={1}>
@@ -352,31 +413,34 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                 ) : (
                   <View style={{ flex: 1 }} />
                 )}
-
                 <View style={styles.topSpacer} />
               </View>
             ) : null}
 
-            {/* Overlay children (badges, reaction pills) that fade with the controls. */}
             {overlayChildren}
 
-            {/* Center transport / indicator */}
             <View style={styles.center} pointerEvents="box-none">
               {canControl ? (
                 <View style={styles.centerRow} pointerEvents="box-none">
-                  <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(-10); show(); }} hitSlop={8}>
-                    <Glass material="control" radius={radius.pill} visible={visible} />
+                  <Pressable
+                    accessibilityLabel="Back 10 seconds"
+                    style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                    onPress={() => {
+                      onSeekBy(-SEEK_STEP_SEC);
+                      show();
+                    }}
+                    hitSlop={8}
+                  >
+                    <Glass material="control" radius={radius.pill} visible={shown} />
                     <MaterialIcons name="replay-10" size={ms(29)} color={colors.text} />
                   </Pressable>
                   <Pressable
+                    accessibilityLabel={paused ? "Play" : "Pause"}
                     style={({ pressed }) => [styles.playBtn, pressed && styles.pressed]}
                     onPress={() => {
                       if (paused) onPlay();
                       else onPause();
-                      // Flip the icon immediately instead of waiting up to ~1s for the
-                      // next tick (or a videasy poster-swap that stalls events) — the
-                      // control would otherwise desync from what the tap just did. The
-                      // next real playback event confirms or corrects this.
+                      // Flip at once; the next playback event confirms or corrects it.
                       setPaused((p) => !p);
                       show();
                     }}
@@ -389,13 +453,28 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                       style={paused ? { marginLeft: ms(3) } : undefined}
                     />
                   </Pressable>
-                  <Pressable style={({ pressed }) => [styles.chip, pressed && styles.pressed]} onPress={() => { onSeekBy(10); show(); }} hitSlop={8}>
-                    <Glass material="control" radius={radius.pill} visible={visible} />
+                  <Pressable
+                    accessibilityLabel="Forward 10 seconds"
+                    style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+                    onPress={() => {
+                      onSeekBy(SEEK_STEP_SEC);
+                      show();
+                    }}
+                    hitSlop={8}
+                  >
+                    <Glass material="control" radius={radius.pill} visible={shown} />
                     <MaterialIcons name="forward-10" size={ms(29)} color={colors.text} />
                   </Pressable>
                 </View>
               ) : outOfSync ? (
-                <Pressable style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]} onPress={() => { onTapSync?.(); show(); }} hitSlop={10}>
+                <Pressable
+                  style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]}
+                  onPress={() => {
+                    onTapSync?.();
+                    show();
+                  }}
+                  hitSlop={10}
+                >
                   <Ionicons name="flash" size={ms(16)} color={colors.onHoney} />
                   <Text style={styles.syncText}>Tap to sync</Text>
                 </Pressable>
@@ -406,11 +485,43 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
               ) : null}
             </View>
 
-            {/* Glass bottom bar: time · scrub · time · actions. Over the video it is crafted glass on Android and
-                Liquid Glass on iOS (the player's GlassLayer has no backdrop) — see
-                docs/superpowers/specs/2026-10-11-glass-design.md. Everything in this fade, the top bar included,
-                learns the controls' visibility from GlassVisible. */}
-            <GlassCard material="bar" visible={visible} rounded={radius.pill} style={styles.bottomBar} pointerEvents="box-none">
+            {/* Glass bottom bar — crafted glass over the video on Android unless the native lane renders into a
+                TextureView inside a GlassBackdrop; Liquid Glass on iOS (docs/superpowers/specs/2026-10-11-glass-design.md). */}
+            <GlassCard material="bar" visible={shown} rounded={radius.lg} style={styles.bottomBar} pointerEvents="box-none">
+              <View style={styles.actionsRow} pointerEvents="box-none">
+                {chip && onOpenSettings ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Playback options: ${chip}`}
+                    style={({ pressed }) => [styles.quickChip, pressed && styles.pressedFlat]}
+                    onPress={() => {
+                      onOpenSettings();
+                      show();
+                    }}
+                    hitSlop={6}
+                  >
+                    <Text style={styles.quickChipText} numberOfLines={1}>
+                      {chip}
+                    </Text>
+                    <Ionicons name="chevron-up" size={ms(12)} color={colors.textDim} />
+                  </Pressable>
+                ) : (
+                  <View style={styles.flex} />
+                )}
+                <View style={styles.actionsRight} pointerEvents="box-none">
+                  {canControl && onNextEpisode ? (
+                    <BarButton label="Next episode" icon="play-skip-forward" onPress={() => { onNextEpisode(); show(); }} />
+                  ) : null}
+                  {onEpisodes ? <BarButton label="Episodes" icon="list" size={ms(18)} onPress={() => { onEpisodes(); show(); }} /> : null}
+                  <BarButton label="Lock controls" icon="lock-closed-outline" size={ms(16)} onPress={lock} />
+                  {onOpenSettings ? (
+                    <BarButton label="Player settings" icon="settings-outline" size={ms(16)} onPress={() => { onOpenSettings(); show(); }} />
+                  ) : null}
+                  {onToggleFullscreen ? (
+                    <BarButton label={fullscreen ? "Exit fullscreen" : "Fullscreen"} icon={fullscreen ? "contract" : "expand"} onPress={onToggleFullscreen} />
+                  ) : null}
+                </View>
+              </View>
               <View style={styles.bottomRow} pointerEvents="box-none">
                 <Text style={styles.time}>{fmt(displayTime)}</Text>
                 <View
@@ -419,44 +530,58 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
                   {...(canControl ? pan.panHandlers : {})}
                 >
                   <View style={styles.track}>
+                    <View testID="buffered" style={[styles.buffered, { width: `${bufferedProgress * 100}%` }]} />
                     <View style={[styles.fill, { width: `${progress * 100}%` }]} />
-                    {canControl ? <View style={[styles.thumb, { left: `${progress * 100}%` }]} /> : null}
+                    {canControl ? (
+                      <View style={[styles.thumb, scrubbing && styles.thumbActive, { left: `${progress * 100}%` }]} />
+                    ) : null}
                   </View>
+                  {scrubbing ? (
+                    <View pointerEvents="none" style={[styles.bubble, { left: `${progress * 100}%` }]}>
+                      <Text style={styles.bubbleText}>{fmt(displayTime)}</Text>
+                    </View>
+                  ) : null}
                 </View>
-                <Text style={styles.time}>{duration > 0 ? fmt(duration) : "--:--"}</Text>
-                {onEpisodes ? (
-                  <Pressable
-                    style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]}
-                    onPress={() => {
-                      onEpisodes();
-                      show();
-                    }}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="list" size={ms(18)} color={colors.text} />
-                  </Pressable>
-                ) : null}
-                {onOpenSettings ? (
-                  <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={() => { onOpenSettings(); show(); }} hitSlop={8}>
-                    <Ionicons name="settings-outline" size={ms(16)} color={colors.text} />
-                  </Pressable>
-                ) : null}
-                {onToggleFullscreen ? (
-                  <Pressable style={({ pressed }) => [styles.fsBtn, pressed && styles.pressedFlat]} onPress={onToggleFullscreen} hitSlop={8}>
-                    <Ionicons name={fullscreen ? "contract" : "expand"} size={ms(17)} color={colors.text} />
-                  </Pressable>
-                ) : null}
+                <Pressable
+                  accessibilityLabel="Toggle remaining time"
+                  onPress={() => {
+                    setShowRemaining((r) => !r);
+                    show();
+                  }}
+                  hitSlop={6}
+                >
+                  <Text style={styles.time}>
+                    {duration > 0 ? (showRemaining ? `−${fmt(duration - displayTime)}` : fmt(duration)) : "--:--"}
+                  </Text>
+                </Pressable>
               </View>
             </GlassCard>
           </GlassVisible>
         </Animated.View>
 
-        {/* Buffering spinner — OUTSIDE the auto-hide fade, so a stalled stream shows
-            feedback even when the controls are hidden (the case we regressed by hiding
-            videasy's own spinner). */}
+        {ripple ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.ripple, ripple.zone === "left" ? styles.rippleLeft : styles.rippleRight, { opacity: rippleFade }]}
+          >
+            <MaterialIcons name={ripple.zone === "left" ? "fast-rewind" : "fast-forward"} size={ms(26)} color={colors.text} />
+            <Text style={styles.rippleText}>{`${ripple.sec} s`}</Text>
+          </Animated.View>
+        ) : null}
+
+        {locked && unlockPill ? (
+          <View style={styles.unlockLayer} pointerEvents="box-none">
+            <Pressable accessibilityRole="button" accessibilityLabel="Unlock controls" style={styles.unlockPill} onPress={unlock}>
+              <Ionicons name="lock-open-outline" size={ms(16)} color={colors.onHoney} />
+              <Text style={styles.unlockText}>Tap to unlock</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Buffering spinner — outside the fade, so a stall shows even with the controls hidden. */}
         {buffering ? (
           <View style={styles.bufferLayer} pointerEvents="none">
-            <View style={styles.bufferBadge}>
+            <View style={styles.bufferBadge} accessibilityLabel="Buffering">
               <ActivityIndicator color={colors.honeyBright} size="large" />
             </View>
           </View>
@@ -469,6 +594,7 @@ export const PlayerControls = forwardRef<PlayerControlsHandle, PlayerControlsPro
 PlayerControls.displayName = "PlayerControls";
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   center: { ...absoluteFill, alignItems: "center", justifyContent: "center" },
   bufferLayer: { ...absoluteFill, alignItems: "center", justifyContent: "center" },
   bufferBadge: {
@@ -480,10 +606,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.playerChip,
   },
   centerRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: ms(26) },
-  // Press feedback: round controls dim + shrink slightly; flat icon buttons just dim.
   pressed: { opacity: 0.5, transform: [{ scale: 0.92 }] },
   pressedFlat: { opacity: 0.45 },
-  // Translucent honey-accented glass chip (blur-free for perf — matches the party pills).
   chip: {
     width: ms(52),
     height: ms(52),
@@ -500,7 +624,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.honey,  },
+    backgroundColor: colors.honey,
+  },
   indicator: {
     width: ms(60),
     height: ms(60),
@@ -518,35 +643,41 @@ const styles = StyleSheet.create({
     backgroundColor: colors.honey,
     paddingHorizontal: ms(18),
     paddingVertical: ms(11),
-    borderRadius: radius.pill,  },
-  syncText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
-  bottomBar: {
-    position: "absolute",
-    left: ms(10),
-    right: ms(10),
-    bottom: ms(10),
+    borderRadius: radius.pill,
   },
+  syncText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
+  bottomBar: { position: "absolute", left: ms(10), right: ms(10), bottom: ms(10) },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(6),
+    paddingHorizontal: ms(10),
+    paddingTop: ms(6),
+  },
+  actionsRight: { flexDirection: "row", alignItems: "center", gap: ms(2) },
+  quickChip: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(4),
+    alignSelf: "flex-start",
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(5),
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceStrong,
+  },
+  quickChipText: { flexShrink: 1, color: colors.text, fontFamily: font.bodySemi, fontSize: ms(11) },
   bottomRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: ms(9),
     paddingHorizontal: ms(13),
-    paddingVertical: ms(8),
+    paddingBottom: ms(6),
   },
-  time: {
-    color: colors.textDim,
-    fontFamily: font.label,
-    fontSize: ms(11),
-    minWidth: ms(40),
-    textAlign: "center",
-  },
+  time: { color: colors.textDim, fontFamily: font.label, fontSize: ms(11), minWidth: ms(44), textAlign: "center" },
   trackHit: { flex: 1, height: ms(30), justifyContent: "center" },
-  track: {
-    height: ms(4),
-    borderRadius: ms(2),
-    backgroundColor: colors.surfaceStrong,
-    overflow: "visible",
-  },
+  track: { height: ms(4), borderRadius: ms(2), backgroundColor: colors.surfaceStrong, overflow: "visible" },
+  buffered: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: ms(2), backgroundColor: "rgba(246,239,227,0.28)" },
   fill: { height: "100%", borderRadius: ms(2), backgroundColor: colors.honey },
   thumb: {
     position: "absolute",
@@ -558,14 +689,47 @@ const styles = StyleSheet.create({
     marginTop: -ms(7),
     backgroundColor: colors.honeyBright,
     borderWidth: ms(2),
-    borderColor: colors.onHoney,  },
-  fsBtn: { width: ms(32), height: ms(32), alignItems: "center", justifyContent: "center" },
-  topBarCustom: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    zIndex: 10,
+    borderColor: colors.onHoney,
   },
+  thumbActive: { transform: [{ scale: 1.35 }] },
+  bubble: {
+    position: "absolute",
+    bottom: ms(26),
+    width: ms(56),
+    marginLeft: -ms(28),
+    alignItems: "center",
+    paddingVertical: ms(3),
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgElevated,
+  },
+  bubbleText: { color: colors.text, fontFamily: font.label, fontSize: ms(11) },
+  barBtn: { width: ms(32), height: ms(32), alignItems: "center", justifyContent: "center" },
+  ripple: {
+    position: "absolute",
+    top: "50%",
+    width: ms(78),
+    height: ms(78),
+    marginTop: -ms(39),
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.playerChip,
+  },
+  rippleLeft: { left: ms(28) },
+  rippleRight: { right: ms(28) },
+  rippleText: { color: colors.text, fontFamily: font.label, fontSize: ms(12), marginTop: ms(2) },
+  unlockLayer: { ...absoluteFill, alignItems: "center", justifyContent: "flex-end", paddingBottom: ms(40) },
+  unlockPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ms(8),
+    paddingHorizontal: ms(18),
+    paddingVertical: ms(10),
+    borderRadius: radius.pill,
+    backgroundColor: colors.honey,
+  },
+  unlockText: { color: colors.onHoney, fontFamily: font.headlineSemi, fontSize: ms(13) },
+  topBarCustom: { position: "absolute", left: 0, right: 0, zIndex: 10 },
   topRow: {
     position: "absolute",
     left: ms(16),
@@ -585,28 +749,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
   },
-  // Plain centered title text (no pill card) to match the detail-screen header.
-  topTitleCard: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  topTitle: {
-    color: colors.text,
-    fontFamily: font.headlineSemi,
-    fontSize: ms(16),
-    textAlign: "center",
-  },
-  topSubtitle: {
-    color: colors.honey,
-    fontFamily: font.bodySemi,
-    fontSize: ms(11),
-    textAlign: "center",
-    marginTop: ms(1),
-  },
-  topSpacer: {
-    width: ms(40),
-  },
+  topTitleCard: { flex: 1, alignItems: "center", justifyContent: "center" },
+  topTitle: { color: colors.text, fontFamily: font.headlineSemi, fontSize: ms(16), textAlign: "center" },
+  topSubtitle: { color: colors.honey, fontFamily: font.bodySemi, fontSize: ms(11), textAlign: "center", marginTop: ms(1) },
+  topSpacer: { width: ms(40) },
 });
 
 export default PlayerControls;
