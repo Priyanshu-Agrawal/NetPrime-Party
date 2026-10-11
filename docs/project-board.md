@@ -519,7 +519,7 @@ Nothing Phone 1, release build, thermal status 0, perfetto traces + framestats.
   (`SurfaceView`: video composited by the system, zero app frames per video frame — a `TextureView` — needed for
   glass over video — brings back one app frame per video frame: far less work than Chromium's, not yet measured).
 
-## `[~]` Phase 1B — native player + full skin (2026-10-11)
+## `[x]` Phase 1B — native player + full skin (2026-10-11)
 
 Spec `docs/superpowers/specs/2026-10-10-playback-languages-party-design.md` §9 row 1B · plan
 `docs/superpowers/plans/2026-10-11-phase1b-native-player.md` · branch `phase1b/native-player`.
@@ -561,6 +561,13 @@ Spec `docs/superpowers/specs/2026-10-10-playback-languages-party-design.md` §9 
 - **Found and fixed on the phone:** Android reports no current audio track until a pick (DEFAULT rendition now counts
   as playing); play after the end did nothing (replay); subtitles too big in the portrait player; unlock pill over the
   subtitles; quick chip stretched across the bar; spinner stacked on the pause button.
-- **Pending:** the WebView lane + party on the new controls on the phone, and a normal build back on the phone
-  (phone was in use); the Android emulator and iOS 27 simulator legs incl. the iOS compile of `BearoomPlayerModule`
-  (owner's call — simulators busy); `/report` migration `20261011141809` then worker deploy (owner yes — stored schema).
+- **Final review (Opus) → with fixes, all done test-first:** render loop when a stream has no sidecar subtitles;
+  stale position after an Android seek (thumb snapped back); double-tap streaks under-seeking; pauses from outside
+  the app (calls, app switch) and the end of the film leaving the controls out of step. iOS module compiles.
+- **Checked on the phone after the fixes:** native double-tap +20 s lands at +20 s (seek Δ 0.00); background → return
+  shows paused and one tap plays; the WebView lane (Fight Club) and the party host on the new controls (double-tap
+  through the room 12:55 → 13:16); landscape party reactions moved above the taller bar (regression found here).
+- **Telemetry live (owner yes, 2026-10-11):** migration `20261011141809` applied, worker `9b30b46f` deployed; bad
+  lane/stage/ttff values are dropped instead of failing a report; success now waits for real playback. First full row:
+  vidfast · Fight Club · success · embed · playing · ttff 9.3 s.
+- **Pending:** Android emulator + iOS 27 simulator legs (owner: not now), including running the iOS quality cap.
