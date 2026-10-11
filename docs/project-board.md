@@ -787,3 +787,44 @@ Spec §9 row 2 (repo scorecard + repo selection).
   - M1: namespaced candidate keys.
   - The first, pre-review smoke run was discarded.
 - **Next, after the owner's yes:** enable the chosen allow-list, then build the benchmark runner (plays each title 20 s) and run the Phase 2 S1/S2/S3/S8 gate on enabled sources. Full 20-title scorecard runs need the owner's OK on data, or an unmetered network.
+
+## `[x]` Phase 3A — watch party on the native player (2026-10-12)
+
+Plan `docs/superpowers/plans/2026-10-12-phase3a-party-native.md` · branch `feat/phase3a-party-native`. Spec §6.4, §9 row 3.
+
+- **What it does:** **Watch together** on the native player pauses it and opens a host room.
+  - The room's queue holds a plugin item (source + stream key + language, no URL), so there's no migration; 0008 stores it.
+  - **Host:** plays its stream in the native room player and hands `{url, headers, container, length, language}` to members as an ephemeral broadcast on the private room channel, again whenever a member asks. Nothing is stored or logged.
+  - **Guests:** play the host's stream. If it won't load here, a guest plays its own copy of the same source, only when the cut matches (±2.5 s); otherwise it shows "This source won't play here — Try again". A guest left waiting 20 s can look for the stream on its own device.
+  - **Host change:** a guest promoted to host keeps playing and re-shares.
+  - **WebView rooms:** unchanged.
+- **Sync engine (native rooms only):**
+  - a stall counts after 3 s;
+  - a host stall pauses the room at the host's frame and guests see "Waiting for the host…"; it resumes once when the media is back;
+  - a guest stall never pauses the room, and the guest catches up on recovery;
+  - when the film ends, the host advances the queue.
+- **Gate (Nothing Phone 1 host ↔ iOS 27 simulator guest; 240p on the metered hotspot):**
+  - Join, handoff and the same frame on both all work.
+  - **Drift over the last 5 minutes:** host p50 0.12 / p95 0.14 s, guest p50 0.03 / p95 0.06 s against the room clock. Spec S5 is p95 ≤ 0.5 s → pass.
+  - Re-gate after the fixes: the host app was killed, and the guest took over as host and played on without a restart.
+- **Final review (Opus) → with fixes; all fixed test-first:**
+  - C1: a host stall flapped pause and play every 3 s; reproduced with the real event machine.
+  - C2: a promoted guest discarded its stream.
+  - I1: a swapped source was never re-synced.
+  - I2: dead-end cards, a host with no F6 retry, guests waiting silently.
+  - I3: races in the stall flow.
+  - I4: the stall pause jumped 3 s ahead of the host.
+  - I5: the web background session started in native rooms.
+  - I6: "Waiting for the host…".
+  - Found on the device: the room clock ran on past the film's end; the host now advances the queue.
+  - Minors are in BACKLOG.
+- **Not measured on device:** a host stall (it can't be induced here; unit-tested with the real event machine) and a guest's broken handoff (unit-tested).
+- **3B (needs the owner's review: the RPC change):**
+  - scheduled transitions (`serverStartMs`);
+  - ready barrier and lobby;
+  - attributed toasts;
+  - per-member language;
+  - share link;
+  - private rooms by default;
+  - carrying the solo position into the room;
+  - a source picker in native rooms.
