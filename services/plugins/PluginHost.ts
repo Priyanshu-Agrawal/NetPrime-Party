@@ -108,30 +108,31 @@ export class PluginHost {
         finish(true);
         return;
       }
-      const queue: LoadedPlugin[] = [];
-      for (const p of plugins) {
+      // A fresh cache entry or a run already going (another caller's) answers for this plugin. Checked again when a
+      // queued plugin gets its slot: another caller may have started it meanwhile. Joined runs report health to the
+      // caller that started them only (once per run).
+      const reuse = (p: LoadedPlugin): boolean => {
         const hit = this.cache.get(`${title}|${p.key}`);
         if (hit && this.deps.now() - hit.at < BUDGET.cacheMs) {
           add(p, hit.streams);
           settle();
-          continue;
+          return true;
         }
-        // Joined runs report health to the caller that started them only (once per run).
         const shared = this.inflight.get(`${title}|${p.key}`);
-        if (shared) {
-          void shared.then((out) => {
-            if (Array.isArray(out)) add(p, out);
-            else failures.push(out);
-            settle();
-          });
-          continue;
-        }
-        queue.push(p);
-      }
+        if (!shared) return false;
+        void shared.then((out) => {
+          if (Array.isArray(out)) add(p, out);
+          else failures.push(out);
+          settle();
+        });
+        return true;
+      };
+      const queue = plugins.filter((p) => !reuse(p));
       let inFlight = 0;
       const pump = () => {
         while (inFlight < BUDGET.parallel && queue.length) {
           const p = queue.shift()!;
+          if (reuse(p)) continue;
           inFlight++;
           ran.push(p.key);
           void this.runOne(p, req, title, failures, add, opts.onSettled).finally(() => {

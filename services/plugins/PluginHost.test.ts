@@ -160,6 +160,21 @@ describe("PluginHost.getStreams", () => {
     expect(settled).toEqual(["r/a@1"]);
   });
 
+  it("with more plugins than parallel slots, a second call joins the queued ones too (each runs once, health once)", async () => {
+    const plugins = Array.from({ length: BUDGET.parallel + 1 }, (_, i) => plugin(`q${i}`));
+    const { host, run, answer } = harness(plugins);
+    const settled: string[] = [];
+    void host.getStreams(REQ, { onSettled: (k) => settled.push(k) });
+    await jest.advanceTimersByTimeAsync(0);
+    const second = host.getStreams(REQ, { onSettled: (k) => settled.push(k) });
+    await jest.advanceTimersByTimeAsync(0);
+    for (const p of plugins) await answer(p.pluginId, [`u-${p.pluginId}`], 10);
+    const last = plugins[plugins.length - 1].key;
+    expect(run.mock.calls.filter(([p]) => p.key === last)).toHaveLength(1);
+    expect(settled.filter((k) => k === last)).toHaveLength(1);
+    expect((await second).streams.map((s) => s.url)).toContain(`u-q${BUDGET.parallel}`);
+  });
+
   it("after clearCache a new request runs the plugin afresh instead of joining the older run", async () => {
     const { host, run } = harness([plugin("a")]);
     void host.getStreams(REQ);
