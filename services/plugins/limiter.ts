@@ -1,0 +1,51 @@
+/**
+ * Caps requests in flight per backend and overall (spec §5.4: playimdb/zevran's hostnames share one backend that
+ * 429s under parallel load). A backend is approximated by its registrable domain.
+ */
+export class Limiter {
+  private active = new Map<string, number>();
+  private total = 0;
+  private queue: { key: string; start: () => void }[] = [];
+
+  constructor(private readonly perKey: number, private readonly overall: number) {}
+
+  run<T>(key: string, task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const start = () => {
+        this.total++;
+        this.active.set(key, (this.active.get(key) ?? 0) + 1);
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            this.total--;
+            this.active.set(key, (this.active.get(key) ?? 1) - 1);
+            this.pump();
+          });
+      };
+      this.queue.push({ key, start });
+      this.pump();
+    });
+  }
+
+  private pump(): void {
+    for (let i = 0; i < this.queue.length && this.total < this.overall; ) {
+      const next = this.queue[i];
+      if ((this.active.get(next.key) ?? 0) < this.perKey) {
+        this.queue.splice(i, 1);
+        next.start();
+      } else i++;
+    }
+  }
+}
+
+const TWO_LEVEL = new Set(["co", "com", "net", "org", "gov", "ac", "edu"]);
+
+/** "a.b.example.co.uk" → "example.co.uk". No suffix list: good enough to group one backend's hostnames. */
+export function registrableDomain(host: string): string {
+  const h = host.toLowerCase().replace(/\.$/, "");
+  if (/^\d+(\.\d+){3}$/.test(h) || h.includes(":")) return h;
+  const parts = h.split(".");
+  if (parts.length <= 2) return h;
+  const twoLevel = parts[parts.length - 1].length === 2 && TWO_LEVEL.has(parts[parts.length - 2]);
+  return parts.slice(twoLevel ? -3 : -2).join(".");
+}
