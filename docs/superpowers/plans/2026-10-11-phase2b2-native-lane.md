@@ -1014,8 +1014,13 @@ async function mount(props: Partial<React.ComponentProps<typeof TitlePlayer>> = 
     r = create(<TitlePlayer tmdbId="10378" type="movie" title="Big Buck Bunny" startedAt={Date.now()} onUseWeb={onUseWeb} onClose={jest.fn()} {...props} />);
   });
   await flush();
+  mounted.push(r);
   return { r, onUseWeb };
 }
+const mounted: ReactTestRenderer[] = [];
+afterEach(() => {
+  act(() => mounted.splice(0).forEach((t) => t.unmount()));
+});
 
 beforeEach(() => {
   mockResolve.mockReset();
