@@ -17,7 +17,7 @@ export interface CandidateSubtitle {
 }
 
 export interface PlaybackCandidate {
-  /** Stable across re-resolves: source + label + URL shape (tokens and numbers masked). */
+  /** Stable across re-resolves: source + label + quality + URL shape (tokens and numbers masked). */
   key: string;
   /** `${repoId}/${pluginId}` — health, telemetry and failure memory key on this, never on a hostname. */
   sourceId: string;
@@ -72,11 +72,21 @@ export function heightOf(label?: string): number | undefined {
   return undefined;
 }
 
-/** Host + path with numbers and hex runs masked: what stays the same when a plugin re-resolves a stream. */
+/** One path segment with its re-resolve noise masked: opaque tokens (12+ chars mixing letters and digits) whole, else hex runs and numbers. */
+function maskSegment(seg: string): string {
+  const m = /^(.*?)(\.[a-z0-9]{1,5})?$/.exec(seg)!;
+  const stem = m[1];
+  const ext = m[2] ?? "";
+  if (stem.length >= 12 && /[a-z]/.test(stem) && /\d/.test(stem)) return `*${ext}`;
+  return seg.replace(/[0-9a-f]{8,}|\d+/g, "#");
+}
+
+/** Host + path with tokens and numbers masked: what stays the same when a plugin re-resolves a stream. */
 export function urlShape(url: string): string {
   try {
     const u = new URL(url);
-    return (u.hostname + u.pathname).toLowerCase().replace(/[0-9a-f]{8,}|\d+/g, "#");
+    const path = u.pathname.toLowerCase().split("/").map(maskSegment).join("/");
+    return u.hostname.toLowerCase().replace(/[0-9a-f]{8,}|\d+/g, "#") + path;
   } catch {
     return url;
   }
@@ -91,27 +101,40 @@ function fnv1a(s: string): string {
   return h.toString(36);
 }
 
-export function candidateKey(sourceId: string, label: string, url: string): string {
-  return `${sourceId}:${fnv1a(`${label.toLowerCase().replace(/\s+/g, " ").trim()}|${urlShape(url)}`)}`;
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+export function candidateKey(sourceId: string, label: string, url: string, quality?: string): string {
+  return `${sourceId}:${fnv1a(`${norm(label)}|${norm(quality ?? "")}|${urlShape(url)}`)}`;
+}
+
+/** Which stream owns each URL: the lowest sourceId, so a URL two plugins share never changes hands between resolves. */
+function urlOwners(streams: PluginStream[]): Map<string, PluginStream> {
+  const owners = new Map<string, PluginStream>();
+  for (const s of streams) {
+    const cur = owners.get(s.url);
+    if (!cur || `${s.repoId}/${s.pluginId}` < `${cur.repoId}/${cur.pluginId}`) owners.set(s.url, s);
+  }
+  return owners;
 }
 
 export function toCandidates(
   streams: PluginStream[],
   ctx: { originalLanguage?: string; titleName?: string; originalTitle?: string },
 ): PlaybackCandidate[] {
-  const seenUrls = new Set<string>();
+  const owners = urlOwners(streams);
+  const taken = new Set<string>();
   const seenKeys = new Map<string, number>();
   const out: PlaybackCandidate[] = [];
   for (const s of streams) {
-    if (seenUrls.has(s.url)) continue;
-    seenUrls.add(s.url);
+    if (owners.get(s.url) !== s || taken.has(s.url)) continue;
+    taken.add(s.url);
     const sourceId = `${s.repoId}/${s.pluginId}`;
-    const base = candidateKey(sourceId, s.name, s.url);
+    const height = heightOf(s.quality) ?? heightOf(s.name) ?? heightOf(s.title);
+    const qualityLabel = s.quality ?? (height ? `${height}p` : undefined);
+    const base = candidateKey(sourceId, s.name, s.url, qualityLabel);
     const n = seenKeys.get(base) ?? 0;
     seenKeys.set(base, n + 1);
     const container = containerOf(s.url);
-    const height = heightOf(s.quality) ?? heightOf(s.name) ?? heightOf(s.title);
-    const qualityLabel = s.quality ?? (height ? `${height}p` : undefined);
     const unsupported = container === "unsupported";
     out.push({
       key: n ? `${base}~${n}` : base,

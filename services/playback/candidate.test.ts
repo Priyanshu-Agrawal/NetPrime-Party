@@ -57,6 +57,19 @@ describe("candidate keys", () => {
     expect(candidateKey("r/p", "Hindi", u)).not.toBe(candidateKey("r/q", "Hindi", u));
     expect(candidateKey("r/p", "Hindi", u)).not.toBe(candidateKey("r/p", "Tamil", u));
   });
+
+  it("mask opaque path tokens that mix letters and digits, keeping names and file types", () => {
+    expect(urlShape("https://a.example.net/v/aZ3kq9Lm2Xv8Qp/master.m3u8")).toBe(urlShape("https://a.example.net/v/Rt7Yu1Ws4Ef6Gh/master.m3u8"));
+    expect(urlShape("https://a.example.net/v/aZ3kq9Lm2Xv8Qp.m3u8")).toBe(urlShape("https://a.example.net/v/Rt7Yu1Ws4Ef6Gh.m3u8"));
+    expect(urlShape("https://a.example.net/v/aZ3kq9Lm2Xv8Qp.m3u8")).not.toBe(urlShape("https://a.example.net/v/aZ3kq9Lm2Xv8Qp.mpd"));
+    expect(urlShape("https://a.example.net/hls/master.m3u8")).not.toBe(urlShape("https://a.example.net/dash/master.m3u8"));
+  });
+
+  it("tell qualities apart when the URL shape is the same", () => {
+    expect(candidateKey("r/p", "Hindi", "https://a.example.net/v/720/x.m3u8", "720p")).not.toBe(
+      candidateKey("r/p", "Hindi", "https://a.example.net/v/1080/x.m3u8", "1080p"),
+    );
+  });
 });
 
 describe("toCandidates", () => {
@@ -89,6 +102,21 @@ describe("toCandidates", () => {
     expect(out).toHaveLength(2);
     expect(new Set(out.map((c) => c.key)).size).toBe(2);
     expect(out.map((c) => c.order)).toEqual([0, 1]);
+  });
+
+  it("gives the same keys whichever order the streams arrive in", () => {
+    const hd = stream({ quality: "1080p", url: "https://a.example.net/v/1080/x.m3u8?t=1" });
+    const sd = stream({ quality: "720p", url: "https://a.example.net/v/720/x.m3u8?t=1" });
+    const keys = (cs: ReturnType<typeof toCandidates>) => Object.fromEntries(cs.map((c) => [c.quality?.label, c.key]));
+    expect(keys(toCandidates([hd, sd], {}))).toEqual(keys(toCandidates([sd, hd], {})));
+  });
+
+  it("gives a URL two plugins share to the same plugin every time", () => {
+    const url = "https://a.example.net/1/x.m3u8";
+    const p = stream({ url });
+    const q = stream({ url, pluginKey: "r/q@1", pluginId: "q" });
+    expect(toCandidates([q, p], {}).map((c) => c.sourceId)).toEqual(["r/p"]);
+    expect(toCandidates([p, q], {}).map((c) => c.sourceId)).toEqual(["r/p"]);
   });
 
   it("rejects files no player here can open", () => {
