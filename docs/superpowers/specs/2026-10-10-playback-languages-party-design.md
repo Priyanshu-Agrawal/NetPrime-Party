@@ -313,8 +313,11 @@ the active player's capabilities allow** them (no dead buttons):
   or a sibling candidate. Choosing a sibling = `replaceAsync` + seek to the same position. The choice is remembered
   **per title** and becomes the next default. If the chosen language disappears on failover, a toast says so — never
   silent.
-- **Quality:** "Auto" (ABR) + the HLS master's variants. expo-video's `videoTrack` is read-only, so manual quality =
-  load that variant's media playlist + seek (local only, never on the party anchor).
+- **Quality:** "Auto" (ABR) + quality tiers from the player's variants. expo-video's `videoTrack` is read-only, so
+  manual quality **caps adaptive selection** at that tier (`modules/bearoom-player`: Android max video size, iOS
+  `preferredMaximumResolution`) — local only, never on the party anchor. *(Amended 2026-10-11, Phase 1B: the first
+  plan — load the variant's media playlist + seek — would drop demuxed audio and subtitle renditions, which is how
+  multi-language HLS is packaged.)*
 - **Subtitles:** in-stream text tracks through expo-video `subtitleTrack`; sidecar lists from plugins (WebVTT/SRT)
   through **our own overlay** (`SubtitleOverlay`, driven by `tick`), because `VideoSource` has no sidecar field. One list
   in the UI whatever the origin, with an offset control and a size setting.
@@ -348,8 +351,10 @@ video screen.
     plan's Task 2 and Task 7).
 - **Settings sheet** (`PlayerSettingsSheet`): Audio · Subtitles (off / list / offset / size) · Quality (Auto + list) ·
   Speed · Source. Rows render only when the capability exists (§6.3) and always show their current value.
-- **States:** buffering = a small centre spinner after 300 ms (no flash on short stalls); errors = the §7 card (Retry ·
-  Try another source · Report); end of film = credits-aware "Up next" card for series.
+- **States:** buffering = a small centre spinner after 300 ms (no flash on short stalls; it takes the play button's
+  place while the controls show); errors = the §7 card (Retry · Try another source · Report); end of film =
+  credits-aware "Up next" card for series. *(Phase 1B shipped Retry · Try another source; the Report action and the
+  Up-next card arrive with Phase 2's real sources — test streams have neither series nor anything to report.)*
 - **Party in the player:** a Watch Party button → create room → share sheet (WhatsApp first) → lobby (§6.4) → synced
   play; avatars, attributed toasts, Resync, and the existing chat tray live in the same layer.
 

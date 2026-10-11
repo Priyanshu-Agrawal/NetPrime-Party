@@ -81,12 +81,17 @@ the investigations, the deferred-backlog memory (groups A–I), and the current 
 | Glass: iOS 27 simulator check | OPEN | Liquid Glass on tab bar/buttons, system blur on headers, fades without pop (simulator was busy 2026-10-11). |
 | Glass: Android lens/refraction | DEFERRED | AGSL `RuntimeShader` (API 33+) chained on `modules/bearoom-glass`'s blur for a Liquid-Glass edge. |
 | Glass: remote kill switch | DEFERRED | `/config` flag to force crafted glass if a device misbehaves. |
-| Glass over video (Android) | DEFERRED → Phase 1B | Live blur over the native player once it renders into a `TextureView`; WebView backdrops are banned (36–50 % janky / black when scaled). |
+| Glass over video (Android) | DECIDED: no (measured 2026-10-11) | Phase 1B A/B: a `TextureView` (needed for live blur) puts only 75–81 % of 24 fps frames on rhythm (32 % at 60 fps) vs 98–100 % for `SurfaceView`; native video stays on SurfaceView with crafted glass over it. WebView backdrops stay banned. |
 | Glass review minors (2026-10-11) | DONE 2026-10-11 | Opaque fallback, one invalidate per offset + isShown guard, same-window check, backdrop prop on primitives, backdrops registered from navigation events, single reduce-transparency subscription, touchable interactive Liquid Glass, weak backdrop ref + recordings freed on detach. |
 | Glass: low-end Android check | DEFERRED | Bar blur on a weak Android 12+ device (gate is already API 31+ and bars-only). |
 | Party playback jank | ROOT CAUSE FOUND → Phase 1B | WebView video costs every video frame ~10–12 ms of our threads (Chromium draws inside our RenderThread ~4.5–5 ms at ~1.3 GHz + its vsync tick ~1.1 ms on the main thread at 120/s); frames start evenly every 5th vsync but land 2–4 vsyncs later → uneven cadence (≈⅓ of frames off by ±1–3 vsyncs). Not ours to fix inside a WebView: 60 Hz A/B was mixed, controls add only ~1.2 ms. Fix = native player (SurfaceView: zero app frames per video frame). Measured 2026-10-11. |
 | Details error state has no way back | DONE 2026-10-11 | `DetailsError` (back + Try again) on movie/TV details. |
 | Home scroll animation frames | DONE 2026-10-11 | Not scrolling: pull-to-refresh (my scroll script's up-swipes hit the top) cleared the TMDB cache → every rail swapped to skeletons in one frame (~1,800 views torn down, up to 63 ms frames). Now invalidates in place (`c66e79e`): 0 frames > 12 ms. Real Home scrolling: 0.2–0.4 % janky. |
+| Native player: Up-next card + Report action | PENDING (Phase 2) | Spec §6.2.1 states; arrive with real sources (no series / nothing reportable on test streams). |
+| Native player: emulator + iOS legs | PENDING (owner) | Phase 1B gate legs on the Android emulator and iOS 27 simulator, incl. the iOS compile of `modules/bearoom-player` (SharedRef<AVPlayer> argument). |
+| `/report` lane · stage · ttffMs | PENDING (owner yes) | Apply `supabase/migrations/20261011150000_provider_reports_native_fields.sql`, THEN deploy the worker (it inserts the new columns). The live worker strips the fields until then. |
+| Dead stream fails slowly | NOTED (Phase 2) | A 404 master playlist shows the error card only after ExoPlayer's retries (~10–15 s); Phase 2's StreamProbe checks reachability before the player gets a URL. |
+| Home hero sized at launch orientation | OPEN | `HeroCarousel` reads `Dimensions` at module load: launching while the phone is sideways gives a full-screen hero in portrait. Use `useWindowDimensions`. |
 
 ## H. Atmospheric background
 | Item | Status | Detail |

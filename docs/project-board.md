@@ -518,3 +518,49 @@ Nothing Phone 1, release build, thermal status 0, perfetto traces + framestats.
   reliable); our controls add only ~1.2 ms. Nothing inside the WebView path fixes it; the native player does
   (`SurfaceView`: video composited by the system, zero app frames per video frame — a `TextureView` — needed for
   glass over video — brings back one app frame per video frame: far less work than Chromium's, not yet measured).
+
+## `[~]` Phase 1B — native player + full skin (2026-10-11)
+
+Spec `docs/superpowers/specs/2026-10-10-playback-languages-party-design.md` §9 row 1B · plan
+`docs/superpowers/plans/2026-10-11-phase1b-native-player.md` · branch `phase1b/native-player`.
+
+- **Native player** (`components/player/native/`): expo-video 57.0.5 behind the shared `PlayerHandle`; `seeked` and
+  `buffering` synthesised; audio by language (names from codes, repeats numbered), in-stream subtitles, sidecar
+  WebVTT/SRT through our own overlay (sized to the player, offset ±0.5 s steps, S/M/L remembered), Auto + manual
+  quality as a **cap** (`modules/bearoom-player`, Android media3 / iOS AVPlayerItem) so demuxed audio keeps playing,
+  replay after the end, reload that resumes where it was.
+- **One controls layer for both lanes and the party:** double-tap ∓10 s with a stacking counter, lock + unlock pill,
+  buffered range, drag bubble, remaining time, quick chip ("Hindi · CC · 1080p"), Next episode (solo TV), 3 s
+  auto-hide, 300 ms spinner (inside the play button while the controls show). Settings rows show their value; Source
+  row. Shared loading and error cards for both lanes.
+- **Dev-only Test streams** (More → "Test streams (dev)" in dev builds or builds made with `EXPO_PUBLIC_TEST_STREAMS=1`,
+  and only while `/config.flags.nativeLane` is on — switched on 2026-10-11 in KV `flags:v1`): Google Shaka Angel One
+  (HLS + DASH, 5 audio languages, 4 subtitle languages), Apple BipBop, Mux Big Buck Bunny (60 fps) and Tears of Steel
+  (24 fps), Blender Tears of Steel + SRT, and a broken stream.
+- **Gate on the Nothing Phone 1 (release build):**
+
+  | Check | Result |
+  |---|---|
+  | Audio by language / subtitles in-stream / sidecar | German audio + English subtitles + 240p cap together; sidecar German SRT in sync with the dialogue |
+  | Auto + manual quality | decoded width 1920 → 848 px within 3 s of picking 480p, back to 1920 on Auto (SurfaceFlinger) |
+  | Speed | 1.5× = 16 s of video in 10.8 s |
+  | Landed seek | paused 0.00 s; while playing ≤ 0.23 s (that is the 0.5 s tick, not the landing) |
+  | TTFF p50 | Mux CDN streams 0.84–0.88 s ✓ · Angel One 5.5 s — Google Storage + a 3.8 MB first segment, network-bound |
+  | F4 / F7 / F8 | error card (after ExoPlayer's 404 retries, ~10–15 s); spinner on an unbuffered seek; airplane mode pauses, reconnect resumes from the same second |
+
+- **Android video surface A/B** (video-layer cadence from SurfaceFlinger, alternating runs):
+
+  | | 24 fps hidden / shown | 60 fps hidden / shown | RenderThread |
+  |---|---|---|---|
+  | **SurfaceView (shipped)** | 98–100 % / 87–91 % | 100 % (display drops to 60 Hz) / 90 % | 2–4 ms/s |
+  | TextureView | 75–76 % / 49–51 % | — | 51–53 ms/s |
+  | TextureView + live glass | 79–81 % / 55–57 % | 32 % / 33 % | 61–154 ms/s |
+
+  Ruling: SurfaceView; controls over native video stay crafted glass on Android (iOS keeps Liquid Glass). Live blur
+  over video would cost the smoothness the owner asked for first.
+- **Found and fixed on the phone:** Android reports no current audio track until a pick (DEFAULT rendition now counts
+  as playing); play after the end did nothing (replay); subtitles too big in the portrait player; unlock pill over the
+  subtitles; quick chip stretched across the bar; spinner stacked on the pause button.
+- **Pending:** the WebView lane + party on the new controls on the phone, and a normal build back on the phone
+  (phone was in use); the Android emulator and iOS 27 simulator legs incl. the iOS compile of `BearoomPlayerModule`
+  (owner's call — simulators busy); `/report` migration `20261011150000` then worker deploy (owner yes — stored schema).
