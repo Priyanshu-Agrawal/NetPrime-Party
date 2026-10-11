@@ -15,8 +15,9 @@
  *   - Host: the user's embed controls become authoritative RPCs. Guest: a local
  *     pause DETACHES (stops following) and a resume JUMPS TO LIVE.
  *
- * Group-pause-on-buffer from the old engine is intentionally deferred to a later
- * phase; it needs a guest→host buffering signal that we haven't wired yet.
+ * Native rooms (players whose capabilities say partySync) add the spec §6.4 buffering protocol: a stall counts after
+ * 3 s; the host's pauses the room, a guest's never does (it catches up to live on recovery). A player without
+ * fractional rate is never nudged, only seeked when 2 s off. WebView rooms (no capabilities) behave as before.
  */
 import type { PlayerEvent } from "@/components/player/HijackPlayer";
 import type { PartyClient } from "./PartyClient";
@@ -27,6 +28,8 @@ export interface PlayerControl {
   pause(): void;
   seek(seconds: number): void;
   setRate(rate: number): void;
+  /** What the player can do (PlayerHandle v2). Absent = today's WebView behaviour, unchanged. */
+  capabilities?(): { fractionalRate: boolean; partySync: boolean };
 }
 
 // --- drift tunables (identical to the proven SyncEngine values) -------------
@@ -42,6 +45,12 @@ const DRIFT_EMA_ALPHA = 0.25;
 const MEDIAN_N = 5;
 // A `seeked` landing within this of expected is our own re-seek, not a user scrub.
 const USER_SEEK_THRESHOLD_S = 2.0;
+// Native rooms (spec §6.4): a stall counts only after this long; a guest catching up lands this far past live (HLS
+// segments start on keyframes, so landing slightly ahead avoids an immediate re-buffer behind the room).
+const STALL_MS = 3000;
+const CATCH_UP_LEAD_S = 1;
+// A player without fractional rate can't be nudged: it only seeks, once this far off.
+const NO_RATE_SEEK_BAND_S = 2.0;
 
 function median(xs: number[]): number {
   if (xs.length === 0) return 0;
@@ -63,12 +72,22 @@ export class PartySyncEngine {
   private persist = 0;
   private rate = 1;
   private lastHardSeek = 0;
+  private stallTimer: ReturnType<typeof setTimeout> | null = null;
+  private stalled = false;
 
   constructor(
     private client: PartyClient,
     private player: PlayerControl,
-    private opts: { onDetach?: (detached: boolean) => void } = {},
+    private opts: {
+      onDetach?: (detached: boolean) => void;
+      /** Host only, native rooms: the host's player stalled for over 3 s (pause the room) / recovered (resume). */
+      onHostStall?: (stalled: boolean) => void;
+    } = {},
   ) {}
+
+  private caps() {
+    return this.player.capabilities?.();
+  }
 
   /** Feed a new snapshot's playback anchor. Re-applies only when it changed. */
   setAnchor(anchor: PlaybackAnchor): void {
@@ -98,6 +117,10 @@ export class PartySyncEngine {
 
   onPlayerEvent(e: PlayerEvent): void {
     if (Number.isFinite(e.currentTime)) this.lastCt = e.currentTime;
+    if (e.event === "buffering" && this.caps()?.partySync) {
+      this.onBuffering(e.buffering === true);
+      return;
+    }
     // Anything reaching here is a USER action (bridge suppresses our own changes).
     if (e.event === "play" || e.event === "pause" || e.event === "seeked") {
       this.handleUserControl(e);
@@ -114,6 +137,28 @@ export class PartySyncEngine {
       return;
     }
     this.drift(e);
+  }
+
+  /** Spec §6.4 buffering protocol (native rooms): only a stall over 3 s counts; a host's pauses the room, a guest's
+   * never does — the guest catches up to live when it recovers. */
+  private onBuffering(buffering: boolean): void {
+    if (buffering) {
+      if (this.stallTimer || this.stalled) return;
+      this.stallTimer = setTimeout(() => {
+        this.stallTimer = null;
+        this.stalled = true;
+        if (this.client.isHost) this.opts.onHostStall?.(true);
+      }, STALL_MS);
+      return;
+    }
+    if (this.stallTimer) {
+      clearTimeout(this.stallTimer);
+      this.stallTimer = null;
+    }
+    if (!this.stalled) return;
+    this.stalled = false;
+    if (this.client.isHost) this.opts.onHostStall?.(false);
+    else if (!this.detached && this.anchor?.status === "playing") this.player.seek(this.expectedSec() + CATCH_UP_LEAD_S);
   }
 
   // --- helpers --------------------------------------------------------------
@@ -196,6 +241,23 @@ export class PartySyncEngine {
     this.driftSamples.push(rawDrift);
     if (this.driftSamples.length > MEDIAN_N) this.driftSamples.shift();
     const medDrift = median(this.driftSamples);
+
+    if (this.caps()?.fractionalRate === false) {
+      // No rate control: never nudge; seek once clearly off (2 s), with the usual persistence + cooldown.
+      if (Math.abs(medDrift) < NO_RATE_SEEK_BAND_S) {
+        this.persist = 0;
+        return;
+      }
+      this.persist += 1;
+      const nowMs = Date.now();
+      if (this.persist >= SEEK_PERSIST_N && nowMs - this.lastHardSeek >= HARD_SEEK_COOLDOWN_MS) {
+        this.lastHardSeek = nowMs;
+        this.persist = 0;
+        this.driftSamples.length = 0;
+        this.player.seek(exp);
+      }
+      return;
+    }
     this.driftEma = this.driftEma * (1 - DRIFT_EMA_ALPHA) + rawDrift * DRIFT_EMA_ALPHA;
 
     if (Math.abs(medDrift) >= RATE_ZONE_MAX_S) {
